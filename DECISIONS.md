@@ -312,3 +312,41 @@ Approved by Alessio at ask point B, with the software round as the example.
 - **Lookup order:** one lookup rule for models and tools gives each actor its own credentials, without a shared `.env`.
 - **`refusal` is opt-in:** a refusal is often the right answer, and shouldn't silently be retried elsewhere.
 - **Provider names:** they are allowed here because the actor configuration is the one file that is about an instance. Roles, scripts and plays still never name a vendor (golden rule 4).
+
+## D21. Casting on plain A2A 1.0: the director listens, the actor connects, a seat is a task (2026-10-24)
+
+**Decision:**
+
+- **The A2A version:** Zanni's director-to-actor protocol is A2A 1.0, the version `a2a-sdk` 1.2.3 implements (`PROTOCOL_VERSION_CURRENT = "1.0"`), over the JSON-RPC binding.
+- **Who listens:** only the director. It serves its Agent Card at A2A's well-known path, with a `join` skill. The actor is always the A2A client and never listens, so it needs no open port and can run behind NAT.
+- **A seat is one A2A task on the director, for the seat's whole life:**
+  - **Join:** the actor sends a join message, which carries its own Agent Card inline. The director answers with a task.
+  - **Cast:** the task moves to `working`, and its status message holds the cast.
+  - **Refused:** the task moves to `rejected`, with the reason.
+  - **Cue:** the director moves the task to `input-required`, and its status message holds the cue.
+  - **Report:** the actor replies with a message on the same task.
+  - **Release:** the director sends a release cue, the actor confirms, and the task moves to `completed`, or to `canceled` when the seat is recast.
+  - **Heartbeats:** the actor follows the task with `SubscribeToTask` (streaming) or `GetTask` (polling), and each contact counts as one.
+- **Zanni's own content:** every Zanni payload is a data part with a `kind` field, in a message that lists the casting extension's URI in `extensions`. Requests send the `A2A-Extensions` header.
+- **Not used from A2A:** push notifications (the actor isn't reachable), `TASK_STATE_AUTH_REQUIRED`, and the extended agent card.
+
+**Why:**
+
+- Alessio's call at ask point A: the director listens and the actors connect.
+- A multi-turn task is A2A's own way to have an agent ask for input. Here the director is the agent that coordinates, and each cue is its request for the actor's work.
+- Keeping all of a seat in one task gives one id for the log, for credentials and for recasting.
+
+**Supersedes:** `port` in the actor configuration (D20). An actor never listens, so it has no port.
+
+**Deferred** (see `TODO.md`): how the director decides to accept an actor beyond checking its role and token, such as approving joins or allowlists.
+
+## D22. The extension's URI lives in the repository until there is a domain (2026-10-24)
+
+**Decision:** the casting extension's URI is `https://github.com/alessioricco/Zanni/blob/master/docs/spec/casting-extension.md#v1`.
+
+- **Versioning:** the fragment is the version. Any change to a message's fields makes a new version (`#v2`), and an actor or director that speaks several versions lists one `AgentExtension` per version.
+- **Strictness:** messages are validated strictly (D10), so a field from a newer version is an error to an older reader rather than silently ignored.
+
+**Why:** Alessio's call. Zanni has no domain yet: `zanni.dev`, `zanni.org` and `zanni.ai` are registered, and `zanni.io` looked free on 2026-10-24. A URI in the repository Zanni controls works today, and opens the spec page.
+
+**Revisit when:** a domain is registered. Moving the URI is itself a version change.

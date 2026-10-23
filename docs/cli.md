@@ -35,7 +35,7 @@ Actor configuration: would start 'tester-1', playing a role in a play.
     1. anthropic claude-sonnet-5-5
     2. ollama qwen3.8:27b, at ${OLLAMA_BASE_URL}, $0/$0 per million tokens
   credentials: ANTHROPIC_API_KEY (from the environment), GITHUB_TOKEN (from the environment)
-  state: ~/.zanni/actors/tester-1; port: any free port
+  state: ~/.zanni/actors/tester-1
 Valid. Nothing was started: running files comes in a later version (see ROADMAP.md).
 ```
 

@@ -80,6 +80,10 @@ uv run zanni examples/plays/habit-tracker/play.yaml   # validate a file and show
 uv build                # sdist and wheel into dist/
 ```
 
+## Deferred work
+
+`TODO.md` lists what was decided to come later (mTLS, how the director accepts actors, per-actor join tokens, and more), each with where it was deferred. Check it before designing anything in those areas.
+
 ## Agent skills
 
 `SKILLS.md` lists the skills from Anthropic's official repository that agents use on this project (`mcp-builder`, `skill-creator`, `webapp-testing`), pinned to one commit. Run `scripts/get-skills.sh` to download them into `.claude/skills/`; the downloads are git-ignored. Change the list only in `SKILLS.md`.

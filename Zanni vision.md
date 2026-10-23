@@ -176,12 +176,12 @@ Every actor is a separate process running the same engine, a zanni. It starts fr
 zanni tester.yaml
 ```
 
-1. **Join.** The actor connects and presents its A2A Agent Card, built from its role.
+1. **Join.** Only the director listens. The actor connects to it and presents its A2A Agent Card, built from its role, with the play's join token.
 2. **Casting.** The director checks the role against the play's cast, assigns a seat, and sends the play, the stage's location and credentials scoped to that seat.
 3. **Cues and reports.** The director sends a cue; the actor works on the stage and reports back. Heartbeats run in between.
 4. **Release.** The director ends the seat and revokes its credentials.
 
-- **Actors bring their own model and keys,** set in their configuration. A coder on a GPU workstation runs a local model; an architect on a cloud server runs a cloud model. The director never holds anyone's API keys. Several actors can run on one machine, each with its own state folder and port; the director knows which actors share a host and caps local-model seats per host, since they share its GPU.
+- **Actors bring their own model and keys,** set in their configuration. A coder on a GPU workstation runs a local model; an architect on a cloud server runs a cloud model. The director never holds anyone's API keys. Several actors can run on one machine, each with its own configuration and state folder; the director knows which actors share a host and caps seats per host, since they share its GPU.
 - **Failure is ordinary.** If an actor stops answering, the director recasts its seat. The work survives on the stage.
 - **The director is a role too,** played by the same engine. It is the only role allowed to cast and release actors.
 - **Protocols:** MCP for actor-to-tools, A2A for director-to-actor. Only casting and permissions are Zanni's own, as an A2A extension.

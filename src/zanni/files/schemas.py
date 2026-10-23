@@ -117,7 +117,6 @@ class ActorConfiguration(Strict):
     models: list[ModelEntry] = Field(min_length=1)
     credentials: dict[EnvName, str] = {}  # this instance's own; protected by D15's safeguards
     state_dir: str | None = None  # default: ~/.zanni/actors/<name>
-    port: int = Field(default=0, ge=0, le=65535)  # 0: any free port
 
     @model_validator(mode="after")
     def _credentials_exist(self) -> "ActorConfiguration":

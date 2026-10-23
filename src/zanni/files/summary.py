@@ -22,7 +22,7 @@ def summarise(doc: ActorConfiguration | PlayFile | RoleManifest | Script | Lockf
         creds = [f"{k} ({'stored, hidden' if k in stored else 'from the environment'})" for k in doc.credentials]
         lines.append(f"  credentials: {', '.join(creds) or 'none; models use their usual environment variables'}")
         state = doc.state_dir or f"~/.zanni/actors/{doc.name or '<name>'}"
-        lines.append(f"  state: {state}; port: {doc.port or 'any free port'}")
+        lines.append(f"  state: {state}")
         return lines
     if isinstance(doc, PlayFile):
         lines = [f"Play file: would start the director for the play '{doc.name}'.",

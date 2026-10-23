@@ -18,7 +18,7 @@ models:
 credentials:
   ANTHROPIC_API_KEY: sk-ant-…              # stored here: the file must be private and untracked
   GITHUB_TOKEN: ${GITHUB_TOKEN}            # or taken from the environment
-port: 8701
+  ZANNI_JOIN_TOKEN: ${ZANNI_JOIN_TOKEN}    # presented when joining the play
 ```
 
 It is recognised by having both `role` and `play`, and it is the file passed to `zanni` to start an actor. Several actors on one machine each have their own configuration file, with their own models and credentials.
@@ -33,7 +33,6 @@ It is recognised by having both `role` and `play`, and it is the file passed to 
 | `models` | list of model entries, at least one | yes | — | the actor | The models this actor runs, in order (D11). |
 | `credentials` | map of name → value | no | none | the actor, and `zanni` | This instance's credentials ([below](#credentials)). |
 | `state_dir` | path | no | `~/.zanni/actors/<name>` | the actor | Where the actor keeps its working memory and state. It is discarded or kept by the actor; the play's shared state lives on the stage. |
-| `port` | whole number, 0 to 65535 | no | `0` (any free port) | the actor | The port the actor listens on for the director. |
 
 ## Package references
 
