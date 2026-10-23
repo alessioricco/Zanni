@@ -44,8 +44,10 @@ def entry(model="m", **kw) -> ResolvedModel:
 def scripted(*turns, name="scripted"):
     """A model that plays the given turns in order: a dict of tool calls, a string reply, or an exception to raise."""
     turns = list(turns)
+    seen: list = []  # every message the model was sent, for tests to inspect
 
     def respond(messages, info: AgentInfo) -> ModelResponse:
+        seen[:] = messages
         turn = turns.pop(0)
         if isinstance(turn, BaseException):
             raise turn
@@ -53,4 +55,6 @@ def scripted(*turns, name="scripted"):
             return ModelResponse(parts=[ToolCallPart(name, args) for name, args in turn.items()])
         return ModelResponse(parts=[TextPart(turn)])
 
-    return FunctionModel(respond, model_name=name)
+    model = FunctionModel(respond, model_name=name)
+    model.seen = seen
+    return model
