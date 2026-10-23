@@ -1,0 +1,22 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.12", "3.14"]
+    env:
+      UV_PYTHON: ${{ matrix.python }}   # every uv call, including the conformance tests' `uv run zanni`
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v7   # same versions as publish.yml
+      - run: uv sync --locked
+      - run: uv run pytest
