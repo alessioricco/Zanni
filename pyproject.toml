@@ -1,0 +1,27 @@
+[project]
+name = "zanni"
+version = "0.0.1"
+description = "An engine for teams of AI personas: roles, actors, a director and a stage."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.12"
+authors = [{ name = "Alessio Ricco" }]
+classifiers = [
+  "Development Status :: 1 - Planning",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+  "Operating System :: OS Independent",
+]
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/alessioricco/zanni"
+Issues = "https://github.com/alessioricco/zanni/issues"
+
+[project.scripts]
+zanni = "zanni:main"
+
+[build-system]
+requires = ["uv_build"]
+build-backend = "uv_build"
