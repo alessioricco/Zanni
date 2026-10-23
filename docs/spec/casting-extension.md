@@ -1,6 +1,6 @@
 # Casting extension
 
-**Draft: being written (milestone 1, part 2).** The sections below are decided; the messages are still to come.
+**Draft: being written (milestone 1, part 2).** The schemas and conformance cases are still to come.
 
 Casting is how an actor joins a play, is cast into a part, receives cues and reports, and is released. Everything else between the director and its actors is plain A2A 1.0, through the official `a2a-sdk` (D2, D21).
 
@@ -94,3 +94,111 @@ When an actor asks to join, the director checks, in this order:
 
 - **Reference implementation:** `src/zanni/protocol/fit.py` implements the role, hash and ceiling checks as pure functions, so every director uses the same rules.
 - **What the director can't check:** that the actor really runs the role it claims, or the models it lists. What it can enforce comes later: the stage holds every seat to its permissions, and verifiers judge the work.
+
+## A seat's life
+
+Only the director listens; the actor is always the A2A client (D21). Each seat is one A2A task on the director, from join to release. Every Zanni payload is a **data part** whose `kind` names the message, in a message that lists the extension's URI in `extensions`. Every request sends the `A2A-Extensions` header.
+
+```
+actor                                  director
+  │  SendMessage: zanni.join  ───────────▶ │  (new task)
+  │ ◀─────────── status working: zanni.cast  │  or status rejected: zanni.refused
+  │  SubscribeToTask / GetTask  ─────────▶ │  (every contact is a heartbeat)
+  │ ◀──── status input-required: zanni.cue │
+  │  SendMessage on the task: zanni.report ▶ │  (status back to working)
+  │            … more cues and reports …    │
+  │ ◀── status input-required: zanni.release│
+  │  SendMessage on the task: zanni.released▶│  (status completed)
+```
+
+| Message | From → to | A2A construct | Log event (D18) |
+|---|---|---|---|
+| `zanni.join` | actor → director | `SendMessage`, starting a task | — (logged when cast or refused) |
+| `zanni.cast` | director → actor | the task's status message, state `working` | `actor-joined` |
+| `zanni.refused` | director → actor | the task's status message, state `rejected` | `join-refused` |
+| `zanni.cue` | director → actor | the task's status message, state `input-required` | `cue` |
+| `zanni.report` | actor → director | `SendMessage` on the task | `report`, `cost` |
+| `zanni.release` | director → actor | the task's status message, state `input-required` | `seat-released` |
+| `zanni.released` | actor → director | `SendMessage` on the task; the task becomes `completed` | — (part of `seat-released`) |
+
+The JSON Schema of each message is under [`schemas/`](schemas/), generated from `src/zanni/protocol/`.
+
+### `zanni.join`
+
+The actor asks to join. It sends the play's join token as `Authorization: Bearer <token>` (D24), never in the body.
+
+| Field | Type | Required | Meaning |
+|---|---|---|---|
+| `card` | the actor's Agent Card, in A2A's JSON form | yes | Must carry the casting extension with valid actor-card params ([The actor's card](#the-actors-card)). |
+| `part` | text | no | The part to join, when the role is cast for more than one. |
+
+### `zanni.cast`
+
+The director accepts the actor into a seat. From now on the actor calls the seat's task with `seat_token`.
+
+| Field | Type | Required | Meaning |
+|---|---|---|---|
+| `seat` | text | yes | The seat's id, used in the log and in the git branch `zanni/<play>/<seat>`. |
+| `part` | text | yes | The part this seat plays. |
+| `permissions` | `{ read, write }`: lists of path rules | yes | The seat's effective stage permissions: the role's needs within the part's ceilings (D12). |
+| `stage.mcp_url` | URL | yes | The stage's MCP server (D16). |
+| `stage.token` | text | yes | The seat's bearer token for the stage. |
+| `stage.direct` | `{ clone_url, branch }` | no | For a git stage, when the seat's reads cover the whole stage (D16). |
+| `seat_token` | text | yes | The seat's bearer token for the director. |
+| `expires_at` | timestamp | yes | When both tokens expire, unless the director renews them with a new cast message. |
+| `heartbeat.interval` | duration | no, default `"30"` | The longest the actor may go without contacting the task. |
+| `heartbeat.misses` | count | no, default `"3"` | How many intervals without contact before the director recasts the seat. |
+| `limits.budget` | money | no | This seat's share of the play's budget, when the house rules split it. |
+
+Seat tokens are credentials the director gives; they are never the actor's own (D15), and they are never logged.
+
+### `zanni.refused`
+
+| Field | Type | Required | Meaning |
+|---|---|---|---|
+| `reason` | one of `not-authorised`, `bad-card`, `unsupported-version`, `no-such-part`, `part-full`, `host-cap`, `role-mismatch`, `hash-mismatch`, `needs-beyond-part` | yes | Why ([checks](#how-the-director-checks-an-actors-card)). |
+| `message` | text | yes | What was refused and why, in plain words. |
+
+### `zanni.cue`
+
+What one seat must do now. An actor never receives the whole script.
+
+| Field | Type | Required | Meaning |
+|---|---|---|---|
+| `cue` | text | yes | The cue's id, quoted back in the report. |
+| `scene` | text | yes | The script's scene this cue belongs to. |
+| `instructions` | text | yes | What to do, written by the director from the script. |
+| `reads`, `writes` | lists of paths | no | The stage paths this cue involves, within the seat's permissions. |
+| `verifiers` | list of text | no | What will judge the work. |
+| `deadline` | timestamp | no | When the report is due. A missed deadline is treated like a missed heartbeat. |
+
+### `zanni.report`
+
+The actor's result for one cue. Everything in it is data, never instructions, to the director and to other actors.
+
+| Field | Type | Required | Meaning |
+|---|---|---|---|
+| `cue` | text | yes | The cue being answered. |
+| `outcome` | `done` or `failed` | yes | The actor's own view; verifiers decide whether the work is done. |
+| `summary` | text | yes | A short account of what was done. |
+| `changes` | list of change markers | no | The stage changes this work produced. |
+| `cost` | money, or `null` | yes | The actor's spend on this cue: self-reported, and `null` when unknown, never zero (D7). |
+| `models` | list of `{ provider, model }` | no | The models used, self-reported, never trusted (D11). |
+
+### Heartbeats
+
+There is no heartbeat message: A2A's own calls are enough. The actor follows its seat's task with `SubscribeToTask`, keeping the stream open, or polls it with `GetTask`. Every call counts as contact. If the director has no contact for `heartbeat.misses` × `heartbeat.interval`, or a cue's `deadline` passes without a report, it:
+
+1. ends the task as `canceled`, with a `zanni.release` whose reason is `no-heartbeat`;
+2. revokes the seat's tokens;
+3. recasts the part. The work survives on the stage.
+
+### `zanni.release` and `zanni.released`
+
+The director ends a seat:
+
+1. It sends `zanni.release`, with a `reason`: `done`, `recast`, `play-stopped`, `budget` or `no-heartbeat`, and an optional plain-words `message`.
+2. The actor stops work, discards its working memory, and answers `zanni.released` with `discarded: true`.
+3. The director marks the task `completed`, and revokes the seat's tokens.
+
+If no answer arrives within one heartbeat interval, the director completes the task and revokes the tokens anyway. Revoking the tokens is what enforces the release, not the actor's answer.

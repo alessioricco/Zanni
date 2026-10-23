@@ -119,6 +119,7 @@ It is recognised by having `lock_version`.
 |---|---|---|
 | `run-started` | `play`, `script` (reference and commit) | The director starts the run. |
 | `actor-joined` | `seat`, `part`, `role`, `actor` (its configuration's `name`) | An actor is cast into a seat. |
+| `join-refused` | `reason`, `actor`, `role` | The director refuses an actor (D24). |
 | `cue` | `seat`, `scene`, `cue` | The director gives a cue. |
 | `report` | `seat`, `scene`, `summary`, `changes` (stage change markers) | An actor reports back. |
 | `verdict` | `scene`, `verifier`, `kind` (`hard` or `soft`), `passed`, `detail` | A verifier runs. |

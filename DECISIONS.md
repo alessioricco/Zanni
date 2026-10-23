@@ -369,3 +369,17 @@ Approved by Alessio at ask point B, with the software round as the example.
 - `20.10` lost its trailing zero.
 
 Strings arrived exactly in every case. Approved by Alessio at ask point B.
+
+## D24. Bearer tokens for joining and for seats; mTLS later (2026-10-24)
+
+**Decision:**
+
+- **Joining:** an actor joins with the play's join token, sent as an HTTP bearer token. The director reads it from `ZANNI_JOIN_TOKEN` in its environment; the actor holds it in its configuration's `credentials` as `ZANNI_JOIN_TOKEN` (D15).
+- **At casting:** the director gives the seat two bearer tokens: `seat_token`, for every later call on the seat's task, and the stage's `token`, for its MCP server (D16). Both are scoped to that seat, carry an expiry (`expires_at`), and are revoked at release.
+- **Not logged:** seat tokens appear only in the cast message, and are never logged (D15, D18).
+- **Refusals:** a refusal names one reason from a fixed list (`not-authorised`, `bad-card`, `unsupported-version`, `no-such-part`, `part-full`, `host-cap`, `role-mismatch`, `hash-mismatch`, `needs-beyond-part`), with a plain-words message.
+- **A new log event:** `join-refused`, because a refused join is the one casting event the log of D18 couldn't record. Its fields are `reason`, `actor` and `role`.
+
+**Why:** Alessio's call at ask point C: make it work now, then make it better. Bearer tokens need nothing beyond what A2A's security schemes already declare.
+
+**Deferred** (`TODO.md`): mTLS, per-actor join tokens, how the director accepts actors beyond its checks, and whether the director's join tokens come from a director configuration.
