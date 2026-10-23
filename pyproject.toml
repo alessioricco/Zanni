@@ -13,15 +13,29 @@ classifiers = [
   "Programming Language :: Python :: 3.12",
   "Operating System :: OS Independent",
 ]
-dependencies = []
+dependencies = [
+    "a2a-sdk==1.2.3",
+    "mcp==2.3.0",
+    "pydantic>=2.10",
+    "pydantic-ai-slim[anthropic,mcp,openai]==2.60.0",
+    "pyyaml>=6.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/alessioricco/zanni"
 Issues = "https://github.com/alessioricco/zanni/issues"
 
 [project.scripts]
-zanni = "zanni:main"
+zanni = "zanni.cli:main"
 
 [build-system]
 requires = ["uv_build"]
 build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

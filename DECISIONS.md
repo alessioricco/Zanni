@@ -95,3 +95,15 @@ Each decision says what was decided, why, and what would make us revisit it. New
 - `cost_limit` is checked after each response, so the request that crosses the limit has already been paid for.
 
 The budget therefore lives in the director, across seats, as the trust model says. Pydantic AI's per-run limit is not enough.
+
+## D8. Exact pins for the engine's dependencies (2026-10-23)
+
+**Decision:**
+
+- `pydantic-ai-slim[anthropic,openai,mcp]`, `mcp` and `a2a-sdk` are pinned to exact versions in `pyproject.toml`: 2.60.0, 2.3.0 and 1.2.3, the versions the spike tested.
+- `pydantic` and `pyyaml` have lower bounds only.
+- `uv.lock` is committed.
+
+**Why:** all three engine packages change fast, and D1 allows an upgrade only when the conformance tests pass. An exact pin makes every upgrade a deliberate change, with its own commit and test run.
+
+**Revisit if:** Zanni is installed as a library next to other packages that need different versions of these.
