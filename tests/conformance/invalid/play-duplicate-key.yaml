@@ -1,0 +1,5 @@
+name: x
+stage: ./s
+stage: ./t
+cast:
+  a: roles/a

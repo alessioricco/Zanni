@@ -1,0 +1,4 @@
+name: reader
+version: "2.0.0"
+mission: Read.
+model: { needs: { context: 128000 } }

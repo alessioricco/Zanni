@@ -1,0 +1,3 @@
+role: roles/tester
+play: ./play.yaml
+model: qwen

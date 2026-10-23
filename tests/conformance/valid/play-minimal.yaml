@@ -1,0 +1,4 @@
+name: minimal
+stage: ./stage
+cast:
+  writer: roles/writer

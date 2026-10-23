@@ -1,0 +1,6 @@
+name: x
+stage: ./s
+cast:
+  a: roles/a
+house_rules:
+  budjet: 5

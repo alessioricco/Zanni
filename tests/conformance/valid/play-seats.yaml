@@ -1,0 +1,7 @@
+name: ranges
+stage: ./stage
+cast:
+  coder: { role: roles/coder, seats: 3 }
+  reviewer: { role: roles/reviewer, seats: " 1 - 2 " }
+house_rules:
+  budget: 0

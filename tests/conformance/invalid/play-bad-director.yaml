@@ -1,0 +1,5 @@
+name: x
+director: director.example.com
+stage: ./s
+cast:
+  a: roles/a
