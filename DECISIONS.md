@@ -6,7 +6,7 @@ Each decision says what was decided, why, and what would make us revisit it. New
 
 - **Python 3.12+ and uv**, with one entry point: `zanni <file>.yaml`. Rust was considered and set aside for now.
 - **MIT licence.**
-- **Name:** "Zanni", held on PyPI (0.0.1 placeholder) and at `github.com/alessioricco/zanni`.
+- **Name:** "Zanni", held on PyPI (0.0.1 placeholder) and at `github.com/alessioricco/Zanni`.
 - **Standards first:** AGENTS.md, skills in the SKILL.md format, MCP, A2A, and the A2A Agent Card. Zanni specifies only the gaps.
 
 ## D1. Pydantic AI is the agent engine (2026-10-23)

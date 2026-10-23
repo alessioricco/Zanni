@@ -13,8 +13,8 @@ You don't need an API key or a local model server: nothing in Zanni calls a mode
 Zanni isn't installable from PyPI yet: the package there is a 0.0.1 placeholder that reserves the name. Install it from a clone:
 
 ```bash
-git clone https://github.com/alessioricco/zanni.git
-cd zanni
+git clone https://github.com/alessioricco/Zanni.git
+cd Zanni
 uv sync
 uv run zanni --version
 ```

@@ -5,8 +5,8 @@ Zanni is early, and the most useful contributions now are to the spec: the forma
 ## Set up
 
 ```bash
-git clone https://github.com/alessioricco/zanni.git
-cd zanni
+git clone https://github.com/alessioricco/Zanni.git
+cd Zanni
 uv sync                    # installs Zanni and the dev dependencies
 uv run pytest              # the full suite; no API key, no network, no model needed
 scripts/get-skills.sh      # optional: the agent skills, if you work with a coding agent

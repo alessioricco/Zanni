@@ -13,7 +13,7 @@ An open-source engine for teams of AI personas. Each process is a **zanni**, an 
 ## Quick start
 
 ```bash
-git clone https://github.com/alessioricco/zanni.git && cd zanni
+git clone https://github.com/alessioricco/Zanni.git && cd Zanni
 uv sync
 uv run zanni examples/plays/habit-tracker/play.yaml
 ```

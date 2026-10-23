@@ -316,7 +316,7 @@ Out of scope for now:
 
 ## Open questions
 
-- [ ] Name: "Zanni". Reserved on PyPI (0.0.1) and GitHub (`alessioricco/zanni`); a domain is still to check.
+- [ ] Name: "Zanni". Reserved on PyPI (0.0.1) and GitHub (`alessioricco/Zanni`); a domain is still to check.
 - [x] A2A fit: yes. The spike carried a role's needs, never-rules and model needs in an Agent Card extension, intact. Caveat: extension params are a protobuf `Struct` with no integer type, so seat counts and budgets need a typed encoding (D6 in `DECISIONS.md`).
 - [x] Stage: neither, as a definition. The stage is an abstract workspace; the spec defines its operations and permissions, and the play picks a backend: git for code, something else for documents (D12).
 - [ ] Who merges the coders' worktrees: the developer lead, the director, or the coding engine?

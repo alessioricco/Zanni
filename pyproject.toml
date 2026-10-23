@@ -22,8 +22,8 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/alessioricco/zanni"
-Issues = "https://github.com/alessioricco/zanni/issues"
+Homepage = "https://github.com/alessioricco/Zanni"
+Issues = "https://github.com/alessioricco/Zanni/issues"
 
 [project.scripts]
 zanni = "zanni.cli:main"

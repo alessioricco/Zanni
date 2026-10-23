@@ -182,4 +182,4 @@ roles/tester/mcp.json, line 5, mcpServers.gh.env.GITHUB_TOKEN: holds a literal s
 
 ## Still stuck?
 
-[Open an issue](https://github.com/alessioricco/zanni/issues). Include the file, the exact output, and `zanni --version`.
+[Open an issue](https://github.com/alessioricco/Zanni/issues). Include the file, the exact output, and `zanni --version`.
