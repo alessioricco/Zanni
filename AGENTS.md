@@ -14,7 +14,13 @@ The full design is in the vision doc ("Zanni: vision"). Decisions and their reas
 
 ## Current state
 
-Early: a 0.0.1 placeholder on PyPI that reserves the name. The engine is decided: the Pydantic AI spike gave a go (`docs/spikes/pydantic-ai.md`, D1 in `DECISIONS.md`). Next is the scaffold. Don't assume a module, command or file exists; check.
+Scaffold done (milestone 0 in `ROADMAP.md`); next is the spec (milestone 1). The PyPI package is still the 0.0.1 placeholder. Don't assume a module, command or file exists; check.
+
+- `src/zanni/cli.py`: the `zanni` command. It detects the kind of file, validates it and prints what it would run (D9).
+- `src/zanni/files/`: the YAML loader with line numbers, the plain-words errors (D10), and the schemas for actor files, play files and role manifests.
+- `src/zanni/engine/`: the engine adapter, the only place that may import Pydantic AI, `mcp` or `a2a-sdk`. It is empty for now.
+- `docs/spec/`: the spec. `tests/conformance/`: the conformance suite, which can run against any implementation (`ZANNI_CMD`).
+- `examples/`: one file of each kind, all valid.
 
 ## Vocabulary
 
@@ -65,7 +71,9 @@ The engine speaks theatre; each play speaks its own domain (a software play has 
 ```bash
 uv sync                 # install
 uv run pytest           # full suite, no API key needed
+uv run pytest tests/conformance          # conformance only; ZANNI_CMD=... to test another implementation
 uv run zanni --version
+uv run zanni examples/plays/habit-tracker/play.yaml   # validate a file and show what it would run
 uv build                # sdist and wheel into dist/
 ```
 
