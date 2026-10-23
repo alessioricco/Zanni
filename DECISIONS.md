@@ -107,3 +107,34 @@ The budget therefore lives in the director, across seats, as the trust model say
 **Why:** all three engine packages change fast, and D1 allows an upgrade only when the conformance tests pass. An exact pin makes every upgrade a deliberate change, with its own commit and test run.
 
 **Revisit if:** Zanni is installed as a library next to other packages that need different versions of these.
+
+## D9. The kind of file is detected from its keys (2026-10-23)
+
+**Decision:** `zanni <file>` works out what it was given from the keys in the file, never from a flag or the file name:
+
+- `role` and `play` make an actor file;
+- `cast` makes a play file;
+- `mission` makes a role manifest.
+
+A file that matches no kind, or more than one, is an error that names the keys each kind needs. A key that is close to one of those markers, such as `mision`, gets a "did you mean" instead.
+
+**Why:** "one command, one file" and "flags only override". File names are the user's own choice, so they can't carry meaning.
+
+**Revisit if:** a new kind of file has no distinctive key. It would then need an explicit `kind:` field, which would be a spec change.
+
+## D10. Unknown keys and secrets are rejected, in plain words (2026-10-23)
+
+**Decision:**
+
+- Every Zanni file is validated strictly: an unknown key is an error, with "did you mean" when a known key is close.
+- Every problem in a file is reported at once, each with its file, line, field path, what is wrong and what to change. Raw Pydantic messages are never shown.
+- A key that looks like a secret, at any depth, is rejected, and the message points to the environment or `.env`.
+- A key looks like a secret when one of its words is `key`, `apikey`, `token`, `secret`, `password` or `passwd`. Words are split on `_`, `-` and camelCase, so `api_key`, `apiKey` and `client_secret` match, and `keywords`, `monkey` and `tokenizer_model` don't.
+- A duplicate key is an error. PyYAML would silently keep the last one.
+
+**Why:**
+
+- Typos in a permissive schema become silent defaults, which is a trust problem: a misspelled `house_rules` key must never loosen a limit.
+- "No secrets in files" is enforced by the parser, not by goodwill (golden rule 5).
+
+**Revisit if:** files need extension fields from other tools. They would get a reserved prefix, such as `x-`, rather than loosening strictness.

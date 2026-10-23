@@ -1,8 +1,15 @@
-"""The `zanni` command: one command, one file."""
+"""The `zanni` command: one command, one file. The file decides what runs."""
 
 import argparse
+import sys
 
 from zanni import __version__
+from zanni.files.errors import FileErrors
+from zanni.files.kinds import detect
+from zanni.files.loader import load_file
+from zanni.files.schemas import RoleManifest
+from zanni.files.summary import summarise
+from zanni.files.validation import validate
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -13,5 +20,18 @@ def main(argv: list[str] | None = None) -> int:
     if args.file is None:
         parser.print_usage()
         return 2
-    print("Zanni is in early development: files can't be run yet.")
+    try:
+        loaded = load_file(args.file)
+        doc = validate(loaded, detect(loaded).model)
+    except FileErrors as e:
+        print(f"{args.file} has {len(e.errors)} problem{'s' if len(e.errors) > 1 else ''}; nothing was started.",
+              file=sys.stderr)
+        for err in e.errors:
+            print(f"  {err}", file=sys.stderr)
+        return 2
+    print("\n".join(summarise(doc)))
+    if isinstance(doc, RoleManifest):
+        print("Valid.")
+    else:
+        print("Valid. Nothing was started: running files comes in a later version (see ROADMAP.md).")
     return 0

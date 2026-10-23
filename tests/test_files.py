@@ -1,0 +1,75 @@
+"""The CLI on the examples, which must validate, and on broken copies of them, which must not."""
+
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+import pytest
+
+EXAMPLES = Path(__file__).parent.parent / "examples"
+ACTOR = EXAMPLES / "tester.yaml"
+PLAY = EXAMPLES / "plays/habit-tracker/play.yaml"
+ROLE = EXAMPLES / "roles/tester/role.yaml"
+
+
+def zanni(path: Path) -> subprocess.CompletedProcess:
+    return subprocess.run([sys.executable, "-m", "zanni", str(path)], capture_output=True, text=True)
+
+
+def broken(tmp_path: Path, example: Path, old: str, new: str) -> Path:
+    text = example.read_text()
+    assert old in text, f"{old!r} not in {example}"
+    target = tmp_path / example.name
+    target.write_text(text.replace(old, new, 1))
+    return target
+
+
+@pytest.mark.parametrize("example, first_line", [
+    (ACTOR, "Actor file: would start an actor that joins a play."),
+    (PLAY, "Play file: would start the director for the play 'habit-tracker'."),
+    (ROLE, "Role manifest: the role 'tester' 1.4.0."),
+])
+def test_examples_validate(example, first_line):
+    result = zanni(example)
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.splitlines()[0] == first_line
+
+
+def test_play_summary_shows_cast_and_house_rules():
+    out = zanni(PLAY).stdout
+    assert "coder: github.com/zanni-roles/coder@1.0.0, 1-4 seats, started here (local)" in out
+    assert "house rules: budget $20.00; human gates: plan, release" in out
+
+
+@pytest.mark.parametrize("example, old, new, expected", [
+    (ACTOR, "tester@1.4.0", "tester",
+     'line 2, role: "github.com/someone/tester" has no version; write it as github.com/someone/tester@1.0.0'),
+    (ACTOR, "play:", "plya:", "line 3, plya: is not a known field; did you mean `play`?"),
+    (PLAY, "seats: 1-4", "seats: 4-1", "line 9, cast.coder.seats: the range 4-1 goes down"),
+    (PLAY, "host: local", "hots: local", "line 9, cast.coder.hots: is not a known field; did you mean `host`?"),
+    (PLAY, "budget: 20.00", "budget: -1", "line 11, house_rules.budget: should be at least 0, not -1"),
+    (PLAY, "director: wss://", "director: ftp://", "line 3, director: \"ftp://director.example.com\" is not a director address"),
+    (PLAY, "  gates: [plan, release]", "  gates: [plan, release]\n  token: abc", "line 13, house_rules.token: looks like a secret"),
+    (ROLE, "version: 1.4.0", "version: 1.4", "line 3, version: 1.4 was read as a number"),
+    (ROLE, "mission:", "mision:", "line 4, mision: is not a known field; did you mean `mission`?"),
+    (ROLE, "tools: true", "tools: maybe", 'line 5, model.needs.tools: should be true or false, not "maybe"'),
+])
+def test_broken_copies_fail_in_plain_words(tmp_path, example, old, new, expected):
+    result = zanni(broken(tmp_path, example, old, new))
+    assert result.returncode == 2
+    assert result.stdout == ""
+    assert "nothing was started" in result.stderr
+    assert expected in result.stderr, result.stderr
+
+
+def test_missing_file(tmp_path):
+    result = zanni(tmp_path / "nope.yaml")
+    assert result.returncode == 2
+    assert "nope.yaml: does not exist; check the path" in result.stderr
+
+
+def test_local_role_folder_is_accepted(tmp_path):
+    shutil.copy(PLAY, tmp_path / "play.yaml")
+    target = broken(tmp_path, tmp_path / "play.yaml", "github.com/someone/tester@1.4.0", "roles/tester")
+    assert zanni(target).returncode == 0

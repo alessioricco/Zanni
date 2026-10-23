@@ -76,7 +76,7 @@ def test_duplicate_key_is_an_error():
 
 def test_empty_file():
     (msg,) = errors_for("")
-    assert msg == "toy.yaml, is empty; see docs/files.md for what a Zanni file holds"
+    assert msg == "toy.yaml: is empty; see docs/files.md for what a Zanni file holds"
 
 
 def test_all_problems_are_reported_together():

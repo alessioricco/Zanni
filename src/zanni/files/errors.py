@@ -21,9 +21,9 @@ class FileError:
     fix: str = ""
 
     def __str__(self) -> str:
-        where = ", ".join(x for x in (self.file, f"line {self.line}" if self.line else "") if x)
-        field = f"{render_path(self.path)}: " if self.path else ""
-        return f"{where}, {field}{self.problem}" + (f"; {self.fix}" if self.fix else "")
+        where = self.file + (f", line {self.line}" if self.line else "")
+        where += f", {render_path(self.path)}: " if self.path else ": "
+        return where + self.problem + (f"; {self.fix}" if self.fix else "")
 
 
 class FileErrors(Exception):
