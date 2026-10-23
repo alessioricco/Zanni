@@ -10,8 +10,9 @@ Zanni is an open-source engine for teams of AI personas. Each process is a **zan
 |---|---|
 | [Getting started](getting-started.md) | Install Zanni and check your first file |
 | [Concepts](concepts.md) | Understand roles, actors, the director, the stage and plays, and how limits are enforced |
-| [Zanni files](files.md) | Learn the kinds of file: actor configurations, play files, role manifests |
+| [Zanni files](files.md) | Learn the kinds of file: actor configurations, plays, role manifests, scripts, lockfiles |
 | [Writing a role](writing-a-role.md) | Build a role folder: `role.yaml`, `AGENTS.md`, skills, `mcp.json` |
+| [Writing a script](writing-a-script.md) | Write the reusable work a play performs: parts, gates, acts and scenes |
 | [Models and keys](models-and-keys.md) | See where API keys go, and how local and cloud models will be chosen |
 | [Command reference](cli.md) | Look up every option, output and exit code of `zanni` |
 | [Troubleshooting](troubleshooting.md) | Fix the errors `zanni` reports |

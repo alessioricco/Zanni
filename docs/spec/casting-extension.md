@@ -5,7 +5,7 @@
 Casting is how an actor joins a play:
 
 1. **Join:** the actor connects to the director and presents its A2A Agent Card, built from its role.
-2. **Casting:** the director checks the role against the cast, assigns a seat, and sends the play, the stage's location and credentials scoped to that seat.
+2. **Casting:** the director checks the actor's role against the part it is cast for, assigns a seat, and sends the stage's MCP address and credentials scoped to that seat ([Stage: transport](stage.md#transport-how-actors-reach-the-stage)).
 3. **Cues and reports:** the director sends cues as A2A tasks, and the actor reports back. Heartbeats run in between.
 4. **Release:** the director ends the seat and revokes its credentials.
 
@@ -22,5 +22,5 @@ Everything except casting and permissions is plain A2A, through the official `a2
 - **URIs:** the extension URI(s) and versioning.
 - **Card fields:** the role fields on the card, with types, using the typed encoding above.
 - **Join and release:** the casting messages, including how a refusal is reported back to the actor.
-- **Credentials:** how credentials scoped to a seat are delivered and revoked (depends on the open "Stage" question).
+- **Credentials:** how the seat's stage credentials (D16) are delivered and revoked. They are the director's to give, and never the actor's own credentials, which stay in its configuration (D15).
 - **Heartbeats:** heartbeats and recasting a seat whose actor stopped answering.

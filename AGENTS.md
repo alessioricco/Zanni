@@ -14,13 +14,13 @@ The full design is in the vision doc ("Zanni: vision"). Decisions and their reas
 
 ## Current state
 
-Scaffold done (milestone 0 in `ROADMAP.md`); next is the spec (milestone 1). The PyPI package is still the 0.0.1 placeholder. Don't assume a module, command or file exists; check.
+Milestone 1 (the spec) is half done: the file formats are specified (actor configuration, role package, script, play, stage), and the casting extension is next (prompt 03). The PyPI package is still the 0.0.1 placeholder. Don't assume a module, command or file exists; check.
 
-- `src/zanni/cli.py`: the `zanni` command. It detects the kind of file, validates it and prints what it would run (D9).
-- `src/zanni/files/`: the YAML loader with line numbers, the plain-words errors (D10), and the schemas for actor configurations, play files and role manifests.
+- `src/zanni/cli.py`: the `zanni` command. It detects the kind of file or folder, validates it and prints what it would run (D9).
+- `src/zanni/files/`: the loader (YAML and Markdown frontmatter, with line numbers), the plain-words errors (D10), the schemas for every format, and `check.py` (role folders, a play against its script and lockfile, credential safeguards).
 - `src/zanni/engine/`: the engine adapter, the only place that may import Pydantic AI, `mcp` or `a2a-sdk`. It is empty for now.
 - `docs/spec/`: the spec. `tests/conformance/`: the conformance suite, which can run against any implementation (`ZANNI_CMD`).
-- `examples/`: one file of each kind, all valid.
+- `examples/`: an actor configuration, two plays, two scripts and a whole role folder, all valid.
 
 ## Vocabulary
 

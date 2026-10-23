@@ -25,6 +25,7 @@ uv run zanni examples/plays/habit-tracker/play.yaml
 - [Concepts](docs/concepts.md)
 - [Zanni files](docs/files.md)
 - [Writing a role](docs/writing-a-role.md)
+- [Writing a script](docs/writing-a-script.md)
 - [Models and keys](docs/models-and-keys.md)
 - [Command reference](docs/cli.md)
 - [Troubleshooting](docs/troubleshooting.md)

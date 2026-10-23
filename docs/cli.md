@@ -31,8 +31,15 @@ A valid file prints its summary on standard output, ending with `Valid.`:
 Actor configuration: would start 'tester-1', playing a role in a play.
   role: github.com/someone/tester@1.4.0
   play: https://example.com/plays/habit-tracker/play.yaml
+  models, in order:
+    1. anthropic claude-sonnet-5-5
+    2. ollama qwen3.8:27b, at ${OLLAMA_BASE_URL}, $0/$0 per million tokens
+  credentials: ANTHROPIC_API_KEY (from the environment), GITHUB_TOKEN (from the environment)
+  state: ~/.zanni/actors/tester-1; port: any free port
 Valid. Nothing was started: running files comes in a later version (see ROADMAP.md).
 ```
+
+Credential values are never printed: a summary shows each credential's name and whether it is stored or comes from the environment (D15).
 
 A file with problems prints them on standard error, one per line, in this form:
 

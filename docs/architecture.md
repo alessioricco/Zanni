@@ -10,10 +10,12 @@ src/zanni/
   __main__.py       # python -m zanni
   cli.py            # the `zanni` command
   files/            # loading and validating Zanni files
-    loader.py       # YAML -> data, plus the line of every field
+    check.py        # what `zanni <path>` checks: one file, a role folder, a play against its script and lockfile
+    loader.py       # YAML (or Markdown frontmatter) -> data, plus the line of every field
     errors.py       # FileError / FileErrors: the plain-words error format
     validation.py   # Pydantic errors -> plain words; secret detection; "did you mean"
-    schemas.py      # Pydantic models: ActorConfiguration, PlayFile, RoleManifest
+    schemas.py      # Pydantic models: ActorConfiguration, PlayFile, Stage, Script, Lockfile, RoleManifest,
+                    #   SkillFrontmatter, McpConfig
     kinds.py        # which kind of file this is, from its keys
     summary.py      # what a valid file would run, in a few lines
   engine/           # the engine adapter (empty for now)
@@ -31,9 +33,13 @@ zanni play.yaml
   │
   ├─ loader.load_file      read the text; parse the YAML; map every field path to its line;
   │                        reject duplicate keys and YAML syntax errors
-  ├─ kinds.detect          role+play → ActorConfiguration, cast → PlayFile, mission → RoleManifest
+  ├─ check.resolve         a folder → its role.yaml or SCRIPT.md
+  ├─ kinds.detect          role+play → ActorConfiguration, cast → PlayFile, mission → RoleManifest,
+  │                        parts → Script (Markdown only), lock_version → Lockfile
   ├─ validation.validate   reject secret-looking keys; validate with the Pydantic model;
   │                        turn every ValidationError into a FileError with its line
+  ├─ check.check           per kind: a play against its local script and play.lock; a role folder's
+  │                        AGENTS.md, skills and mcp.json; an actor configuration's credential safeguards
   └─ summary.summarise     print what it would run          (or print every FileError, exit 2)
 ```
 
@@ -45,6 +51,8 @@ Each step raises `FileErrors` with every problem it found. `cli.main` catches it
 - **Lines come from the YAML parser.** `loader.py` composes the YAML node tree and records each key's line under its field path, as a tuple such as `("cast", "coder", "seats")`. A missing field is reported at its parent's line.
 - **Validators speak plain words.** A custom validator in `schemas.py` raises `ValueError("problem; fix")`. `validation.py` splits the message on the first `"; "` into the problem and the fix.
 - **Strict models.** Every model inherits from `Strict` (`extra="forbid"`, frozen). For unknown keys, `validation._known_fields` walks the model tree to find the allowed names, and `difflib` suggests the closest.
+- **Secrets have one home.** `find_secrets` rejects secret-looking keys anywhere, except in the sections a model lists in `SECRET_SECTIONS` (only `ActorConfiguration.credentials`). Inputs under those sections are replaced by `a value (hidden)` in every message (D15).
+- **Standards are checked, not tightened.** `SkillFrontmatter` and `McpConfig` ignore fields they don't define, because SKILL.md and `mcp.json` are shared with other tools (D19).
 - **Shorthand is normalised before validation.** A cast entry can be a plain package reference. A `BeforeValidator` turns it into `{role: …}`, so there is one model and error paths stay clean.
 
 ## The engine adapter (coming)

@@ -37,6 +37,7 @@ Play file: would start the director for the play 'habit-tracker'.
     tester: github.com/someone/tester@1.4.0, 1 seat
     coder: github.com/zanni-roles/coder@1.0.0, 1-4 seats, started here (local)
   house rules: budget $20.00; human gates: plan, release
+  script: remote, so the play wasn't checked against it (fetching scripts comes later)
 Valid. Nothing was started: running files comes in a later version (see ROADMAP.md).
 ```
 
@@ -54,16 +55,18 @@ The other two examples:
 
 ```bash
 uv run zanni examples/tester.yaml               # an actor configuration
-uv run zanni examples/roles/tester/role.yaml    # a role manifest
+uv run zanni examples/roles/tester              # a whole role folder
+uv run zanni examples/scripts/software-team     # a script
+uv run zanni examples/plays/newsroom/play.yaml  # a play, checked against its local script
 ```
 
 ## What works today
 
 | Works | Not yet |
 |---|---|
-| Validating actor configurations, play files and role manifests | Starting an actor or a director |
+| Validating actor configurations, plays, scripts, lockfiles and whole role folders | Starting an actor or a director |
 | Errors with their line and how to fix them | Fetching roles and scripts from git, or plays from URLs (only their shape is checked) |
-| Rejecting secrets in shared files | Validating `AGENTS.md`, `skills/`, `mcp.json`, scripts or `roles.lock` |
+| Rejecting secrets in shared files | Checking a play against a remote script (it needs fetching) |
 | A summary of what each file would run | Calling any model |
 
 ## Next steps
@@ -71,4 +74,5 @@ uv run zanni examples/roles/tester/role.yaml    # a role manifest
 - [Concepts](concepts.md): what the pieces are and how they fit together.
 - [Zanni files](files.md): every field of the three kinds of file.
 - [Writing a role](writing-a-role.md): build your own role folder.
+- [Writing a script](writing-a-script.md): write the work a play performs.
 - [Contributing](contributing.md): if you want to work on Zanni itself.

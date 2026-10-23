@@ -19,7 +19,7 @@ The spec covers only what existing standards don't:
 
 ## Status
 
-Version 0 is a draft, and anything may change until 1.0.
+Version 0 is a draft, and anything may change until 1.0. The file formats are specified for the first version's scope; the casting extension is still a draft (milestone 1, part 2).
 
 - **Normative:** each field table describes what the reference implementation validates today. The conformance tests check it.
 - **Draft:** sections marked this way aren't decided. They link to the open question in the vision doc.

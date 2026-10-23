@@ -9,6 +9,9 @@ There is one command, `zanni <file>`. The kind of file comes from its keys, neve
 | Role manifest (`role.yaml`) | `mission` | nothing; it is validated | [spec: role package](spec/role-package.md) |
 
 | Script (`SCRIPT.md`) | `parts`, in Markdown frontmatter | nothing; it is validated | [spec: script](spec/script.md) |
+| Lockfile (`play.lock`) | `lock_version` | nothing; it is validated | [spec: play](spec/play.md#the-lockfile) |
+
+`zanni` also takes a folder: a role folder (holding `role.yaml`) is checked as a whole package, and a script folder (holding `SCRIPT.md`) as its script.
 
 ## Rules for every file
 
@@ -20,14 +23,28 @@ There is one command, `zanni <file>`. The kind of file comes from its keys, neve
 
 ## Actor configuration
 
-One actor instance's own file. It names the role this instance plays and the play it joins, and (as the spec grows) its models and credentials. It stays on the actor's machine and never goes in a repository.
+One actor instance's own file: the role this instance plays, the play it joins, the models it runs in order, and its credentials. It stays on the actor's machine and never goes in a repository.
 
 ```yaml
 # examples/tester.yaml
 name: tester-1
 role: github.com/someone/tester@1.4.0
 play: https://example.com/plays/habit-tracker/play.yaml
+models:
+  - provider: anthropic
+    model: claude-sonnet-5-5
+    credential: ANTHROPIC_API_KEY
+  - provider: ollama
+    model: qwen3.8:27b
+    base_url: ${OLLAMA_BASE_URL}
+    price: { input: 0, output: 0 }
+credentials:
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+  GITHUB_TOKEN: ${GITHUB_TOKEN}
 ```
+
+- **`models`:** tried in order: the next is used when one fails.
+- **`credentials`:** may store values, as long as the file is private (`chmod 600`) and git doesn't track it. This example uses `${VAR}` references because it lives in a repository. See [Models and keys](models-and-keys.md).
 
 `role` is a package reference: `host/owner/name@version`, or a local folder such as `roles/tester`. A remote reference needs its version.
 
@@ -52,12 +69,15 @@ house_rules:
 
 - **`script`:** a package reference to the script being performed. It is required.
 - **`stage`:** the play's workspace. A git URL means a `git` stage and a folder path means a `folder` stage, or write `{ backend: …, … }`; see the [stage spec](spec/stage.md#in-the-play-file).
-- **`cast`:** maps each of the script's parts to a role reference, or to `{ role, seats, host }`.
-- **`seats`:** a number (`2`) or a range (`1-4`). For a range, the director decides how many to cast, within it.
+- **`cast`:** maps each of the script's parts to a role reference, or to `{ role, seats, host }`. When the script is local, `zanni` checks the cast against it.
+- **`seats`:** a number (`2`) or a range (`1-4`), within the script's seats for the part. Left out, it takes the part's seats. For a range, the director decides how many to cast, within it.
 - **`host: local`:** the director starts these seats itself, on its own machine.
 - **`director`:** can be left out, which means this machine runs the director.
 - **`house_rules.budget`:** in USD, for the whole play.
-- **`house_rules.gates`:** the moments that need a human's approval.
+- **`house_rules.gates`:** which of the script's gates this play enforces.
+- **`house_rules.max_seats_per_host`:** the most seats the director casts onto one machine.
+
+A second example, `examples/plays/newsroom/play.yaml`, uses a local script, a folder stage and a `play.lock`.
 
 ## Role manifest
 

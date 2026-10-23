@@ -159,7 +159,7 @@ A **play** is one production of a script:
 ```
 plays/habit-tracker-alessio/
   play.yaml     # script reference, director, stage, cast, house rules
-  roles.lock    # each role and the script resolved to a commit
+  play.lock     # each role and the script resolved to a commit
   log/          # who did what, verifier results, costs
 ```
 

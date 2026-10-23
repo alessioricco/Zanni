@@ -2,7 +2,7 @@
 
 A role is a package describing a persona: who it is, what it knows how to do, which tools it needs, and what it may touch. A zanni is an empty shell until it is given a role, so adding a role needs no code. A role holds capabilities only: names, models and credentials belong to each actor's configuration.
 
-> **Status:** today `zanni` validates `role.yaml`, and checks nothing else in the folder. The rest of this page is the format roles will be loaded from (D4 in [DECISIONS.md](../DECISIONS.md)), so you can start writing roles now.
+> **Status:** `zanni` validates a whole role folder today: `role.yaml`, `AGENTS.md`, the skills and `mcp.json`. Actors that load roles come with the engine adapter (D4 in [DECISIONS.md](../DECISIONS.md)), so you can start writing roles now.
 
 ## The folder
 
@@ -42,10 +42,15 @@ outputs:
 - **`never` is guidance for the model, not a limit.** The real limits are the stage's permissions and the verifiers. Write `never` rules anyway: they keep the role on task.
 - **`model.needs` says what kind of model the role needs, not which one.** The model is chosen in each actor's configuration; `model.needs` and `suggested` are hints for whoever writes it. A role never requires a particular model or vendor.
 
-Check it:
+- **`needs.tools` names the role's MCP servers,** and each must be a server in its `mcp.json`.
+- **`outputs` must sit inside `needs.stage_write`.**
+- **`model.needs.tier`** is a free label. The reference roles use `judgement`, `coding` and `basic`.
+
+Check the manifest alone, or the whole folder:
 
 ```bash
 uv run zanni roles/tester/role.yaml
+uv run zanni roles/tester           # also checks AGENTS.md, skills and mcp.json
 ```
 
 Every field, with its type and default, is in the [role package spec](spec/role-package.md).
@@ -68,7 +73,7 @@ You turn acceptance criteria into tests. You write tests, never application code
 
 ## 3. `skills/`: what it knows how to do
 
-Each skill is a folder with a `SKILL.md`, in the [Agent Skills](https://agentskills.io) format: YAML frontmatter with `name` and `description`, then the instructions.
+Each skill is a folder with a `SKILL.md`, in the [Agent Skills](https://agentskills.io) format: YAML frontmatter with `name` (matching the folder's name) and `description`, then the instructions.
 
 ```markdown
 ---
@@ -103,10 +108,8 @@ Zanni has no built-in tools. A role lists the MCP servers it expects, in the sta
 }
 ```
 
-`${VAR}` is expanded from the environment, so no secret ever goes in the file.
+A role is shared, so a secret in `mcp.json` must be a `${NAME}` reference, never a value. Each actor supplies its own value from its configuration's `credentials`, or from its environment. Two actors playing this role can then use different tokens. `zanni` rejects a literal value in an `env` or `headers` entry whose name looks like a secret.
 
 ## 5. Publishing
 
-A role lives in a git repository, at the root or in a folder of one. Plays refer to it as `host/owner/name@version`, such as `github.com/someone/tester@1.4.0`, and pin it to a commit in their `roles.lock`.
-
-**Draft:** how a version resolves to a commit, and the `roles.lock` format, aren't specified yet; see the [role package spec](spec/role-package.md#draft). For now, a play can use a local folder: `tester: roles/tester`.
+A role lives in a git repository, at the root or in a folder of one. Tag each version `vX.Y.Z`; for a role in a subfolder, use `path/to/role/vX.Y.Z`. Plays refer to it as `host/owner/name@version`, such as `github.com/someone/tester@1.4.0`, and pin it to a commit in their `play.lock` ([versions](spec/role-package.md#versions)). A play can also use a local folder: `tester: roles/tester`.
