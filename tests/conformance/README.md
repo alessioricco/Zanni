@@ -2,8 +2,8 @@
 
 These tests check an implementation of the `zanni` command against the [spec](../../docs/spec/README.md), using only files and exit codes. They don't depend on this codebase.
 
-- **`valid/`:** every `*.yaml` file must be accepted, with exit code `0`.
-- **`invalid/`:** every `*.yaml` file must be rejected, with exit code `2`. Its `.expected` sidecar gives the problem the implementation must report:
+- **`valid/`:** every case must be accepted, with exit code `0`. A case is a `.yaml` file, a `.md` file (such as a script), or a folder (such as a role package or a script folder).
+- **`invalid/`:** every case must be rejected, with exit code `2`. Its `.expected` sidecar (`name.expected` for `name.yaml`, `name.md` or the folder `name/`) gives the problem the implementation must report:
   ```
   line: 4
   path: cast.coder.seats

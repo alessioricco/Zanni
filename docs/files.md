@@ -8,7 +8,7 @@ There is one command, `zanni <file>`. The kind of file comes from its keys, neve
 | Play file | `cast` | the play's director, running the play's script | [spec: play](spec/play.md) |
 | Role manifest (`role.yaml`) | `mission` | nothing; it is validated | [spec: role package](spec/role-package.md) |
 
-Scripts have their own format, specified in the [script spec](spec/README.md).
+| Script (`SCRIPT.md`) | `parts`, in Markdown frontmatter | nothing; it is validated | [spec: script](spec/script.md) |
 
 ## Rules for every file
 

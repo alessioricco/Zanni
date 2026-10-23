@@ -228,3 +228,27 @@ Roles, scripts and plays still reject anything that looks like a secret (D10). T
 - **Each backend's own protocol:** a different client for every kind of stage.
 
 Approved by Alessio at ask point A.
+
+## D17. A script is Markdown with a small frontmatter (2026-10-23)
+
+**Decision:** a script is `SCRIPT.md`, styled like `SKILL.md`:
+
+- **Frontmatter:** YAML frontmatter holds only what must be checked: `name`, `version`, `mission`, `parts` (with seats, read and write ceilings, an optional suggested role, and whether the part is optional), the paths the stage must hold, the gates, and the stop rules.
+- **Prose:** acts, scenes, cues, hand-offs and verifiers are prose for the director.
+- **Validation:** `zanni` validates the frontmatter strictly, and checks only that the prose is present.
+
+**Why:**
+
+- The director is an agent, and scripts must fit very different work (a software team, a newsroom, a writers' room) without new fields.
+- Markdown with frontmatter is the convention Zanni already uses for skills (SKILL.md) and roles (AGENTS.md).
+
+**Standards checked:**
+
+- **[CNCF Serverless Workflow](https://github.com/serverlessworkflow/specification):** a DSL of typed tasks (call, do, fork, switch, listen, emit) for runtimes that execute exactly.
+- **[Arazzo](https://spec.openapis.org/arazzo/latest.html)** (OpenAPI Initiative): sequences of API calls.
+
+Both describe deterministic workflows run by machines, not work interpreted by an agent, and neither fits a script whose steps are judgement calls. Neither is used.
+
+**Considered:** a fully structured YAML script, with every scene, cue and verifier as fields. It is more checkable, but rigid, and it would need new fields for every new kind of work.
+
+Approved by Alessio at ask point B, with the software round as the example.

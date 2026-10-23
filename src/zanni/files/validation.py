@@ -56,7 +56,7 @@ def _known_fields(model: type[BaseModel], path: Path) -> list[str]:
 
 
 def _message(err: dict, loaded: Loaded, model: type[BaseModel]) -> FileError:
-    path: Path = tuple(err["loc"])
+    path: Path = tuple(p for p in err["loc"] if p != "[key]")  # Pydantic marks an invalid dict key with "[key]"
     kind = err["type"]
     if kind == "missing":
         return FileError(loaded.file, loaded.line(path[:-1]) or 1, path, "is required but missing",

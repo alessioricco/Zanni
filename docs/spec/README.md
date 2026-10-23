@@ -11,6 +11,7 @@ The spec covers only what existing standards don't:
 | A role's tools | MCP, standard `mcp.json` | — |
 | A role's Zanni fields | — | [Role package](role-package.md) |
 | One actor instance: role, play, models, credentials | — | [Actor configuration](actor-configuration.md) |
+| The reusable work: mission, parts, gates, stop rules, acts and scenes | Markdown with frontmatter, like SKILL.md | [Script](script.md) |
 | A production of a script: script, director, cast, stage, house rules | — | [Play](play.md) |
 | The play's workspace: operations, permissions, backends | MCP (transport) | [Stage](stage.md) |
 | Director to actor | A2A | — |

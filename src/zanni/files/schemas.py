@@ -190,3 +190,49 @@ class RoleManifest(Strict):
     needs: RoleNeeds = RoleNeeds()
     never: list[str] = []
     outputs: dict[str, str] = {}
+
+
+# Script (SCRIPT.md frontmatter; the prose after it is for the director)
+
+NAME = re.compile(r"^[a-z0-9][a-z0-9-]*$")
+
+
+def _name(value: object) -> object:
+    if isinstance(value, str) and not NAME.match(value):
+        raise ValueError(f'"{value}" is not a valid name; use lowercase letters, digits and dashes, e.g. product-owner')
+    return value
+
+
+Name = Annotated[str, BeforeValidator(_name)]
+
+
+class Part(Strict):
+    """A part the script needs. Its `reads` and `writes` are ceilings on what the seat may touch (D12)."""
+
+    description: str | None = None
+    suggested: PackageRef | None = None  # a role the play may cast, or replace
+    seats: SeatRange = Seats(min=1, max=1)
+    reads: list[str] | None = None
+    writes: list[str] | None = None
+    optional: bool = False
+
+
+class ScriptStage(Strict):
+    expects: list[str] = []  # paths the stage must hold before the play starts
+
+
+class StopRules(Strict):
+    max_rounds: int | None = Field(default=None, ge=1)
+    budget_per_round: Decimal | None = Field(default=None, ge=0)  # USD
+
+
+class Script(Strict):
+    """The reusable work: mission, parts, the workspace it expects, gates and stop rules (D13, D17)."""
+
+    name: Name
+    version: Annotated[str, BeforeValidator(_version)]
+    mission: str = Field(min_length=1)
+    parts: dict[Name, Part] = Field(min_length=1)
+    stage: ScriptStage = ScriptStage()
+    gates: list[Name] = []
+    stop: StopRules = StopRules()

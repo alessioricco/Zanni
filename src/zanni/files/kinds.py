@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 from zanni.files.errors import FileError, FileErrors
 from zanni.files.loader import Loaded
-from zanni.files.schemas import ActorConfiguration, PlayFile, RoleManifest
+from zanni.files.schemas import ActorConfiguration, PlayFile, RoleManifest, Script
 
 
 @dataclass(frozen=True)
@@ -15,20 +15,30 @@ class Kind:
     name: str
     model: type[BaseModel]
     marker: frozenset[str]
+    markdown: bool = False  # a Markdown file with frontmatter, rather than plain YAML
+    excludes: frozenset[str] = frozenset()  # keys that mean it is another kind
 
 
 KINDS = (
     Kind("actor configuration", ActorConfiguration, frozenset({"role", "play"})),
     Kind("play file", PlayFile, frozenset({"cast"})),
-    Kind("role manifest", RoleManifest, frozenset({"mission"})),
+    Kind("role manifest", RoleManifest, frozenset({"mission"}), excludes=frozenset({"parts"})),
+    Kind("script", Script, frozenset({"parts"}), markdown=True),
 )
 
 
 def detect(loaded: Loaded) -> Kind:
     keys = set(loaded.data)
-    matches = [k for k in KINDS if k.marker <= keys]
+    matches = [k for k in KINDS if k.marker <= keys and not k.excludes & keys]
     if len(matches) == 1:
-        return matches[0]
+        kind = matches[0]
+        if kind.markdown and loaded.body is None:
+            raise FileErrors([FileError(loaded.file, None, (), f"looks like a {kind.name}, but a {kind.name} is a Markdown file",
+                                        "put these fields between --- lines at the top of a .md file, then the prose")])
+        if not kind.markdown and loaded.body is not None:
+            raise FileErrors([FileError(loaded.file, None, (), f"looks like a {kind.name}, but a {kind.name} is a YAML file",
+                                        "remove the --- lines and the prose")])
+        return kind
     needs = "; ".join(f"{k.name}: {' and '.join(f'`{m}`' for m in sorted(k.marker))}" for k in KINDS)
     if not matches:
         markers = sorted({m for k in KINDS for m in k.marker})
@@ -37,7 +47,7 @@ def detect(loaded: Loaded) -> Kind:
             if close:
                 raise FileErrors([FileError(loaded.file, loaded.line((key,)), (key,), "is not a known field",
                                             f"did you mean `{close[0]}`?")])
-        problem = "is not an actor configuration, a play file or a role manifest"
+        problem = "is not an actor configuration, a play file, a role manifest or a script"
     else:
         problem = f"looks like more than one kind of file ({', '.join(k.name for k in matches)})"
     raise FileErrors([FileError(loaded.file, None, (), problem, f"each kind needs these fields: {needs}")])

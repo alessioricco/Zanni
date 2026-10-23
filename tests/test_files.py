@@ -11,6 +11,8 @@ EXAMPLES = Path(__file__).parent.parent / "examples"
 ACTOR = EXAMPLES / "tester.yaml"
 PLAY = EXAMPLES / "plays/habit-tracker/play.yaml"
 ROLE = EXAMPLES / "roles/tester/role.yaml"
+SCRIPT = EXAMPLES / "scripts/software-team/SCRIPT.md"
+NEWSROOM = EXAMPLES / "scripts/newsroom"  # a folder holding SCRIPT.md
 
 
 def zanni(path: Path) -> subprocess.CompletedProcess:
@@ -29,6 +31,8 @@ def broken(tmp_path: Path, example: Path, old: str, new: str) -> Path:
     (ACTOR, "Actor configuration: would start 'tester-1', playing a role in a play."),
     (PLAY, "Play file: would start the director for the play 'habit-tracker'."),
     (ROLE, "Role manifest: the role 'tester' 1.4.0."),
+    (SCRIPT, "Script: 'software-team' 1.0.0."),
+    (NEWSROOM, "Script: 'newsroom' 0.1.0."),
 ])
 def test_examples_validate(example, first_line):
     result = zanni(example)
@@ -58,6 +62,8 @@ def test_play_summary_shows_cast_and_house_rules():
     (ROLE, "version: 1.4.0", "version: 1.4", "line 3, version: 1.4 was read as a number"),
     (ROLE, "mission:", "mision:", "line 4, mision: is not a known field; did you mean `mission`?"),
     (ROLE, "tools: true", "tools: maybe", 'line 5, model.needs.tools: should be true or false, not "maybe"'),
+    (SCRIPT, "    seats: 1-8", "    seats: 8-1", "line 20, parts.coder.seats: the range 8-1 goes down"),
+    (SCRIPT, "  max_rounds: 5", "  max_rounds: many", 'line 26, stop.max_rounds: should be a whole number, not "many"'),
 ])
 def test_broken_copies_fail_in_plain_words(tmp_path, example, old, new, expected):
     result = zanni(broken(tmp_path, example, old, new))
