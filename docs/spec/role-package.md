@@ -9,6 +9,7 @@ roles/tester/
   skills/         # skills in SKILL.md format (standard)
   mcp.json        # the MCP servers it expects, in the standard `mcpServers` format
   notes/          # curated lessons, private to the role
+  rehearsals/     # the role's own tests: rehearsals and their stage folders (optional)
 ```
 
 Only `role.yaml` is Zanni's own format. `AGENTS.md`, `skills/` and `mcp.json` follow their standards unchanged, and none of them may name a model vendor or an engine (golden rule 4). The repository's example is `examples/roles/tester/`.
@@ -93,6 +94,7 @@ Scripts are referenced and resolved the same way.
   - any `env` or `headers` value whose name looks like a secret must be a `${VAR}` reference, since a role is shared. The value comes from the actor's configuration (see [Actor configuration: credentials](actor-configuration.md#credentials)) or its environment.
   - Keys other MCP clients use, such as `type` or `disabled`, are left alone.
 - **`needs.tools`:** every name is a server in `mcp.json`.
+- **`rehearsals/*.yaml`:** every rehearsal is valid, and its stage folder exists ([Rehearsal](rehearsal.md)).
 
 ```
 Role manifest: the role 'tester' 1.4.0.

@@ -396,3 +396,32 @@ class McpConfig(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     mcpServers: dict[str, McpServer]
+
+
+# Rehearsal: one actor, run on cues against a local stage, with no director (D26)
+
+class RehearsalCue(Strict):
+    """One cue, as the director would give it (the `zanni.cue` message, without the ids)."""
+
+    scene: str = Field(min_length=1)
+    instructions: str = Field(min_length=1)
+    reads: list[str] = []
+    writes: list[str] = []
+    verifiers: list[str] = []  # what will judge the work, in plain words, for the actor
+
+
+class VerifyCommand(Strict):
+    """A check run in the stage copy after the cues; it passes when the command exits 0."""
+
+    name: Name
+    command: list[str] = Field(min_length=1)
+
+
+class Rehearsal(Strict):
+    """Runs a role without a director: an actor configuration's `play` points here (D26)."""
+
+    rehearsal: Name
+    description: str | None = None
+    stage: str = Field(min_length=1)  # a folder, relative to this file, copied fresh for every run
+    cues: list[RehearsalCue] = Field(min_length=1)
+    verify: list[VerifyCommand] = []

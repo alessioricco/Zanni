@@ -1,0 +1,5 @@
+rehearsal: tiny
+stage: ../fixtures/rehearsal-stage
+cues:
+  - scene: Draft
+    instructions: Write draft.md from brief.md.

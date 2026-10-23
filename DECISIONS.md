@@ -398,3 +398,20 @@ Strings arrived exactly in every case. Approved by Alessio at ask point B.
 - One source for the code and the published schemas.
 - Conformance that another implementation can run, with nothing but the schemas and a JSON Schema validator.
 - `jsonschema` stays out of Zanni's runtime dependencies, because only tests need it.
+
+## D26. Rehearsals: one actor, no director, cues from a file (2026-10-24)
+
+**Decision:**
+
+- **The file:** a rehearsal (recognised by `cues`) names a stage folder, a list of cues, and optional `verify` commands.
+- **Running it:** an actor configuration runs it by pointing its `play` at it: `zanni <actor configuration>` then runs the cues locally, with no director.
+  - **The stage:** it is copied fresh into the actor's `state_dir` for every run, and the actor's seat permissions are its role's needs.
+  - **Reports and checks:** each cue's result is a `zanni.report`, the `verify` commands run in the stage copy, and every event goes to a JSON Lines log in the play log's format (D18).
+- **In role packages:** a role package may ship rehearsals in `rehearsals/`, as its own tests, and `zanni <role folder>` checks them.
+
+**Why:** Alessio's call at ask point A of milestone 2. Rehearsals are part of role packages, and let a role run with no director.
+
+- **No configuration named:** a rehearsal can't name an actor configuration, because configurations are private to each machine. Pointing the configuration's `play` at the rehearsal keeps "one command, one file" (D9).
+- **Reused by the director:** the same runner will drive actors when the director exists (milestone 4).
+
+**Not in the first version:** sandboxing `verify` commands (and roles' MCP servers) for roles from other people (`TODO.md`).

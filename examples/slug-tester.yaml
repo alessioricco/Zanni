@@ -1,0 +1,15 @@
+# An actor configuration whose `play` is a rehearsal: `zanni slug-tester.yaml` runs the slug-tester role's
+# smoke rehearsal locally, with no director. Credentials are ${VAR} references, so this example can live in git.
+name: slug-tester-1
+role: ./roles/slug-tester
+play: ./roles/slug-tester/rehearsals/smoke.yaml
+models:
+  - provider: ollama
+    model: qwen3.8:27b
+    base_url: ${OLLAMA_BASE_URL}
+    price: { input: 0, output: 0 }
+  - provider: anthropic
+    model: claude-haiku-5-5
+    credential: ANTHROPIC_API_KEY
+credentials:
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}

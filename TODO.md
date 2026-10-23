@@ -9,6 +9,7 @@ Things decided to come later. Each names where it was deferred. Remove an item w
 - [ ] **One join token per actor.** The first version shares one join token per play (`ZANNI_JOIN_TOKEN`). Per-actor tokens would let a director revoke one actor without the rest.
 - [ ] **The director's own configuration.** The director is an actor too. Decide whether `zanni play.yaml` reads the director's credentials (join tokens) from the environment, as now, or from a director configuration file.
 - [ ] **Secrets management for actors on cloud services** (D15).
+- [ ] **Sandboxing a rehearsal's `verify` commands**, and a role's MCP servers, for roles from other people. Today they run with the user's permissions (D26).
 
 ## Later milestones
 

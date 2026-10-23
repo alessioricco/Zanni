@@ -13,7 +13,7 @@ from zanni.files.errors import FileError, FileErrors
 from zanni.files.kinds import detect
 from zanni.files.loader import Loaded, load_file, load_text
 from zanni.files.schemas import (
-    REMOTE_REF, ActorConfiguration, Lockfile, McpConfig, PlayFile, RoleManifest, Script, SkillFrontmatter,
+    REMOTE_REF, ActorConfiguration, Lockfile, McpConfig, PlayFile, Rehearsal, RoleManifest, Script, SkillFrontmatter,
 )
 from zanni.files.validation import is_secret_name, validate
 
@@ -132,6 +132,35 @@ def check_mcp(loaded: Loaded) -> McpConfig:
     return config
 
 
+def check_rehearsal(loaded: Loaded, rehearsal: Rehearsal) -> list[str]:
+    """A rehearsal's stage must be a folder next to it; it is copied fresh for every run (D26)."""
+    stage = Path(loaded.file).parent / rehearsal.stage
+    if not stage.is_dir():
+        raise FileErrors([FileError(loaded.file, loaded.line(("stage",)), ("stage",),
+                                    f'"{rehearsal.stage}" is not a folder', "point `stage` at a folder, relative to this file")])
+    return []
+
+
+def load_rehearsal(path: Path) -> tuple[Loaded, Rehearsal]:
+    loaded = load_file(path)
+    rehearsal = validate(loaded, Rehearsal)
+    check_rehearsal(loaded, rehearsal)
+    return loaded, rehearsal
+
+
+def check_actor_play(loaded: Loaded, actor: ActorConfiguration) -> list[str]:
+    """An actor configuration's `play` may point at a local rehearsal, to run with no director (D26)."""
+    target = Path(loaded.file).parent / actor.play
+    if "://" in actor.play or not target.is_file():
+        return []
+    play_loaded = load_file(target)
+    if "cues" not in play_loaded.data:
+        return []
+    _, rehearsal = load_rehearsal(target)
+    cues = f"{len(rehearsal.cues)} cue{'s' if len(rehearsal.cues) > 1 else ''}"
+    return [f"  play: the rehearsal '{rehearsal.rehearsal}', {cues}, run with no director"]
+
+
 def check_role_folder(folder: Path, loaded: Loaded, role: RoleManifest) -> list[str]:
     """A role folder: role.yaml, AGENTS.md, skills in SKILL.md format, and mcp.json for the tools it needs."""
     errors: list[FileError] = []
@@ -159,6 +188,12 @@ def check_role_folder(folder: Path, loaded: Loaded, role: RoleManifest) -> list[
             skills.append(skill.name)
         except FileErrors as e:
             errors += e.errors
+    rehearsals = []
+    for path in sorted((folder / "rehearsals").glob("*.yaml")):
+        try:
+            rehearsals.append(load_rehearsal(path)[1].rehearsal)
+        except FileErrors as e:
+            errors += e.errors
     servers: list[str] = []
     mcp = folder / "mcp.json"
     if mcp.is_file():
@@ -174,7 +209,8 @@ def check_role_folder(folder: Path, loaded: Loaded, role: RoleManifest) -> list[
             errors.append(FileError(loaded.file, loaded.line(where), where, f'"{tool}" is not a server in mcp.json', fix))
     if errors:
         raise FileErrors(errors)
-    return [f"  folder: AGENTS.md; skills: {', '.join(skills) or 'none'}; mcp.json servers: {', '.join(servers) or 'none'}"]
+    return [f"  folder: AGENTS.md; skills: {', '.join(skills) or 'none'}; mcp.json servers: {', '.join(servers) or 'none'}"
+            + (f"; rehearsals: {', '.join(rehearsals)}" if rehearsals else "")]
 
 
 def git_tracks(path: Path) -> bool:
@@ -224,4 +260,7 @@ def check(path: str | Path) -> tuple[BaseModel, list[str]]:
         notes = check_play(loaded, doc)
     if isinstance(doc, ActorConfiguration):
         check_credentials(loaded, doc)
+        notes = check_actor_play(loaded, doc)
+    if isinstance(doc, Rehearsal):
+        check_rehearsal(loaded, doc)
     return doc, notes

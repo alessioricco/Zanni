@@ -1,0 +1,9 @@
+name: slug-tester
+version: 0.1.0
+mission: Turn acceptance criteria into pytest tests for a small library.
+model: { needs: { tools: true, tier: basic } }
+needs:
+  stage_read: [vision.md, backlog/, spec/, tests/]
+  stage_write: [tests/]
+never:
+  - edit application code

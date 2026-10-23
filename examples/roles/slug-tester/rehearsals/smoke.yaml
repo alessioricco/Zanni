@@ -1,0 +1,15 @@
+# A rehearsal: runs the slug-tester role with no director. An actor configuration's `play` points here.
+rehearsal: smoke
+description: The tester turns two acceptance criteria into passing pytest tests.
+stage: ./smoke-stage
+cues:
+  - scene: Specify
+    instructions: >-
+      Read backlog/round-1.md and spec/slug.md. Write one pytest test for each acceptance criterion
+      into tests/test_slug.py. The code under test is app.slug.slugify; import it as `from app.slug import slugify`.
+    reads: [backlog/round-1.md, spec/slug.md]
+    writes: [tests/test_slug.py]
+    verifiers: [both tests run under pytest and pass]
+verify:
+  - name: tests-pass
+    command: [uv, run, --no-project, --with, pytest, python, -m, pytest, -q, tests]

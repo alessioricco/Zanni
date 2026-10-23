@@ -1,0 +1,4 @@
+rehearsal: x
+stage: ../fixtures/rehearsal-stage
+cues:
+  - { scene: s, instructions: i, wirtes: [a] }

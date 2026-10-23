@@ -1,0 +1,4 @@
+role: roles/tester
+play: ../fixtures/rehearsals/broken.yaml
+models:
+  - { provider: ollama, model: x }

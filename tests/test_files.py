@@ -14,6 +14,8 @@ ROLE = EXAMPLES / "roles/tester/role.yaml"
 SCRIPT = EXAMPLES / "scripts/software-team/SCRIPT.md"
 NEWSROOM = EXAMPLES / "scripts/newsroom"  # a folder holding SCRIPT.md
 NEWSROOM_PLAY = EXAMPLES / "plays/newsroom/play.yaml"  # a play with a local script and a play.lock
+REHEARSAL = EXAMPLES / "roles/slug-tester/rehearsals/smoke.yaml"
+REHEARSAL_ACTOR = EXAMPLES / "slug-tester.yaml"  # an actor configuration whose play is a rehearsal
 
 
 def zanni(path: Path) -> subprocess.CompletedProcess:
@@ -35,6 +37,8 @@ def broken(tmp_path: Path, example: Path, old: str, new: str) -> Path:
     (SCRIPT, "Script: 'software-team' 1.0.0."),
     (NEWSROOM, "Script: 'newsroom' 0.1.0."),
     (NEWSROOM_PLAY, "Play file: would start the director for the play 'city-desk'."),
+    (REHEARSAL, "Rehearsal: 'smoke', run with no director when an actor configuration's `play` points here."),
+    (REHEARSAL_ACTOR, "Actor configuration: would start 'slug-tester-1', playing a role in a play."),
 ])
 def test_examples_validate(example, first_line):
     result = zanni(example)
@@ -97,6 +101,14 @@ def test_role_folder_reports_a_tool_missing_from_mcp_json(tmp_path):
     result = zanni(tmp_path / "tester")
     assert result.returncode == 2
     assert 'line 9, needs.tools[1]: "test-runner" is not a server in mcp.json; use one of mcp.json\'s servers (browser)' in result.stderr
+
+
+def test_actor_pointing_at_a_rehearsal_says_it_runs_with_no_director():
+    assert "play: the rehearsal 'smoke', 1 cue, run with no director" in zanni(REHEARSAL_ACTOR).stdout
+
+
+def test_role_folder_lists_its_rehearsals():
+    assert "rehearsals: smoke" in zanni(EXAMPLES / "roles/slug-tester").stdout
 
 
 def test_missing_file(tmp_path):

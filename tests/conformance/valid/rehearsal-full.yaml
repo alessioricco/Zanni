@@ -1,0 +1,7 @@
+rehearsal: full
+description: d
+stage: ../fixtures/rehearsal-stage
+cues:
+  - { scene: Draft, instructions: Write draft.md., reads: [brief.md], writes: [draft.md], verifiers: [draft.md exists] }
+verify:
+  - { name: draft-exists, command: [test, -f, draft.md] }

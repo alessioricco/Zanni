@@ -29,7 +29,7 @@ It is recognised by having both `role` and `play`, and it is the file passed to 
 |---|---|---|---|---|---|
 | `name` | text | no | none | the actor | This instance's name, used in the log and in summaries. |
 | `role` | package reference | yes | — | the director, at casting | The role this actor plays. The director casts the actor only into a part whose cast entry names this role. |
-| `play` | URL or path | yes | — | the actor | The play file to join. The actor decides which plays and directors it is willing to join. |
+| `play` | URL or path | yes | — | the actor | The play file to join, or a local [rehearsal](rehearsal.md) to run with no director. The actor decides which plays and directors it is willing to join. |
 | `models` | list of model entries, at least one | yes | — | the actor | The models this actor runs, in order (D11). |
 | `credentials` | map of name → value | no | none | the actor, and `zanni` | This instance's credentials ([below](#credentials)). |
 | `state_dir` | path | no | `~/.zanni/actors/<name>` | the actor | Where the actor keeps its working memory and state. It is discarded or kept by the actor; the play's shared state lives on the stage. |

@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 from zanni.files.errors import FileError, FileErrors
 from zanni.files.loader import Loaded
-from zanni.files.schemas import ActorConfiguration, Lockfile, PlayFile, RoleManifest, Script
+from zanni.files.schemas import ActorConfiguration, Lockfile, PlayFile, Rehearsal, RoleManifest, Script
 
 
 @dataclass(frozen=True)
@@ -25,6 +25,7 @@ KINDS = (
     Kind("role manifest", RoleManifest, frozenset({"mission"}), excludes=frozenset({"parts"})),
     Kind("script", Script, frozenset({"parts"}), markdown=True),
     Kind("lockfile", Lockfile, frozenset({"lock_version"})),
+    Kind("rehearsal", Rehearsal, frozenset({"cues"})),
 )
 
 
@@ -48,7 +49,7 @@ def detect(loaded: Loaded) -> Kind:
             if close:
                 raise FileErrors([FileError(loaded.file, loaded.line((key,)), (key,), "is not a known field",
                                             f"did you mean `{close[0]}`?")])
-        problem = "is not an actor configuration, a play file, a role manifest, a script or a lockfile"
+        problem = "is not an actor configuration, a play file, a role manifest, a script, a lockfile or a rehearsal"
     else:
         problem = f"looks like more than one kind of file ({', '.join(k.name for k in matches)})"
     raise FileErrors([FileError(loaded.file, None, (), problem, f"each kind needs these fields: {needs}")])

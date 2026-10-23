@@ -1,0 +1,4 @@
+rehearsal: broken
+stage: ../nope
+cues:
+  - { scene: s, instructions: i }

@@ -1,9 +1,9 @@
 """What `zanni <file>` would run, in a few lines."""
 
-from zanni.files.schemas import ActorConfiguration, Lockfile, PlayFile, RoleManifest, Script, Seats
+from zanni.files.schemas import ActorConfiguration, Lockfile, PlayFile, Rehearsal, RoleManifest, Script, Seats
 
 
-def summarise(doc: ActorConfiguration | PlayFile | RoleManifest | Script | Lockfile) -> list[str]:
+def summarise(doc: ActorConfiguration | PlayFile | RoleManifest | Script | Lockfile | Rehearsal) -> list[str]:
     if isinstance(doc, ActorConfiguration):
         who = f"'{doc.name}'" if doc.name else "an actor"
         lines = [f"Actor configuration: would start {who}, playing a role in a play.",
@@ -36,6 +36,12 @@ def summarise(doc: ActorConfiguration | PlayFile | RoleManifest | Script | Lockf
         budget = f"${rules.budget:.2f}" if rules.budget is not None else "none set"
         cap = f"; at most {rules.max_seats_per_host} seats per host" if rules.max_seats_per_host else ""
         lines.append(f"  house rules: budget {budget}; human gates: {', '.join(rules.gates) or 'none'}{cap}")
+        return lines
+    if isinstance(doc, Rehearsal):
+        lines = [f"Rehearsal: '{doc.rehearsal}', run with no director when an actor configuration's `play` points here.",
+                 f"  stage: {doc.stage} (copied fresh for every run)", "  cues:"]
+        lines += [f"    {i}. {cue.scene}: {cue.instructions[:70]}" for i, cue in enumerate(doc.cues, start=1)]
+        lines.append(f"  verify: {', '.join(v.name for v in doc.verify) or 'nothing'}")
         return lines
     if isinstance(doc, Lockfile):
         lines = ["Lockfile: pins a play's script and roles."]
