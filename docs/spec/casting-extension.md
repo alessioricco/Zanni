@@ -1,26 +1,35 @@
 # Casting extension
 
-**Draft. No wire format is specified yet.**
+**Draft: being written (milestone 1, part 2).** The sections below are decided; the messages are still to come.
 
-Casting is how an actor joins a play:
+Casting is how an actor joins a play, is cast into a part, receives cues and reports, and is released. Everything else between the director and its actors is plain A2A 1.0, through the official `a2a-sdk` (D2, D21).
 
-1. **Join:** the actor connects to the director and presents its A2A Agent Card, built from its role.
-2. **Casting:** the director checks the actor's role against the part it is cast for, assigns a seat, and sends the stage's MCP address and credentials scoped to that seat ([Stage: transport](stage.md#transport-how-actors-reach-the-stage)).
-3. **Cues and reports:** the director sends cues as A2A tasks, and the actor reports back. Heartbeats run in between.
-4. **Release:** the director ends the seat and revokes its credentials.
+## Extension URI
 
-Everything except casting and permissions is plain A2A, through the official `a2a-sdk` (D2).
+`https://github.com/alessioricco/Zanni/blob/master/docs/spec/casting-extension.md#v1` (D22)
 
-## What the spike showed (D6)
+The fragment is the version. A change to any message makes a new version, and a side that speaks several versions lists one `AgentExtension` per version.
 
-- **The card can carry the role.** A role's `needs`, `never` and `model.needs` fit in an Agent Card extension (`AgentCapabilities.extensions`), and nested lists and maps arrived intact at the director. The spike used the provisional URI `https://zanni.dev/a2a/ext/role/v0`.
-- **Numbers need a typed encoding.** Extension `params` are a protobuf `Struct`, which has no integer type, so every number arrives as a float. Seat counts, budgets and costs need an encoding still to be designed (for example, decimal strings with a declared unit), checked when an actor joins.
-- **Cues can't be one long request.** A cue can take minutes on a local model, and the a2a client's default HTTP timeout is 5 s. Cues must be A2A tasks with polling or streaming.
+## Encoding
 
-## Still to specify
+A2A carries extension params and data parts as protobuf `Struct` values, which have no integer type, so every number travels as a string (D23):
 
-- **URIs:** the extension URI(s) and versioning.
-- **Card fields:** the role fields on the card, with types, using the typed encoding above.
-- **Join and release:** the casting messages, including how a refusal is reported back to the actor.
-- **Credentials:** how the seat's stage credentials (D16) are delivered and revoked. They are the director's to give, and never the actor's own credentials, which stay in its configuration (D15).
-- **Heartbeats:** heartbeats and recasting a seat whose actor stopped answering.
+| Value | Encoding | Example |
+|---|---|---|
+| A count | decimal string, at least 0 | `"4"` |
+| A duration | whole seconds, as a decimal string | `"30"` |
+| Money | `{ amount, currency }`; `amount` is a plain decimal string, at least 0; `currency` is `USD` | `{ "amount": "20.10", "currency": "USD" }` |
+| A range | `{ min, max }`, both counts, `min` ≤ `max` | `{ "min": "1", "max": "4" }` |
+| A timestamp | RFC 3339, UTC | `"2026-10-24T09:30:00Z"` |
+| An unknown cost | `null` (D7) | `null` |
+
+The round-trip that led to this, through `a2a-sdk` 1.2.3's types:
+
+| Sent | Arrived | |
+|---|---|---|
+| `4` | `4.0` | changed |
+| `"4"` | `"4"` | exact |
+| `9007199254740993` | `9007199254740992.0` | changed |
+| `"9007199254740993"` | `"9007199254740993"` | exact |
+| `{"min": 1, "max": 4}` | `{"min": 1.0, "max": 4.0}` | changed |
+| `{"amount": "20.10", "currency": "USD"}` | the same | exact |

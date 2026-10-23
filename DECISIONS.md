@@ -350,3 +350,22 @@ Approved by Alessio at ask point B, with the software round as the example.
 **Why:** Alessio's call. Zanni has no domain yet: `zanni.dev`, `zanni.org` and `zanni.ai` are registered, and `zanni.io` looked free on 2026-10-24. A URI in the repository Zanni controls works today, and opens the spec page.
 
 **Revisit when:** a domain is registered. Moving the URI is itself a version change.
+
+## D23. Every number on the wire is a decimal string (2026-10-24)
+
+**Decision:** in casting messages and in the card extension:
+
+- **Counts:** decimal strings, such as `"4"`.
+- **Durations:** whole seconds, as decimal strings.
+- **Money:** `{ "amount": "20.10", "currency": "USD" }`.
+- **Ranges:** `{ "min": "1", "max": "4" }`.
+- **Timestamps:** RFC 3339 UTC strings.
+- **Checking:** each is checked against the published JSON Schema when it arrives.
+
+**Why:** a round-trip through `a2a-sdk` 1.2.3's types showed that every number in extension params and data parts arrives as a protobuf float:
+
+- `4` became `4.0`, and the range `{1, 4}` became `{1.0, 4.0}`;
+- `9007199254740993` became `9007199254740992`;
+- `20.10` lost its trailing zero.
+
+Strings arrived exactly in every case. Approved by Alessio at ask point B.
