@@ -415,3 +415,28 @@ Strings arrived exactly in every case. Approved by Alessio at ask point B.
 - **Reused by the director:** the same runner will drive actors when the director exists (milestone 4).
 
 **Not in the first version:** sandboxing `verify` commands (and roles' MCP servers) for roles from other people (`TODO.md`).
+
+## D27. Zanni's own fallback loop; Google as an optional extra (2026-10-24)
+
+**Decision:**
+
+- **The loop:** an actor runs a cue on its first model. On a failure, Zanni classifies it into D20's reasons, using Pydantic AI's exception types:
+  - `rate-limit`: rate-limit and quota errors;
+  - `context`: the request didn't fit the model's context window;
+  - `timeout`: timeouts;
+  - `refusal`: the content filter;
+  - `error`: any other model API, connection or HTTP error.
+
+  Zanni moves to the next model only if the failing entry lists that reason, and records every attempt.
+- **Restarting:** a fallback restarts the cue on the next model. Work already written stays on the stage, and the next model sees it.
+- **Ollama capabilities:** for Ollama entries, when the role needs tools and the entry uses native tool calling, Zanni asks the server (`/api/show`) before running, and refuses a model with no `tools` capability, suggesting `tool_format: text`. If the server can't be asked, the run's own fallback handles it.
+- **Google models:** they need the optional `google` extra (`uv sync --extra google`). Without it, a `google` entry is refused in plain words.
+
+**Why not Pydantic AI's `FallbackModel`:**
+
+- it falls back on one set of exception types for the whole chain, while D20 gives each entry its own reasons;
+- it doesn't tell Zanni which model answered and why the others were skipped, which the log needs.
+
+The loop is about 25 lines.
+
+**Why the extra:** `google-genai` is a large dependency most installs don't need. The pin stays exact (D8).
