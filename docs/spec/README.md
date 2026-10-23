@@ -12,6 +12,7 @@ The spec covers only what existing standards don't:
 | A role's Zanni fields | — | [Role package](role-package.md) |
 | One actor instance: role, play, models, credentials | — | [Actor configuration](actor-configuration.md) |
 | A production of a script: script, director, cast, stage, house rules | — | [Play](play.md) |
+| The play's workspace: operations, permissions, backends | MCP (transport) | [Stage](stage.md) |
 | Director to actor | A2A | — |
 | Joining, seats, scoped credentials, release | A2A extension | [Casting extension](casting-extension.md) |
 

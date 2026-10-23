@@ -1,0 +1,5 @@
+name: book
+script: ./SCRIPT.md
+stage: ./chapters
+cast:
+  writer: roles/writer

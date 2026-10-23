@@ -1,0 +1,7 @@
+name: x
+script: ./SCRIPT.md
+stage:
+  backend: git
+  branch: main
+cast:
+  a: roles/a

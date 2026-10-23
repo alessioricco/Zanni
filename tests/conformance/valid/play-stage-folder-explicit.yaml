@@ -1,0 +1,7 @@
+name: book
+script: ./SCRIPT.md
+stage:
+  backend: folder
+  path: /srv/books/one
+cast:
+  writer: roles/writer

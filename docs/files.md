@@ -51,6 +51,7 @@ house_rules:
 ```
 
 - **`script`:** a package reference to the script being performed. It is required.
+- **`stage`:** the play's workspace. A git URL means a `git` stage and a folder path means a `folder` stage, or write `{ backend: …, … }`; see the [stage spec](spec/stage.md#in-the-play-file).
 - **`cast`:** maps each of the script's parts to a role reference, or to `{ role, seats, host }`.
 - **`seats`:** a number (`2`) or a range (`1-4`). For a range, the director decides how many to cast, within it.
 - **`host: local`:** the director starts these seats itself, on its own machine.

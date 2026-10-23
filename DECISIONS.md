@@ -207,3 +207,24 @@ Roles, scripts and plays still reject anything that looks like a secret (D10). T
 **Supersedes:** D10's "no Zanni file holds a secret", for the actor configuration only. The agent-session rule is unchanged: never print, log or commit a real key, and tests use obviously fake keys.
 
 **Not in the first version:** secrets management for actors running on cloud services.
+
+## D16. Actors reach the stage through MCP; git stages also allow a checkout (2026-10-23)
+
+**Decision:**
+
+- **Every backend:** the director serves the stage as an MCP server with five tools, `stage_read`, `stage_write`, `stage_list`, `stage_delete` and `stage_changes`. Each seat's credentials are scoped to it, given at casting and revoked at release, and the server applies the seat's permissions on every call.
+- **Git backends:** a seat may also clone the repository and push to its own branch. The director merges the branch only if every changed path is within the seat's write permissions.
+- **Who gets a clone:** direct access is offered only to seats whose read permissions cover the whole stage, because a clone can't hide files.
+
+**Why:**
+
+- Zanni needs only MCP (golden rule 3), and actors already reach every tool that way.
+- Coding engines work on a real checkout, so git plays need one.
+- Checking before merging keeps write permissions enforced by the stage, not by the actor.
+
+**Considered:**
+
+- **MCP only:** coding engines couldn't use a checkout.
+- **Each backend's own protocol:** a different client for every kind of stage.
+
+Approved by Alessio at ask point A.

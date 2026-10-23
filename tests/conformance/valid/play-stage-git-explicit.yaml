@@ -1,0 +1,5 @@
+name: app
+script: ./SCRIPT.md
+stage: { backend: git, url: https://github.com/a/app.git, branch: dev }
+cast:
+  coder: roles/coder

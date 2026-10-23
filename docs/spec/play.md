@@ -35,7 +35,7 @@ house_rules:
 |---|---|---|---|---|---|
 | `name` | text | yes | — | the director | The play's name, used in the log and in summaries. |
 | `director` | URL (`ws`, `wss`, `http`, `https`) | no | this machine | the actor | Where actors connect to join. Each actor decides whether it trusts this address. |
-| `stage` | git URL or path | yes | — | the stage | Where the shared state lives. |
+| `stage` | git URL, folder path, or `{ backend, … }` ([stage](stage.md#in-the-play-file)) | yes | — | the stage | The play's workspace, and the backend that stores it and enforces each seat's permissions. |
 | `script` | package reference ([references](actor-configuration.md#package-references)) | yes | — | the director | The script this play performs. The director reads it and gives cues; actors never read it. |
 | `cast` | map of part name → cast entry | yes, at least one | — | the director | A role for each of the script's parts. |
 | `house_rules` | house rules | no | no budget, no gates | the director | Limits set when the director starts. Nothing in a role, the script or an actor can loosen them. |
@@ -59,7 +59,6 @@ A cast entry is either a role reference (shorthand for `{ role: … }`) or:
 
 ## Draft
 
-- **Stage:** whether it is a git repo with a branch per seat or a service with an API is an open question in the vision ("Stage").
 - **Other files:** the formats of the lockfile and `log/` aren't specified yet.
 - **Checking a play against its script:** that every part is cast and seats are within the script's limits.
 - **More house rules:** seat caps per host, risk tiers and stop rules aren't specified yet.

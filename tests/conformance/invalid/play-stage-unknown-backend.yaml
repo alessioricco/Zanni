@@ -1,0 +1,5 @@
+name: x
+script: ./SCRIPT.md
+stage: { backend: svn, url: x }
+cast:
+  a: roles/a

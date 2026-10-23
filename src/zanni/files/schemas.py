@@ -2,9 +2,9 @@
 
 import re
 from decimal import Decimal
-from typing import Annotated
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, PlainSerializer
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, PlainSerializer, model_validator
 
 REMOTE_REF = re.compile(r"^(?P<source>[a-z0-9-]+(\.[a-z0-9-]+)+/[^@\s]+)@(?P<version>[^@\s/]+)$")
 SEMVER = re.compile(r"^\d+\.\d+\.\d+([-+][0-9A-Za-z.-]+)?$")
@@ -91,6 +91,45 @@ class HouseRules(Strict):
     gates: list[str] = []  # moments that need human approval, e.g. plan, release
 
 
+GIT_URL = re.compile(r"^(git@[^:\s]+:\S+|(ssh|git|https?)://\S+\.git/?|\S+\.git/?)$")
+
+
+def _stage(value: object) -> object:
+    """A plain string is shorthand: a git URL or .git path means `git`, anything else is a local folder."""
+    if isinstance(value, str):
+        return {"backend": "git", "url": value} if GIT_URL.match(value.strip()) else {"backend": "folder", "path": value}
+    return value
+
+
+class Stage(Strict):
+    """The play's workspace. The backend enforces each seat's permissions (D12)."""
+
+    backend: Literal["git", "folder"]
+    url: str | None = Field(default=None, min_length=1)  # git: the repository
+    branch: str = Field(default="main", min_length=1)  # git: the branch seats start from and merge into
+    path: str | None = Field(default=None, min_length=1)  # folder: a folder on the director's machine
+
+    @model_validator(mode="after")
+    def _fields_match_backend(self) -> "Stage":
+        if self.backend == "git":
+            if not self.url:
+                raise ValueError("a git stage needs a `url`; add the repository, e.g. url: git@github.com:you/app.git")
+            if self.path:
+                raise ValueError("`path` is for folder stages; a git stage takes `url` and `branch`")
+        else:
+            if not self.path:
+                raise ValueError("a folder stage needs a `path`; add the folder, e.g. path: ./stage")
+            if self.url or "branch" in self.model_fields_set:
+                raise ValueError("`url` and `branch` are for git stages; a folder stage takes `path`")
+        return self
+
+    def __str__(self) -> str:
+        return f"git {self.url} (branch {self.branch})" if self.backend == "git" else f"folder {self.path}"
+
+
+StageSpec = Annotated[Stage, BeforeValidator(_stage)]
+
+
 def _director(value: object) -> object:
     if isinstance(value, str) and not re.match(r"^(wss?|https?)://\S+$", value):
         raise ValueError(f'"{value}" is not a director address; write a URL such as wss://director.example.com')
@@ -103,7 +142,7 @@ class PlayFile(Strict):
     name: str = Field(min_length=1)
     script: PackageRef
     director: Annotated[str, BeforeValidator(_director)] | None = None  # None: this machine runs the director
-    stage: str = Field(min_length=1)
+    stage: StageSpec
     cast: dict[str, CastSeat] = Field(min_length=1)  # part name -> role
     house_rules: HouseRules = HouseRules()
 

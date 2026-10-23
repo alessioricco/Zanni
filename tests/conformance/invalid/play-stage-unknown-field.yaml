@@ -1,0 +1,5 @@
+name: x
+script: ./SCRIPT.md
+stage: { backend: git, url: git@h:a/b.git, brnach: dev }
+cast:
+  a: roles/a
