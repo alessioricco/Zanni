@@ -85,6 +85,20 @@ def test_broken_copies_fail_in_plain_words(tmp_path, example, old, new, expected
     assert expected in result.stderr, result.stderr
 
 
+def test_role_folder_checks_the_whole_package():
+    result = zanni(ROLE.parent)
+    assert result.returncode == 0, result.stderr
+    assert "folder: AGENTS.md; skills: explore-app, write-test; mcp.json servers: browser, test-runner" in result.stdout
+
+
+def test_role_folder_reports_a_tool_missing_from_mcp_json(tmp_path):
+    shutil.copytree(ROLE.parent, tmp_path / "tester")
+    (tmp_path / "tester/mcp.json").write_text('{"mcpServers": {"browser": {"command": "x"}}}')
+    result = zanni(tmp_path / "tester")
+    assert result.returncode == 2
+    assert 'line 9, needs.tools[1]: "test-runner" is not a server in mcp.json; use one of mcp.json\'s servers (browser)' in result.stderr
+
+
 def test_missing_file(tmp_path):
     result = zanni(tmp_path / "nope.yaml")
     assert result.returncode == 2

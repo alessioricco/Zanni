@@ -85,7 +85,7 @@ def _message(err: dict, loaded: Loaded, model: type[BaseModel]) -> FileError:
                      "see docs/files.md for this field")
 
 
-def _is_secret_name(name: str) -> bool:
+def is_secret_name(name: str) -> bool:
     words = {w.lower() for w in re.findall(r"[A-Z]?[a-z0-9]+|[A-Z]+(?![a-z])", name)}
     return bool(words & SECRET_WORDS) or "apikey" in name.lower().replace("_", "").replace("-", "")
 
@@ -96,7 +96,7 @@ def find_secrets(loaded: Loaded) -> list[FileError]:
     def walk(value: Any, path: Path) -> None:
         if isinstance(value, dict):
             for k, v in value.items():
-                if isinstance(k, str) and _is_secret_name(k):
+                if isinstance(k, str) and is_secret_name(k):
                     found.append(FileError(loaded.file, loaded.line((*path, k)), (*path, k),
                                            "looks like a secret, and Zanni files never hold secrets",
                                            "remove it and set the value in the environment or a git-ignored .env"))
@@ -110,8 +110,8 @@ def find_secrets(loaded: Loaded) -> list[FileError]:
     return found
 
 
-def validate(loaded: Loaded, model: type[M]) -> M:
-    errors = find_secrets(loaded)
+def validate(loaded: Loaded, model: type[M], *, reject_secrets: bool = True) -> M:
+    errors = find_secrets(loaded) if reject_secrets else []
     try:
         result = model.model_validate(loaded.data)
     except ValidationError as e:

@@ -4,21 +4,21 @@
 zanni [-h] [--version] [file]
 ```
 
-There is one command, and it takes one file. The file decides what runs; options only override what a file could say.
+There is one command, and it takes one file or folder. The file decides what runs; options only override what a file could say.
 
 ## Arguments and options
 
 | | Meaning |
 |---|---|
-| `file` | An actor configuration, a play file or a role manifest. The kind comes from its keys ([Zanni files](files.md)). |
+| `file` | An actor configuration, a play file, a role manifest, a script (`SCRIPT.md`), a lockfile, or a folder. The kind comes from its keys ([Zanni files](files.md)). A folder holding `role.yaml` is checked as a whole role package; a folder holding `SCRIPT.md` is checked as that script. |
 | `--version` | Print `zanni <version>` and exit. |
 | `-h`, `--help` | Print the usage and exit. |
 
 ## What it does
 
 1. **Read the file** as YAML. A syntax error is reported with its line.
-2. **Work out the kind of file:** `role` + `play` is an actor configuration, `cast` is a play file, `mission` is a role manifest.
-3. **Validate it** against that kind's schema, and collect every problem.
+2. **Work out the kind of file:** `role` + `play` is an actor configuration, `cast` is a play file, `mission` is a role manifest, `parts` (in Markdown frontmatter) is a script, `lock_version` is a lockfile.
+3. **Validate it** against that kind's schema, and collect every problem. A play is also checked against its script when the script is local, and against `play.lock` when there is one. A role folder also has its `AGENTS.md`, skills and `mcp.json` checked.
 4. **Print a summary** of what it would run, or the list of problems.
 
 It doesn't start anything yet. Running actors and directors comes in later milestones ([roadmap](../ROADMAP.md)).

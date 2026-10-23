@@ -61,6 +61,11 @@ def _seats(value: object) -> object:
 SeatRange = Annotated[Seats, BeforeValidator(_seats), PlainSerializer(str)]
 
 
+def covers(rule: str, path: str) -> bool:
+    """A rule ending in `/` covers a folder and everything under it; any other rule covers exactly one path."""
+    return path.startswith(rule) if rule.endswith("/") else path == rule
+
+
 # Actor configuration
 
 class ActorConfiguration(Strict):
@@ -192,6 +197,17 @@ class RoleManifest(Strict):
     never: list[str] = []
     outputs: dict[str, str] = {}
 
+    @field_validator("outputs")
+    @classmethod
+    def _outputs_inside_writes(cls, outputs: dict[str, str], info) -> dict[str, str]:
+        needs = info.data.get("needs")
+        writes = needs.stage_write if needs else []
+        for path in outputs:
+            if not any(covers(rule, path) for rule in writes):
+                raise ValueError(f'"{path}" is not inside needs.stage_write; '
+                                 f"add its folder to needs.stage_write, or write it to one of: {', '.join(writes) or 'nothing yet'}")
+        return outputs
+
 
 # Script (SCRIPT.md frontmatter; the prose after it is for the director)
 
@@ -272,3 +288,53 @@ class Lockfile(Strict):
             if REMOTE_REF.match(ref) and pin.commit is None:
                 raise ValueError(f"{ref} is a remote package, so it needs a `commit`; add the commit it resolved to")
         return pins
+
+
+# SKILL.md frontmatter, per the Agent Skills spec (agentskills.io/specification). A standard, not Zanni's
+# own format: its rules are enforced, and fields it doesn't define are left alone for other tools.
+
+SKILL_NAME = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
+
+
+def _skill_name(value: object) -> object:
+    if isinstance(value, str) and not (len(value) <= 64 and SKILL_NAME.match(value)):
+        raise ValueError(f'"{value}" is not a valid skill name; use 1-64 lowercase letters, digits and single hyphens, '
+                         "not starting or ending with a hyphen")
+    return value
+
+
+class SkillFrontmatter(BaseModel):
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+    name: Annotated[str, BeforeValidator(_skill_name)]
+    description: str = Field(min_length=1, max_length=1024)
+    license: str | None = None
+    compatibility: str | None = Field(default=None, min_length=1, max_length=500)
+    metadata: dict[str, str] = {}
+    allowed_tools: str | None = Field(default=None, alias="allowed-tools")
+
+
+# mcp.json, the standard `mcpServers` format shared with Claude Desktop, Claude Code and Cursor.
+# Server entries may carry keys other clients use (type, disabled, ...); those are left alone.
+
+class McpServer(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    command: str | None = Field(default=None, min_length=1)
+    args: list[str] = []
+    env: dict[str, str] = {}
+    cwd: str | None = None
+    url: str | None = Field(default=None, min_length=1)
+    headers: dict[str, str] = {}
+
+    @model_validator(mode="after")
+    def _command_or_url(self) -> "McpServer":
+        if bool(self.command) == bool(self.url):
+            raise ValueError("a server needs exactly one of `command` (a local process) or `url` (a remote server)")
+        return self
+
+
+class McpConfig(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    mcpServers: dict[str, McpServer]

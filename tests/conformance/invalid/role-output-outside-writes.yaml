@@ -1,0 +1,7 @@
+name: r
+version: 1.0.0
+mission: m
+needs:
+  stage_write: [tests/]
+outputs:
+  findings/x.md: a finding

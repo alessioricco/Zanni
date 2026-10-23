@@ -1,17 +1,20 @@
 """Check what `zanni <path>` was given: a Zanni file, or a folder holding one."""
 
 import difflib
+import json
+import re
 from pathlib import Path
 
 from pydantic import BaseModel
 
 from zanni.files.errors import FileError, FileErrors
 from zanni.files.kinds import detect
-from zanni.files.loader import Loaded, load_file
-from zanni.files.schemas import REMOTE_REF, Lockfile, PlayFile, Script
-from zanni.files.validation import validate
+from zanni.files.loader import Loaded, load_file, load_text
+from zanni.files.schemas import REMOTE_REF, Lockfile, McpConfig, PlayFile, RoleManifest, Script, SkillFrontmatter
+from zanni.files.validation import is_secret_name, validate
 
-FOLDER_FILES = ("SCRIPT.md",)  # a folder is checked through the first of these it holds
+FOLDER_FILES = ("role.yaml", "SCRIPT.md")  # a folder is checked through the first of these it holds
+ENV_REF = re.compile(r"^\$\{[A-Za-z_][A-Za-z0-9_]*(:-[^}]*)?\}$")
 LOCKFILE = "play.lock"
 
 
@@ -98,11 +101,89 @@ def check_play(loaded: Loaded, play: PlayFile) -> list[str]:
     return notes
 
 
+def load_mcp_json(path: Path) -> Loaded:
+    """mcp.json is JSON; it is checked as JSON first, then parsed for line numbers (JSON is valid YAML)."""
+    text = path.read_text()
+    try:
+        json.loads(text)
+    except json.JSONDecodeError as e:
+        raise FileErrors([FileError(str(path), e.lineno, (), f"is not valid JSON: {e.msg}",
+                                    "check the commas and quotes on this line and the one before")]) from None
+    return load_text(text, str(path))
+
+
+def check_mcp(loaded: Loaded) -> McpConfig:
+    config = validate(loaded, McpConfig, reject_secrets=False)
+    errors = []
+    for name, server in config.mcpServers.items():
+        for section in ("env", "headers"):
+            for key, value in getattr(server, section).items():
+                if is_secret_name(key) and not ENV_REF.match(value):
+                    where = ("mcpServers", name, section, key)
+                    errors.append(FileError(loaded.file, loaded.line(where), where,
+                                            "holds a literal secret, and a role is shared, so it never holds secrets",
+                                            f"write ${{{key}}} and give the value in the actor configuration"))
+    if errors:
+        raise FileErrors(errors)
+    return config
+
+
+def check_role_folder(folder: Path, loaded: Loaded, role: RoleManifest) -> list[str]:
+    """A role folder: role.yaml, AGENTS.md, skills in SKILL.md format, and mcp.json for the tools it needs."""
+    errors: list[FileError] = []
+    agents = folder / "AGENTS.md"
+    if not agents.is_file() or not agents.read_text().strip():
+        errors.append(FileError(str(agents), None, (), "is missing or empty",
+                                "write the role's character and instructions in AGENTS.md"))
+    skills = []
+    for skill_dir in sorted(p for p in (folder / "skills").glob("*") if p.is_dir()):
+        skill_md = skill_dir / "SKILL.md"
+        if not skill_md.is_file():
+            errors.append(FileError(str(skill_dir), None, (), "is a skill folder with no SKILL.md",
+                                    "add SKILL.md, or remove the folder"))
+            continue
+        try:
+            skill_loaded = load_file(skill_md)
+            if skill_loaded.body is None:
+                raise FileErrors([FileError(str(skill_md), 1, (), "has no frontmatter",
+                                            "start it with --- lines holding `name` and `description`")])
+            skill = validate(skill_loaded, SkillFrontmatter)
+            if skill.name != skill_dir.name:
+                errors.append(FileError(str(skill_md), skill_loaded.line(("name",)), ("name",),
+                                        f'"{skill.name}" doesn\'t match its folder "{skill_dir.name}"',
+                                        "rename the folder or the skill so they match"))
+            skills.append(skill.name)
+        except FileErrors as e:
+            errors += e.errors
+    servers: list[str] = []
+    mcp = folder / "mcp.json"
+    if mcp.is_file():
+        try:
+            servers = list(check_mcp(load_mcp_json(mcp)).mcpServers)
+        except FileErrors as e:
+            errors += e.errors
+    for i, tool in enumerate(role.needs.tools):
+        if tool not in servers:
+            where = ("needs", "tools", i)
+            fix = (f"add a `{tool}` server to mcp.json" if not servers
+                   else f"use one of mcp.json's servers ({', '.join(servers)}), or add `{tool}` to it")
+            errors.append(FileError(loaded.file, loaded.line(where), where, f'"{tool}" is not a server in mcp.json', fix))
+    if errors:
+        raise FileErrors(errors)
+    return [f"  folder: AGENTS.md; skills: {', '.join(skills) or 'none'}; mcp.json servers: {', '.join(servers) or 'none'}"]
+
+
 def check(path: str | Path) -> tuple[BaseModel, list[str]]:
     """Validate a file or folder. Returns the document and notes on the extra checks that ran."""
-    loaded = load_file(resolve(Path(path)))
+    target = resolve(Path(path))
+    loaded = load_file(target)
     doc = validate(loaded, detect(loaded).model)
     notes: list[str] = []
+    if isinstance(doc, RoleManifest):
+        if Path(path).is_dir():
+            notes = check_role_folder(Path(path), loaded, doc)
+        else:
+            notes = ["  (pass the role's folder to also check AGENTS.md, skills and mcp.json)"]
     if isinstance(doc, Script):
         check_body(loaded)
     if isinstance(doc, PlayFile):

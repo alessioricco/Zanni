@@ -271,3 +271,25 @@ Approved by Alessio at ask point B, with the software round as the example.
 - JSON Lines is append-only, readable with standard tools, and safe to write while a run is in progress.
 
 **Not in the first version:** risk tiers.
+
+## D19. Role packages: checking the whole folder, version tags, tiers as labels (2026-10-23)
+
+**Decision:**
+
+- **Folder checks:** `zanni <role folder>` checks the whole package:
+  - `role.yaml`;
+  - `AGENTS.md`, present and not empty;
+  - every `skills/*/SKILL.md`, against the Agent Skills spec (agentskills.io/specification), with the name matching its folder;
+  - `mcp.json`, in the standard `mcpServers` shape;
+  - that every `needs.tools` name is an `mcp.json` server, and every `outputs` path is inside `needs.stage_write`.
+- **Standard formats are checked, not tightened.** SKILL.md and `mcp.json` are standards shared with other tools, so their rules are enforced but fields Zanni doesn't define are left alone. D10's strictness applies to Zanni's own formats.
+- **Secrets in `mcp.json`:** an `env` or `headers` value whose name looks like a secret must be a `${VAR}` reference. The value comes from the actor configuration or the environment (D15).
+- **Versions:** `@X.Y.Z` resolves to the tag `path/to/role/vX.Y.Z` (for a role in a subfolder), then `vX.Y.Z`, then `X.Y.Z`. Two of them pointing to different commits is an error. Scripts resolve the same way.
+- **Tiers:** `model.needs.tier` is a free label. The reference roles use `judgement`, `coding` and `basic`.
+- **Not in the first version:** a role-level budget, and sandboxing roles from other people.
+
+**Why:**
+
+- **Tiers:** models change faster than a spec should, and the tier is only a hint (D11).
+- **Version tags:** subfolder tags follow the convention of repositories that hold several packages.
+- **Mismatched tags:** a version resolving two ways is refused, rather than guessed.
