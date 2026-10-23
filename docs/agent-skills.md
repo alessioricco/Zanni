@@ -22,7 +22,7 @@ The limits for agent sessions in `AGENTS.md` apply to every agent:
 |---|---|
 | `mcp-builder` | Designing MCP servers and their tools, such as Zanni's verifiers |
 | `skill-creator` | Writing role skills in the SKILL.md format, and testing when they trigger |
-| `webapp-testing` | Driving a running web app with Playwright, for the software play's tester and browser verifiers |
+| `webapp-testing` | Driving a running web app with Playwright, for the software script's tester and browser verifiers |
 
 The skills aren't committed. Download them with:
 

@@ -10,14 +10,14 @@ There is one command, and it takes one file. The file decides what runs; options
 
 | | Meaning |
 |---|---|
-| `file` | An actor file, a play file or a role manifest. The kind comes from its keys ([Zanni files](files.md)). |
+| `file` | An actor configuration, a play file or a role manifest. The kind comes from its keys ([Zanni files](files.md)). |
 | `--version` | Print `zanni <version>` and exit. |
 | `-h`, `--help` | Print the usage and exit. |
 
 ## What it does
 
 1. **Read the file** as YAML. A syntax error is reported with its line.
-2. **Work out the kind of file:** `role` + `play` is an actor file, `cast` is a play file, `mission` is a role manifest.
+2. **Work out the kind of file:** `role` + `play` is an actor configuration, `cast` is a play file, `mission` is a role manifest.
 3. **Validate it** against that kind's schema, and collect every problem.
 4. **Print a summary** of what it would run, or the list of problems.
 
@@ -28,7 +28,7 @@ It doesn't start anything yet. Running actors and directors comes in later miles
 A valid file prints its summary on standard output, ending with `Valid.`:
 
 ```
-Actor file: would start an actor that joins a play.
+Actor configuration: would start 'tester-1', playing a role in a play.
   role: github.com/someone/tester@1.4.0
   play: https://example.com/plays/habit-tracker/play.yaml
 Valid. Nothing was started: running files comes in a later version (see ROADMAP.md).

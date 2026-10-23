@@ -1,4 +1,5 @@
 name: ranges
+script: ./script.md
 stage: ./stage
 cast:
   coder: { role: roles/coder, seats: 3 }

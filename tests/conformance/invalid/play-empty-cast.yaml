@@ -1,3 +1,4 @@
 name: x
+script: ./script.md
 stage: ./s
 cast: {}

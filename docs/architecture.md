@@ -13,7 +13,7 @@ src/zanni/
     loader.py       # YAML -> data, plus the line of every field
     errors.py       # FileError / FileErrors: the plain-words error format
     validation.py   # Pydantic errors -> plain words; secret detection; "did you mean"
-    schemas.py      # Pydantic models: ActorFile, PlayFile, RoleManifest
+    schemas.py      # Pydantic models: ActorConfiguration, PlayFile, RoleManifest
     kinds.py        # which kind of file this is, from its keys
     summary.py      # what a valid file would run, in a few lines
   engine/           # the engine adapter (empty for now)
@@ -31,7 +31,7 @@ zanni play.yaml
   │
   ├─ loader.load_file      read the text; parse the YAML; map every field path to its line;
   │                        reject duplicate keys and YAML syntax errors
-  ├─ kinds.detect          role+play → ActorFile, cast → PlayFile, mission → RoleManifest
+  ├─ kinds.detect          role+play → ActorConfiguration, cast → PlayFile, mission → RoleManifest
   ├─ validation.validate   reject secret-looking keys; validate with the Pydantic model;
   │                        turn every ValidationError into a FileError with its line
   └─ summary.summarise     print what it would run          (or print every FileError, exit 2)
@@ -45,7 +45,7 @@ Each step raises `FileErrors` with every problem it found. `cli.main` catches it
 - **Lines come from the YAML parser.** `loader.py` composes the YAML node tree and records each key's line under its field path, as a tuple such as `("cast", "coder", "seats")`. A missing field is reported at its parent's line.
 - **Validators speak plain words.** A custom validator in `schemas.py` raises `ValueError("problem; fix")`. `validation.py` splits the message on the first `"; "` into the problem and the fix.
 - **Strict models.** Every model inherits from `Strict` (`extra="forbid"`, frozen). For unknown keys, `validation._known_fields` walks the model tree to find the allowed names, and `difflib` suggests the closest.
-- **Shorthand is normalised before validation.** A cast entry can be a plain role reference. A `BeforeValidator` turns it into `{role: …}`, so there is one model and error paths stay clean.
+- **Shorthand is normalised before validation.** A cast entry can be a plain package reference. A `BeforeValidator` turns it into `{role: …}`, so there is one model and error paths stay clean.
 
 ## The engine adapter (coming)
 

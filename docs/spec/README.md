@@ -10,8 +10,8 @@ The spec covers only what existing standards don't:
 | A role's skills | SKILL.md | — |
 | A role's tools | MCP, standard `mcp.json` | — |
 | A role's Zanni fields | — | [Role package](role-package.md) |
-| Which role to play, in which play | — | [Actor file](actor-file.md) |
-| The play: cast, stage, script, house rules | — | [Play folder](play-folder.md) |
+| One actor instance: role, play, models, credentials | — | [Actor configuration](actor-configuration.md) |
+| A production of a script: script, director, cast, stage, house rules | — | [Play](play.md) |
 | Director to actor | A2A | — |
 | Joining, seats, scoped credentials, release | A2A extension | [Casting extension](casting-extension.md) |
 
@@ -25,7 +25,7 @@ Version 0 is a draft, and anything may change until 1.0.
 ## Rules that apply to every Zanni file
 
 - **Format:** YAML. Unknown keys are errors, and so are duplicate keys (D10).
-- **No secrets:** a key that looks like a secret (`key`, `token`, `secret`, `password`) is rejected at any depth. Secrets come from the environment or a `.env`.
+- **No secrets in shared files:** in roles, scripts and plays, a key that looks like a secret (`key`, `token`, `secret`, `password`) is rejected at any depth. Only an actor configuration may hold credentials, under D15's safeguards.
 - **Kinds:** the kind of file comes from its keys, never from its name or a flag (D9).
 - **Errors:** an implementation reports each problem with the file, the line, the field path, what is wrong and what to change.
-- **Enforcement:** every field that sets a permission or a limit names the component that enforces it: the stage, the director, a verifier or the actor's host. No limit relies on an actor obeying it.
+- **Enforcement:** every field that sets a permission or a limit names the component that enforces it: the stage, the director, a verifier or the actor (through its configuration). No limit relies on an actor obeying it.

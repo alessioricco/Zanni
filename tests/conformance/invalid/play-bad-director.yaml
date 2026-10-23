@@ -1,4 +1,5 @@
 name: x
+script: ./script.md
 director: director.example.com
 stage: ./s
 cast:

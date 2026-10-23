@@ -1,4 +1,4 @@
-"""The file decides what runs: tell actor files, play files and role manifests apart by their keys."""
+"""The file decides what runs: tell actor configurations, play files and role manifests apart by their keys."""
 
 import difflib
 from dataclasses import dataclass
@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 from zanni.files.errors import FileError, FileErrors
 from zanni.files.loader import Loaded
-from zanni.files.schemas import ActorFile, PlayFile, RoleManifest
+from zanni.files.schemas import ActorConfiguration, PlayFile, RoleManifest
 
 
 @dataclass(frozen=True)
@@ -18,7 +18,7 @@ class Kind:
 
 
 KINDS = (
-    Kind("actor file", ActorFile, frozenset({"role", "play"})),
+    Kind("actor configuration", ActorConfiguration, frozenset({"role", "play"})),
     Kind("play file", PlayFile, frozenset({"cast"})),
     Kind("role manifest", RoleManifest, frozenset({"mission"})),
 )
@@ -37,7 +37,7 @@ def detect(loaded: Loaded) -> Kind:
             if close:
                 raise FileErrors([FileError(loaded.file, loaded.line((key,)), (key,), "is not a known field",
                                             f"did you mean `{close[0]}`?")])
-        problem = "is not an actor file, a play file or a role manifest"
+        problem = "is not an actor configuration, a play file or a role manifest"
     else:
         problem = f"looks like more than one kind of file ({', '.join(k.name for k in matches)})"
     raise FileErrors([FileError(loaded.file, None, (), problem, f"each kind needs these fields: {needs}")])

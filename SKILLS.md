@@ -9,8 +9,8 @@ Other agents may look for skills in another folder; pass it with `--dir`, for ex
 | Skill | Why Zanni needs it | Source |
 |---|---|---|
 | `mcp-builder` | Zanni has no built-in tools. Everything an actor can do comes from an MCP server, and Zanni ships some of its own, such as verifiers. This skill covers designing MCP servers and their tools. | [skills/mcp-builder](https://github.com/anthropics/skills/tree/dbd4588f9e1033efb41dad4bef2f7947c8993d44/skills/mcp-builder) |
-| `skill-creator` | Every Zanni role ships skills in the SKILL.md format, so writing them and measuring whether they trigger is core work for the roles, and for the reference roles of the first play. | [skills/skill-creator](https://github.com/anthropics/skills/tree/dbd4588f9e1033efb41dad4bef2f7947c8993d44/skills/skill-creator) |
-| `webapp-testing` | The software play's tester explores the running app, and its verifiers run browser tests on it. This skill covers driving a local web app with Playwright. | [skills/webapp-testing](https://github.com/anthropics/skills/tree/dbd4588f9e1033efb41dad4bef2f7947c8993d44/skills/webapp-testing) |
+| `skill-creator` | Every Zanni role ships skills in the SKILL.md format, so writing them and measuring whether they trigger is core work for the roles, and for the reference roles of the first script. | [skills/skill-creator](https://github.com/anthropics/skills/tree/dbd4588f9e1033efb41dad4bef2f7947c8993d44/skills/skill-creator) |
+| `webapp-testing` | The software script's tester explores the running app, and its verifiers run browser tests on it. This skill covers driving a local web app with Playwright. | [skills/webapp-testing](https://github.com/anthropics/skills/tree/dbd4588f9e1033efb41dad4bef2f7947c8993d44/skills/webapp-testing) |
 
 All three are licensed under Apache 2.0. Each folder includes its `LICENSE.txt`.
 

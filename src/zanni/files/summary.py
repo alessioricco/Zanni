@@ -1,18 +1,17 @@
 """What `zanni <file>` would run, in a few lines."""
 
-from zanni.files.schemas import ActorFile, PlayFile, RoleManifest
+from zanni.files.schemas import ActorConfiguration, PlayFile, RoleManifest
 
 
-def summarise(doc: ActorFile | PlayFile | RoleManifest) -> list[str]:
-    if isinstance(doc, ActorFile):
-        return ["Actor file: would start an actor that joins a play.",
+def summarise(doc: ActorConfiguration | PlayFile | RoleManifest) -> list[str]:
+    if isinstance(doc, ActorConfiguration):
+        who = f"'{doc.name}'" if doc.name else "an actor"
+        return [f"Actor configuration: would start {who}, playing a role in a play.",
                 f"  role: {doc.role}", f"  play: {doc.play}"]
     if isinstance(doc, PlayFile):
         lines = [f"Play file: would start the director for the play '{doc.name}'.",
-                 f"  director: {doc.director or 'this machine'}", f"  stage: {doc.stage}"]
-        if doc.script:
-            lines.append(f"  script: {doc.script}")
-        lines.append("  cast:")
+                 f"  script: {doc.script}",
+                 f"  director: {doc.director or 'this machine'}", f"  stage: {doc.stage}", "  cast:"]
         for name, entry in doc.cast.items():
             host = f", started here ({entry.host})" if entry.host == "local" else (f", on {entry.host}" if entry.host else "")
             lines.append(f"    {name}: {entry.role}, {entry.seats} seat{'s' if entry.seats.max > 1 else ''}{host}")

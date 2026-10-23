@@ -29,9 +29,9 @@ uv run zanni examples/plays/habit-tracker/play.yaml
 
 ```
 Play file: would start the director for the play 'habit-tracker'.
+  script: github.com/someone/habit-tracker@1.0.0
   director: wss://director.example.com
   stage: git@github.com:alessio/habit-tracker.git
-  script: ./script.yaml
   cast:
     product-owner: github.com/zanni-roles/product-owner@1.0.0, 1 seat
     tester: github.com/someone/tester@1.4.0, 1 seat
@@ -53,7 +53,7 @@ play.yaml has 2 problems; nothing was started.
 The other two examples:
 
 ```bash
-uv run zanni examples/tester.yaml               # an actor file
+uv run zanni examples/tester.yaml               # an actor configuration
 uv run zanni examples/roles/tester/role.yaml    # a role manifest
 ```
 
@@ -61,9 +61,9 @@ uv run zanni examples/roles/tester/role.yaml    # a role manifest
 
 | Works | Not yet |
 |---|---|
-| Validating actor files, play files and role manifests | Starting an actor or a director |
-| Errors with their line and how to fix them | Fetching roles from git, or plays from URLs (only their shape is checked) |
-| Rejecting keys that look like secrets | Validating `AGENTS.md`, `skills/`, `mcp.json`, `script.yaml` or `roles.lock` |
+| Validating actor configurations, play files and role manifests | Starting an actor or a director |
+| Errors with their line and how to fix them | Fetching roles and scripts from git, or plays from URLs (only their shape is checked) |
+| Rejecting secrets in shared files | Validating `AGENTS.md`, `skills/`, `mcp.json`, scripts or `roles.lock` |
 | A summary of what each file would run | Calling any model |
 
 ## Next steps

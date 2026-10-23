@@ -26,7 +26,7 @@ def broken(tmp_path: Path, example: Path, old: str, new: str) -> Path:
 
 
 @pytest.mark.parametrize("example, first_line", [
-    (ACTOR, "Actor file: would start an actor that joins a play."),
+    (ACTOR, "Actor configuration: would start 'tester-1', playing a role in a play."),
     (PLAY, "Play file: would start the director for the play 'habit-tracker'."),
     (ROLE, "Role manifest: the role 'tester' 1.4.0."),
 ])
@@ -44,13 +44,17 @@ def test_play_summary_shows_cast_and_house_rules():
 
 @pytest.mark.parametrize("example, old, new, expected", [
     (ACTOR, "tester@1.4.0", "tester",
-     'line 2, role: "github.com/someone/tester" has no version; write it as github.com/someone/tester@1.0.0'),
-    (ACTOR, "play:", "plya:", "line 3, plya: is not a known field; did you mean `play`?"),
+     'line 3, role: "github.com/someone/tester" has no version; write it as github.com/someone/tester@1.0.0'),
+    (ACTOR, "play:", "plya:", "line 4, plya: is not a known field; did you mean `play`?"),
     (PLAY, "seats: 1-4", "seats: 4-1", "line 9, cast.coder.seats: the range 4-1 goes down"),
     (PLAY, "host: local", "hots: local", "line 9, cast.coder.hots: is not a known field; did you mean `host`?"),
     (PLAY, "budget: 20.00", "budget: -1", "line 11, house_rules.budget: should be at least 0, not -1"),
-    (PLAY, "director: wss://", "director: ftp://", "line 3, director: \"ftp://director.example.com\" is not a director address"),
+    (PLAY, "director: wss://", "director: ftp://", "line 4, director: \"ftp://director.example.com\" is not a director address"),
     (PLAY, "  gates: [plan, release]", "  gates: [plan, release]\n  token: abc", "line 13, house_rules.token: looks like a secret"),
+    (PLAY, "script: github.com/someone/habit-tracker@1.0.0", "script: github.com/someone/habit-tracker",
+     'line 3, script: "github.com/someone/habit-tracker" has no version'),
+    (PLAY, "script: github.com/someone/habit-tracker@1.0.0\n", "",
+     "line 2, script: is required but missing; add a `script:` line"),
     (ROLE, "version: 1.4.0", "version: 1.4", "line 3, version: 1.4 was read as a number"),
     (ROLE, "mission:", "mision:", "line 4, mision: is not a known field; did you mean `mission`?"),
     (ROLE, "tools: true", "tools: maybe", 'line 5, model.needs.tools: should be true or false, not "maybe"'),

@@ -1,6 +1,6 @@
 # Writing a role
 
-A role is a folder describing a persona: who it is, what it knows how to do, which tools it needs, and what it may touch. The same engine plays any role, so adding a role needs no code.
+A role is a package describing a persona: who it is, what it knows how to do, which tools it needs, and what it may touch. A zanni is an empty shell until it is given a role, so adding a role needs no code. A role holds capabilities only: names, models and credentials belong to each actor's configuration.
 
 > **Status:** today `zanni` validates `role.yaml`, and checks nothing else in the folder. The rest of this page is the format roles will be loaded from (D4 in [DECISIONS.md](../DECISIONS.md)), so you can start writing roles now.
 
@@ -40,7 +40,7 @@ outputs:
 
 - **`needs` are requests, not grants.** The play decides what to grant, and the stage enforces what a seat may read and write. A role can't give itself more access.
 - **`never` is guidance for the model, not a limit.** The real limits are the stage's permissions and the verifiers. Write `never` rules anyway: they keep the role on task.
-- **`model.needs` says what kind of model the role needs, not which one.** The actor's host picks a model that matches. `suggested` is only a hint: a role never requires a particular model or vendor.
+- **`model.needs` says what kind of model the role needs, not which one.** The model is chosen in each actor's configuration; `model.needs` and `suggested` are hints for whoever writes it. A role never requires a particular model or vendor.
 
 Check it:
 

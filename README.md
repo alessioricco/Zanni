@@ -1,9 +1,9 @@
 # Zanni
 
-An open-source engine for teams of AI personas. Each **actor** plays a **role** defined in a folder. A **director** casts actors and coordinates them on a shared **stage**, following a **play**.
+An open-source engine for teams of AI personas. Each process is a **zanni**, an empty shell that becomes an **actor** when given a **role**. A **script** is the reusable work; a **play** is one production of it, where a **director** casts actors into the script's parts and coordinates them on a shared **stage**, the play's workspace.
 
-- **Roles are configuration, not code.** A role is a folder (`role.yaml`, `AGENTS.md`, skills, `mcp.json`) that anyone can write and publish.
-- **Actors run anywhere.** They can run on a laptop, a GPU workstation or a cloud server, each with its own model, local or cloud.
+- **Roles and scripts are packages, not code.** A role (`role.yaml`, `AGENTS.md`, skills, `mcp.json`) and a script can be written and published by anyone, and the same script can be staged by many companies.
+- **Actors run anywhere.** They can run on a laptop, a GPU workstation or a cloud server, each with its own configuration: its models, local or cloud, and its credentials.
 - **Limits can't be bypassed.** Whoever runs the play sets them, and no role can loosen them.
 - **Verifiers decide when work is done**, not the actor that did it.
 - **Built on standards:** AGENTS.md, Agent Skills, MCP and A2A. Zanni specifies only the gaps, and [the spec](docs/spec/README.md) is the product.

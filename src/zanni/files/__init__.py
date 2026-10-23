@@ -1,1 +1,1 @@
-"""Loading and validating Zanni files: actor files, play files and role manifests."""
+"""Loading and validating Zanni files: actor configurations, play files and role manifests."""

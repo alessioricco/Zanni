@@ -1,4 +1,4 @@
-"""The three kinds of Zanni file: actor file, play file and role manifest. Field names follow the vision doc."""
+"""The kinds of Zanni file: actor configuration, play file and role manifest. Field names follow the vision doc."""
 
 import re
 from decimal import Decimal
@@ -6,7 +6,7 @@ from typing import Annotated
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, PlainSerializer
 
-REMOTE_ROLE = re.compile(r"^(?P<source>[a-z0-9-]+(\.[a-z0-9-]+)+/[^@\s]+)@(?P<version>[^@\s/]+)$")
+REMOTE_REF = re.compile(r"^(?P<source>[a-z0-9-]+(\.[a-z0-9-]+)+/[^@\s]+)@(?P<version>[^@\s/]+)$")
 SEMVER = re.compile(r"^\d+\.\d+\.\d+([-+][0-9A-Za-z.-]+)?$")
 
 
@@ -14,21 +14,22 @@ class Strict(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
 
-def _role_ref(value: object) -> object:
+def _package_ref(value: object) -> object:
+    """A role or script reference: host/owner/name@version, or a local folder."""
     if not isinstance(value, str):
         return value
-    if REMOTE_ROLE.match(value):
+    if REMOTE_REF.match(value):
         return value
     first = value.split("/", 1)[0]
     if "@" not in value and "." in first and first not in (".", ".."):
         raise ValueError(f'"{value}" has no version; write it as {value}@1.0.0, with the version you want')
     if "@" in value:
-        raise ValueError(f'"{value}" is not a role reference; write host/owner/name@version, '
+        raise ValueError(f'"{value}" is not a package reference; write host/owner/name@version, '
                          "e.g. github.com/someone/tester@1.4.0")
     return value  # a local folder, e.g. roles/tester or ./roles/tester
 
 
-RoleRef = Annotated[str, BeforeValidator(_role_ref)]
+PackageRef = Annotated[str, BeforeValidator(_package_ref)]
 
 
 class Seats(Strict):
@@ -60,19 +61,20 @@ def _seats(value: object) -> object:
 SeatRange = Annotated[Seats, BeforeValidator(_seats), PlainSerializer(str)]
 
 
-# Actor file
+# Actor configuration
 
-class ActorFile(Strict):
-    """Which role to play, and in which play. Everything else comes from the director."""
+class ActorConfiguration(Strict):
+    """One actor instance: which role it plays and which play it joins. Never the role's capabilities (D14)."""
 
-    role: RoleRef
+    name: str | None = Field(default=None, min_length=1)
+    role: PackageRef
     play: str = Field(min_length=1)
 
 
 # Play file
 
 class CastEntry(Strict):
-    role: RoleRef
+    role: PackageRef
     seats: SeatRange = Seats(min=1, max=1)
     host: str | None = None  # "local": the director starts these seats itself
 
@@ -96,13 +98,13 @@ def _director(value: object) -> object:
 
 
 class PlayFile(Strict):
-    """A play: the director, the stage, the cast, the script and the house rules."""
+    """One production of a script: the director, the cast for the script's parts, the stage and the house rules."""
 
     name: str = Field(min_length=1)
+    script: PackageRef
     director: Annotated[str, BeforeValidator(_director)] | None = None  # None: this machine runs the director
     stage: str = Field(min_length=1)
-    script: str | None = None
-    cast: dict[str, CastSeat] = Field(min_length=1)
+    cast: dict[str, CastSeat] = Field(min_length=1)  # part name -> role
     house_rules: HouseRules = HouseRules()
 
 

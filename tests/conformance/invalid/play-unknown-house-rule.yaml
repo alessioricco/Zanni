@@ -1,4 +1,5 @@
 name: x
+script: ./script.md
 stage: ./s
 cast:
   a: roles/a

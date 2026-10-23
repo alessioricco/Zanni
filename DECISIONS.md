@@ -138,3 +138,72 @@ A file that matches no kind, or more than one, is an error that names the keys e
 - "No secrets in files" is enforced by the parser, not by goodwill (golden rule 5).
 
 **Revisit if:** files need extension fields from other tools. They would get a reserved prefix, such as `x-`, rather than loosening strictness.
+
+## D11. The actor's model is set in its configuration (2026-10-23)
+
+**Decision:**
+
+- An actor's configuration lists the models it runs, in order. The first is used; the next one is used when it fails.
+- The role never forces a model. Its `model.needs` and `suggested` are hints for whoever writes the configuration.
+- The script and the play never choose models.
+
+**Why:** Alessio's call. A zanni is an empty shell. Its role package says what it can do, and its configuration says how this instance runs, including which model. A remote actor contributes with its own model.
+
+**Consequence:** the director can't verify which model an actor used. Quality is enforced by verifiers on the director's side, never by model choice.
+
+**Supersedes:** D7's "a price declared by the actor's host in its `models.yaml`". The price now lives in the model entry of the actor's configuration.
+
+**Closes:** the vision's open question "Who chooses the model".
+
+## D12. The stage is an abstract workspace (2026-10-23)
+
+**Decision:**
+
+- The spec defines the operations every stage offers, and the permissions for each seat.
+- The play chooses a backend, and the backend enforces the permissions.
+- The first version specifies two backends:
+  - `git`: a branch per seat, for plays whose work is code;
+  - one non-git backend, the simplest that proves the abstraction, for plays whose work is documents.
+
+**Why:** Alessio's call. A stage is a git repository only when the play is about code; a play that writes a document may need something else.
+
+**Closes:** the vision's open question "Stage". It replaces "a stage as a git repo" in the first version's scope.
+
+## D13. Script and play are separate (2026-10-23)
+
+**Decision:**
+
+- **The script** is the reusable work: the mission, the parts it needs, the workspace it expects, and how the work unfolds. It is published and referenced like a role (`host/owner/name@version`), and may suggest a role for each part.
+- **The play** is one production of a script: the director, a role cast into each part within the script's limits, the stage, and the house rules.
+- **Kinds of file:** the play file references its script with `script:`, which is required, and casts the script's parts in `cast:`. D9's marker for a play file stays `cast`, so a play without `script:` is reported as "script is required" rather than as an unknown kind of file.
+
+**Why:** Alessio's call, after the theatre itself: two companies can stage the same script with different actors and directors, as *Hamilton* runs on Broadway and in the West End.
+
+**Format:** the script's format must stay flexible, because scripts solve very different problems. It is specified in `docs/spec/script.md`.
+
+## D14. Configuration is separate from the role (2026-10-23)
+
+**Decision:**
+
+- **The actor configuration** is one instance's file: its name, its role reference, the play it joins, its models and its credentials.
+- **The role package** holds only capabilities: character, skills, tools, needs. It never holds a name, a model choice or a credential.
+- **Files:** what was the "actor file" is now the actor configuration.
+
+**Why:** the same role package runs as many actors, on different machines, with different models and access. Mixing instance settings into the role would make every instance a fork.
+
+## D15. The actor configuration may hold its credentials (2026-10-23)
+
+**Decision:** an actor configuration may hold that instance's credentials: API keys for its models, and tokens or key paths for its tools. `zanni` protects them:
+
+- **Permissions:** a configuration holding credentials is refused if other users can read it (anything looser than `600`), as SSH does with private keys. The message gives the `chmod` to run.
+- **Git:** it is refused if git tracks it inside a repository. Git-ignored files are fine.
+- **Output:** credentials are never printed, logged or sent to the director. Summaries show them as `••••`.
+- **Indirection:** a credential may instead be `${VAR}`, read from the environment, which is useful in CI.
+
+Roles, scripts and plays still reject anything that looks like a secret (D10). Those files are shared and published.
+
+**Why:** Alessio's call. The configuration is an instance file, like an addressable `.env` for one actor, and never part of a repository. Two actors on one machine need different credentials: one uses OpenAI and one Claude, one has GitHub access and one an SSH terminal. A `.env` bound to a codebase can't express that.
+
+**Supersedes:** D10's "no Zanni file holds a secret", for the actor configuration only. The agent-session rule is unchanged: never print, log or commit a real key, and tests use obviously fake keys.
+
+**Not in the first version:** secrets management for actors running on cloud services.

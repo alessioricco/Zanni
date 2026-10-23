@@ -1,3 +1,4 @@
 name: x
+script: ./script.md
 cast:
   a: roles/a

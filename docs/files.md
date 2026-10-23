@@ -1,43 +1,46 @@
 # Zanni files
 
-There is one command, `zanni <file>`, and three kinds of file. The kind comes from the file's keys, never from its name or a flag:
+There is one command, `zanni <file>`. The kind of file comes from its keys, never from its name or a flag:
 
 | Kind | Recognised by | What `zanni` would run | Full field list |
 |---|---|---|---|
-| Actor file | `role` and `play` | an actor that joins the play | [spec: actor file](spec/actor-file.md) |
-| Play file | `cast` | the play's director | [spec: play folder](spec/play-folder.md) |
+| Actor configuration | `role` and `play` | an actor: a zanni playing the role, joining the play | [spec: actor configuration](spec/actor-configuration.md) |
+| Play file | `cast` | the play's director, running the play's script | [spec: play](spec/play.md) |
 | Role manifest (`role.yaml`) | `mission` | nothing; it is validated | [spec: role package](spec/role-package.md) |
+
+Scripts have their own format, specified in the [script spec](spec/README.md).
 
 ## Rules for every file
 
 - **Unknown keys are errors.** A typo gets a "did you mean": a misspelled limit must never become a silent default.
 - **Duplicate keys are errors.** Plain YAML would silently keep the last one.
-- **No secrets.** A key that looks like a secret (`api_key`, `token`, `password`, `client_secret`, …) is rejected at any depth. Secrets go in the environment or a git-ignored `.env`; see [Models and keys](models-and-keys.md).
+- **No secrets in shared files.** Roles, scripts and plays are shared and published, so a key that looks like a secret (`api_key`, `token`, `password`, `client_secret`, …) is rejected at any depth. Only an actor configuration may hold credentials, and `zanni` protects it; see [Models and keys](models-and-keys.md).
 - **Defaults everywhere.** A file only says what differs from the defaults. The spec pages list every field with its default.
 - **Every problem at once.** `zanni` reports all the problems in a file in one go, each with its line.
 
-## Actor file
+## Actor configuration
 
-It names the role this actor plays and the play it joins. Everything else comes from the director.
+One actor instance's own file. It names the role this instance plays and the play it joins, and (as the spec grows) its models and credentials. It stays on the actor's machine and never goes in a repository.
 
 ```yaml
 # examples/tester.yaml
+name: tester-1
 role: github.com/someone/tester@1.4.0
 play: https://example.com/plays/habit-tracker/play.yaml
 ```
 
-`role` is a role reference: `host/owner/name@version`, or a local folder such as `roles/tester`. A remote reference needs its version.
+`role` is a package reference: `host/owner/name@version`, or a local folder such as `roles/tester`. A remote reference needs its version.
 
 ## Play file
 
-It describes the play: the director, the stage, the cast, the script and the house rules.
+One production of a script: the script it performs, the director, a role for each of the script's parts, the stage, and the house rules.
 
 ```yaml
 # examples/plays/habit-tracker/play.yaml
 name: habit-tracker
+script: github.com/someone/habit-tracker@1.0.0
 director: wss://director.example.com
 stage: git@github.com:alessio/habit-tracker.git
-script: ./script.yaml
 cast:
   product-owner: github.com/zanni-roles/product-owner@1.0.0
   tester: github.com/someone/tester@1.4.0
@@ -47,7 +50,8 @@ house_rules:
   gates: [plan, release]
 ```
 
-- **`cast`:** maps a seat name to a role reference, or to `{ role, seats, host }`.
+- **`script`:** a package reference to the script being performed. It is required.
+- **`cast`:** maps each of the script's parts to a role reference, or to `{ role, seats, host }`.
 - **`seats`:** a number (`2`) or a range (`1-4`). For a range, the director decides how many to cast, within it.
 - **`host: local`:** the director starts these seats itself, on its own machine.
 - **`director`:** can be left out, which means this machine runs the director.

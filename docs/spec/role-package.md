@@ -1,6 +1,6 @@
 # Role package
 
-A role is a folder anyone can write, version and publish:
+A role is a package anyone can write, version and publish: a local folder, a git repository, or a folder online. It holds capabilities only; names, models and credentials belong to each actor's configuration (D14).
 
 ```
 roles/tester/
@@ -42,13 +42,13 @@ A role's needs are **requests, not grants**. The play grants them or not, and th
 | `name` | text | yes | — | the director, at casting | The role's name. |
 | `version` | `major.minor.patch` | yes | — | the director, at casting | The role's version. Write it as text: `1.4` without quotes is read as a number and rejected. |
 | `mission` | text | yes | — | — (guidance to the model) | One sentence on what the role is for. |
-| `model.needs.tools` | true or false | no | `false` | the actor's host | Whether the model must be able to call tools, natively or through the opt-in text format (D5). |
-| `model.needs.context` | number, or with `k`/`m` (`32k`) | no | none | the actor's host | The smallest context window that works for this role. |
-| `model.needs.tier` | text | no | none | the actor's host | The kind of model the role needs, such as `judgement`. **Draft:** the list of tiers isn't fixed. |
-| `model.suggested` | text | no | none | — (a hint) | A default model the host may use. Roles never require a model. |
+| `model.needs.tools` | true or false | no | `false` | — (a hint for the actor configuration) | Whether the model must be able to call tools, natively or through the opt-in text format (D5). |
+| `model.needs.context` | number, or with `k`/`m` (`32k`) | no | none | — (a hint for the actor configuration) | The smallest context window that works for this role. |
+| `model.needs.tier` | text | no | none | — (a hint for the actor configuration) | The kind of model the role needs, such as `judgement`. **Draft:** the list of tiers isn't fixed. |
+| `model.suggested` | text | no | none | — (a hint) | A model the actor configuration may use. Roles never require a model (D11). |
 | `needs.stage_read` | list of paths | no | none | the stage | Stage paths the role asks to read. A path ending in `/` is a folder. |
 | `needs.stage_write` | list of paths | no | none | the stage | Stage paths the role asks to write. |
-| `needs.tools` | list of text | no | none | the actor's host, under the play's grants | Kinds of tool the role asks for. **Draft:** how these names map to the servers in `mcp.json`. |
+| `needs.tools` | list of text | no | none | the actor, under the play's grants | Kinds of tool the role asks for. **Draft:** how these names map to the servers in `mcp.json`. |
 | `never` | list of text | no | none | — (guidance) | Things the role must never do. These are instructions to the model, **not limits**. The real limits are stage permissions and verifiers. |
 | `outputs` | map of path → description | no | none | verifiers, on the director's side | What the role produces. **Draft:** how verifiers check outputs. |
 

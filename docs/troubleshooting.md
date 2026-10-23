@@ -2,10 +2,10 @@
 
 Each problem `zanni` reports already says what to change. This page explains the common ones.
 
-## "is not an actor file, a play file or a role manifest"
+## "is not an actor configuration, a play file or a role manifest"
 
 ```
-notes.yaml: is not an actor file, a play file or a role manifest; each kind needs these fields: actor file: `play` and `role`; play file: `cast`; role manifest: `mission`
+notes.yaml: is not an actor configuration, a play file or a role manifest; each kind needs these fields: actor configuration: `play` and `role`; play file: `cast`; role manifest: `mission`
 ```
 
 `zanni` recognises a file by its keys. Add the key that marks the kind you meant. If you misspelled one of those keys, `zanni` points at it instead:
@@ -16,7 +16,7 @@ role.yaml, line 3, mision: is not a known field; did you mean `mission`?
 
 ## "looks like more than one kind of file"
 
-The file has the marking keys of two kinds, such as `role` and `play` and also `cast`. An actor file and a play file are separate files: split it in two.
+The file has the marking keys of two kinds, such as `role` and `play` and also `cast`. An actor configuration and a play file are separate files: one belongs to an actor's machine, the other to the play. Split it in two.
 
 ## "is not a known field"
 
@@ -29,15 +29,15 @@ Unknown keys are always errors, so a typo can never silently turn into a default
 ## "looks like a secret"
 
 ```
-tester.yaml, line 3, anthropic_api_key: looks like a secret, and Zanni files never hold secrets; remove it and set the value in the environment or a git-ignored .env
+play.yaml, line 13, house_rules.token: looks like a secret, and Zanni files never hold secrets; remove it and set the value in the environment or a git-ignored .env
 ```
 
-Move the value to the environment or a `.env` file; see [Models and keys](models-and-keys.md). Any key containing the word `key`, `token`, `secret` or `password` is treated as a secret, wherever it appears in the file.
+Roles, scripts and plays are shared, so they never hold secrets. Move the value to the actor configuration that needs it, or to the environment; see [Models and keys](models-and-keys.md). Any key containing the word `key`, `token`, `secret` or `password` is treated as a secret, wherever it appears in the file.
 
 ## "has no version"
 
 ```
-tester.yaml, line 1, role: "github.com/someone/tester" has no version; write it as github.com/someone/tester@1.0.0, with the version you want
+tester.yaml, line 3, role: "github.com/someone/tester" has no version; write it as github.com/someone/tester@1.0.0, with the version you want
 ```
 
 A remote role reference needs a version: `github.com/someone/tester@1.4.0`. A local folder needs none: `roles/tester`.

@@ -15,7 +15,7 @@ from zanni.files.validation import validate
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="zanni", description="Run what a Zanni file describes.")
     parser.add_argument("--version", action="version", version=f"zanni {__version__}")
-    parser.add_argument("file", nargs="?", help="an actor file, a play file or a role manifest (.yaml)")
+    parser.add_argument("file", nargs="?", help="an actor configuration, a play file or a role manifest (.yaml)")
     args = parser.parse_args(argv)
     if args.file is None:
         parser.print_usage()

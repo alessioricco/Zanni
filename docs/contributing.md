@@ -19,17 +19,17 @@ You need Python 3.12 or newer, [uv](https://docs.astral.sh/uv/) and git. A local
 These are the project's golden rules, kept in [AGENTS.md](../AGENTS.md) so that people and coding agents follow the same ones:
 
 1. **Docs in the same change.** A change to a command, a file format, a setting, a behaviour or a known limitation updates the matching page under `docs/` in the same commit.
-2. **Spec and code together.** A change to the role package, the play file, the actor file or the casting extension updates the [spec](spec/README.md) and the [conformance tests](testing.md#conformance-tests) in the same commit.
+2. **Spec and code together.** A change to the role package, the script, the play file, the actor configuration, the stage or the casting extension updates the [spec](spec/README.md) and the [conformance tests](testing.md#conformance-tests) in the same commit.
 3. **Standards first.** Before adding a format or protocol, check whether AGENTS.md, skills, MCP or A2A already covers it. Record in [DECISIONS.md](../DECISIONS.md) why a gap needed something new.
-4. **Engine independence.** No role, play, actor file or protocol message refers to Pydantic AI, a specific MCP server or a model vendor. Only the engine adapter (`src/zanni/engine/`) may import Pydantic AI, `mcp` or `a2a-sdk`.
-5. **Limits are enforced where they can't be bypassed.** Every permission or limit names the component that enforces it: the stage, the director, a verifier or the actor's host. Never the actor's own goodwill.
+4. **Engine independence.** No role, script, play or protocol message refers to Pydantic AI, a specific MCP server or a model vendor. Only the engine adapter (`src/zanni/engine/`) may import Pydantic AI, `mcp` or `a2a-sdk`.
+5. **Limits are enforced where they can't be bypassed.** Every permission or limit names the component that enforces it: the stage, the director, a verifier or the actor (through its configuration). Never the actor's own goodwill.
 6. **Local first, cloud never worse.** Actors must work on local models without making cloud models worse. Strategies for weaker models are opt-in.
 7. **Measure before claiming.** Claims about quality or portability come from conformance tests and recorded runs, never from a single run.
 8. **Verify before using.** Pydantic AI, `mcp` and `a2a-sdk` change fast. Check every symbol against the installed package or its current docs.
 
 Also:
 
-- **No secrets anywhere.** Never commit, print or log an API key. No option and no YAML field takes a key.
+- **No secrets in shared files.** Never commit, print or log a real API key, and no option takes one. Roles, scripts and plays never hold secrets; only an actor configuration may, under the safeguards of D15. Tests use obviously fake keys.
 - **No assumptions about a contributor's machine.** Don't hard-code hosts, ports or model tags. Live tests that need a model skip with a clear message when none is configured.
 
 ## Making a change
