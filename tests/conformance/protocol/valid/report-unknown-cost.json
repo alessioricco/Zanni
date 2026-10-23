@@ -1,0 +1,7 @@
+{
+  "kind": "zanni.report",
+  "cue": "round-1-build-coder-1",
+  "outcome": "failed",
+  "summary": "The tests still fail: the date parser is missing.",
+  "cost": null
+}

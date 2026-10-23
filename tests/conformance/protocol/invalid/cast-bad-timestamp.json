@@ -1,0 +1,34 @@
+{
+  "kind": "zanni.cast",
+  "seat": "tester-1",
+  "part": "tester",
+  "permissions": {
+    "read": [
+      "vision.md",
+      "backlog/",
+      "spec/",
+      "tests/",
+      "findings/"
+    ],
+    "write": [
+      "tests/",
+      "findings/"
+    ]
+  },
+  "stage": {
+    "mcp_url": "https://director.example.com/stage/mcp",
+    "token": "stage-token-fake-0001"
+  },
+  "seat_token": "seat-token-fake-0001",
+  "expires_at": "tomorrow",
+  "heartbeat": {
+    "interval": "30",
+    "misses": "3"
+  },
+  "limits": {
+    "budget": {
+      "amount": "2.50",
+      "currency": "USD"
+    }
+  }
+}

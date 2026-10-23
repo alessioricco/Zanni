@@ -1,0 +1,23 @@
+{
+  "kind": "zanni.cast",
+  "seat": "coder-1",
+  "part": "coder",
+  "permissions": {
+    "read": [
+      "/"
+    ],
+    "write": [
+      "app/"
+    ]
+  },
+  "stage": {
+    "mcp_url": "https://director.example.com/stage/mcp",
+    "token": "stage-token-fake-0002",
+    "direct": {
+      "clone_url": "git@github.com:alessio/habit-tracker.git",
+      "branch": "zanni/habit-tracker/coder-1"
+    }
+  },
+  "seat_token": "seat-token-fake-0002",
+  "expires_at": "2026-10-24T18:00:00Z"
+}

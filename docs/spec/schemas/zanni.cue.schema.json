@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "zanni.cue.schema.json",
+  "additionalProperties": false,
+  "description": "What one seat must do now. Actors never receive the whole script.",
+  "properties": {
+    "kind": {
+      "const": "zanni.cue",
+      "title": "Kind",
+      "type": "string"
+    },
+    "cue": {
+      "description": "This cue's id, quoted back in the report.",
+      "minLength": 1,
+      "title": "Cue",
+      "type": "string"
+    },
+    "scene": {
+      "minLength": 1,
+      "title": "Scene",
+      "type": "string"
+    },
+    "instructions": {
+      "minLength": 1,
+      "title": "Instructions",
+      "type": "string"
+    },
+    "reads": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Reads",
+      "type": "array"
+    },
+    "writes": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Writes",
+      "type": "array"
+    },
+    "verifiers": {
+      "default": [],
+      "description": "What will judge the work, in plain words.",
+      "items": {
+        "type": "string"
+      },
+      "title": "Verifiers",
+      "type": "array"
+    },
+    "deadline": {
+      "anyOf": [
+        {
+          "description": "RFC 3339, in UTC, e.g. \"2026-10-24T09:30:00Z\".",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Deadline"
+    }
+  },
+  "required": [
+    "kind",
+    "cue",
+    "scene",
+    "instructions"
+  ],
+  "title": "Cue",
+  "type": "object"
+}

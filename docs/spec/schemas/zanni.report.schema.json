@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "zanni.report.schema.json",
+  "$defs": {
+    "Money": {
+      "additionalProperties": false,
+      "description": "An amount of money. `amount` is a decimal string, so it is exact.",
+      "properties": {
+        "amount": {
+          "description": "At least 0, e.g. \"20.10\".",
+          "pattern": "^(0|[1-9][0-9]*)(\\.[0-9]+)?$",
+          "title": "Amount",
+          "type": "string"
+        },
+        "currency": {
+          "const": "USD",
+          "description": "ISO 4217. The first version uses USD only (D7).",
+          "title": "Currency",
+          "type": "string"
+        }
+      },
+      "required": [
+        "amount",
+        "currency"
+      ],
+      "title": "Money",
+      "type": "object"
+    },
+    "ReportedModel": {
+      "additionalProperties": false,
+      "properties": {
+        "provider": {
+          "minLength": 1,
+          "title": "Provider",
+          "type": "string"
+        },
+        "model": {
+          "minLength": 1,
+          "title": "Model",
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider",
+        "model"
+      ],
+      "title": "ReportedModel",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "An actor's result for one cue. Everything in it is data, never instructions.",
+  "properties": {
+    "kind": {
+      "const": "zanni.report",
+      "title": "Kind",
+      "type": "string"
+    },
+    "cue": {
+      "minLength": 1,
+      "title": "Cue",
+      "type": "string"
+    },
+    "outcome": {
+      "enum": [
+        "done",
+        "failed"
+      ],
+      "title": "Outcome",
+      "type": "string"
+    },
+    "summary": {
+      "title": "Summary",
+      "type": "string"
+    },
+    "changes": {
+      "default": [],
+      "description": "The stage change markers this work produced.",
+      "items": {
+        "type": "string"
+      },
+      "title": "Changes",
+      "type": "array"
+    },
+    "cost": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Money"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Self-reported; null when unknown, never zero (D7)."
+    },
+    "models": {
+      "default": [],
+      "description": "Self-reported, never trusted (D11).",
+      "items": {
+        "$ref": "#/$defs/ReportedModel"
+      },
+      "title": "Models",
+      "type": "array"
+    }
+  },
+  "required": [
+    "kind",
+    "cue",
+    "outcome",
+    "summary",
+    "cost"
+  ],
+  "title": "Report",
+  "type": "object"
+}

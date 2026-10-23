@@ -1,0 +1,5 @@
+{
+  "kind": "zanni.director-card",
+  "play": "habit-tracker",
+  "script": "github.com/someone/habit-tracker@1.0.0"
+}

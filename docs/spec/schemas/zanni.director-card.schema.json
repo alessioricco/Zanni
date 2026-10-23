@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "zanni.director-card.schema.json",
+  "additionalProperties": false,
+  "description": "The casting extension's params on the director's card.",
+  "properties": {
+    "kind": {
+      "const": "zanni.director-card",
+      "default": "zanni.director-card",
+      "title": "Kind",
+      "type": "string"
+    },
+    "play": {
+      "description": "The play's `name`.",
+      "minLength": 1,
+      "title": "Play",
+      "type": "string"
+    },
+    "script": {
+      "description": "The play's `script` reference.",
+      "minLength": 1,
+      "title": "Script",
+      "type": "string"
+    }
+  },
+  "required": [
+    "play",
+    "script"
+  ],
+  "title": "DirectorCardParams",
+  "type": "object"
+}

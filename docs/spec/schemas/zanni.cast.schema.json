@@ -1,0 +1,213 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "zanni.cast.schema.json",
+  "$defs": {
+    "DirectAccess": {
+      "additionalProperties": false,
+      "description": "For a git stage, a seat whose reads cover the whole stage may also clone it (D16).",
+      "properties": {
+        "clone_url": {
+          "minLength": 1,
+          "title": "Clone Url",
+          "type": "string"
+        },
+        "branch": {
+          "description": "The seat's own branch, zanni/<play>/<seat>.",
+          "minLength": 1,
+          "title": "Branch",
+          "type": "string"
+        }
+      },
+      "required": [
+        "clone_url",
+        "branch"
+      ],
+      "title": "DirectAccess",
+      "type": "object"
+    },
+    "Heartbeat": {
+      "additionalProperties": false,
+      "description": "The actor must contact the seat's task (SubscribeToTask, or GetTask) at least every `interval`.",
+      "properties": {
+        "interval": {
+          "default": "30",
+          "description": "A duration in whole seconds, as a decimal string, e.g. \"30\".",
+          "pattern": "^(0|[1-9][0-9]*)$",
+          "title": "Interval",
+          "type": "string"
+        },
+        "misses": {
+          "default": "3",
+          "description": "How many intervals without contact before the seat is recast.",
+          "pattern": "^(0|[1-9][0-9]*)$",
+          "title": "Misses",
+          "type": "string"
+        }
+      },
+      "title": "Heartbeat",
+      "type": "object"
+    },
+    "Limits": {
+      "additionalProperties": false,
+      "properties": {
+        "budget": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Money"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "This seat's share of the play's budget, if any."
+        }
+      },
+      "title": "Limits",
+      "type": "object"
+    },
+    "Money": {
+      "additionalProperties": false,
+      "description": "An amount of money. `amount` is a decimal string, so it is exact.",
+      "properties": {
+        "amount": {
+          "description": "At least 0, e.g. \"20.10\".",
+          "pattern": "^(0|[1-9][0-9]*)(\\.[0-9]+)?$",
+          "title": "Amount",
+          "type": "string"
+        },
+        "currency": {
+          "const": "USD",
+          "description": "ISO 4217. The first version uses USD only (D7).",
+          "title": "Currency",
+          "type": "string"
+        }
+      },
+      "required": [
+        "amount",
+        "currency"
+      ],
+      "title": "Money",
+      "type": "object"
+    },
+    "Permissions": {
+      "additionalProperties": false,
+      "properties": {
+        "read": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Read",
+          "type": "array"
+        },
+        "write": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Write",
+          "type": "array"
+        }
+      },
+      "title": "Permissions",
+      "type": "object"
+    },
+    "StageAccess": {
+      "additionalProperties": false,
+      "properties": {
+        "mcp_url": {
+          "description": "The stage's MCP server (D16).",
+          "pattern": "^(https?|wss?)://\\S+$",
+          "title": "Mcp Url",
+          "type": "string"
+        },
+        "token": {
+          "description": "The seat's bearer token for the stage. Revoked at release.",
+          "minLength": 1,
+          "title": "Token",
+          "type": "string"
+        },
+        "direct": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DirectAccess"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "mcp_url",
+        "token"
+      ],
+      "title": "StageAccess",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The director accepts the actor into a seat.",
+  "properties": {
+    "kind": {
+      "const": "zanni.cast",
+      "title": "Kind",
+      "type": "string"
+    },
+    "seat": {
+      "minLength": 1,
+      "title": "Seat",
+      "type": "string"
+    },
+    "part": {
+      "minLength": 1,
+      "title": "Part",
+      "type": "string"
+    },
+    "permissions": {
+      "$ref": "#/$defs/Permissions",
+      "description": "The seat's effective stage permissions (D12)."
+    },
+    "stage": {
+      "$ref": "#/$defs/StageAccess"
+    },
+    "seat_token": {
+      "description": "Replaces the join token for every later call on this seat. Revoked at release.",
+      "minLength": 1,
+      "title": "Seat Token",
+      "type": "string"
+    },
+    "expires_at": {
+      "description": "RFC 3339, in UTC, e.g. \"2026-10-24T09:30:00Z\".",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z$",
+      "title": "Expires At",
+      "type": "string"
+    },
+    "heartbeat": {
+      "$ref": "#/$defs/Heartbeat",
+      "default": {
+        "interval": "30",
+        "misses": "3"
+      }
+    },
+    "limits": {
+      "$ref": "#/$defs/Limits",
+      "default": {
+        "budget": null
+      }
+    }
+  },
+  "required": [
+    "kind",
+    "seat",
+    "part",
+    "permissions",
+    "stage",
+    "seat_token",
+    "expires_at"
+  ],
+  "title": "Cast",
+  "type": "object"
+}

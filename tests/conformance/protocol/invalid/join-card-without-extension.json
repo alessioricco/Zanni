@@ -1,0 +1,22 @@
+{
+  "kind": "zanni.join",
+  "card": {
+    "name": "tester-1",
+    "description": "Turn acceptance criteria into tests.",
+    "version": "1.4.0",
+    "skills": [
+      {
+        "id": "write-test",
+        "name": "write-test",
+        "description": "How to write one test.",
+        "tags": [
+          "zanni"
+        ]
+      }
+    ],
+    "capabilities": {
+      "extensions": []
+    }
+  },
+  "part": "tester"
+}

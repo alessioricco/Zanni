@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "zanni.release.schema.json",
+  "additionalProperties": false,
+  "properties": {
+    "kind": {
+      "const": "zanni.release",
+      "title": "Kind",
+      "type": "string"
+    },
+    "reason": {
+      "enum": [
+        "done",
+        "recast",
+        "play-stopped",
+        "budget",
+        "no-heartbeat"
+      ],
+      "title": "Reason",
+      "type": "string"
+    },
+    "message": {
+      "default": "",
+      "title": "Message",
+      "type": "string"
+    }
+  },
+  "required": [
+    "kind",
+    "reason"
+  ],
+  "title": "Release",
+  "type": "object"
+}

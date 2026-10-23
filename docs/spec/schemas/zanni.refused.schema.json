@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "zanni.refused.schema.json",
+  "additionalProperties": false,
+  "properties": {
+    "kind": {
+      "const": "zanni.refused",
+      "title": "Kind",
+      "type": "string"
+    },
+    "reason": {
+      "enum": [
+        "not-authorised",
+        "bad-card",
+        "unsupported-version",
+        "no-such-part",
+        "part-full",
+        "host-cap",
+        "role-mismatch",
+        "hash-mismatch",
+        "needs-beyond-part"
+      ],
+      "title": "Reason",
+      "type": "string"
+    },
+    "message": {
+      "description": "What was refused and why, in plain words.",
+      "minLength": 1,
+      "title": "Message",
+      "type": "string"
+    }
+  },
+  "required": [
+    "kind",
+    "reason",
+    "message"
+  ],
+  "title": "Refused",
+  "type": "object"
+}

@@ -1,0 +1,196 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "zanni.actor-card.schema.json",
+  "$defs": {
+    "ModelNeeds": {
+      "additionalProperties": false,
+      "description": "Hints only (D11): the director never checks a model against them.",
+      "properties": {
+        "tools": {
+          "default": false,
+          "title": "Tools",
+          "type": "boolean"
+        },
+        "context": {
+          "anyOf": [
+            {
+              "pattern": "^\\d+[kKmM]?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Context"
+        },
+        "tier": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tier"
+        }
+      },
+      "title": "ModelNeeds",
+      "type": "object"
+    },
+    "ReportedModel": {
+      "additionalProperties": false,
+      "properties": {
+        "provider": {
+          "minLength": 1,
+          "title": "Provider",
+          "type": "string"
+        },
+        "model": {
+          "minLength": 1,
+          "title": "Model",
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider",
+        "model"
+      ],
+      "title": "ReportedModel",
+      "type": "object"
+    },
+    "RoleNeeds": {
+      "additionalProperties": false,
+      "properties": {
+        "stage_read": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Stage Read",
+          "type": "array"
+        },
+        "stage_write": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Stage Write",
+          "type": "array"
+        },
+        "tools": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Tools",
+          "type": "array"
+        }
+      },
+      "title": "RoleNeeds",
+      "type": "object"
+    },
+    "RoleOnCard": {
+      "additionalProperties": false,
+      "properties": {
+        "ref": {
+          "description": "The package reference the actor was started with.",
+          "minLength": 1,
+          "title": "Ref",
+          "type": "string"
+        },
+        "hash": {
+          "description": "A package's content hash, as in play.lock (D18).",
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Hash",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "version": {
+          "pattern": "^\\d+\\.\\d+\\.\\d+([-+][0-9A-Za-z.-]+)?$",
+          "title": "Version",
+          "type": "string"
+        },
+        "needs": {
+          "$ref": "#/$defs/RoleNeeds",
+          "default": {
+            "stage_read": [],
+            "stage_write": [],
+            "tools": []
+          }
+        },
+        "never": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Never",
+          "type": "array"
+        },
+        "model_needs": {
+          "$ref": "#/$defs/ModelNeeds",
+          "default": {
+            "tools": false,
+            "context": null,
+            "tier": null
+          }
+        }
+      },
+      "required": [
+        "ref",
+        "hash",
+        "name",
+        "version"
+      ],
+      "title": "RoleOnCard",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The casting extension's params on an actor's card.",
+  "properties": {
+    "kind": {
+      "const": "zanni.actor-card",
+      "default": "zanni.actor-card",
+      "title": "Kind",
+      "type": "string"
+    },
+    "actor": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "The configuration's `name`.",
+      "title": "Actor"
+    },
+    "role": {
+      "$ref": "#/$defs/RoleOnCard"
+    },
+    "models": {
+      "default": [],
+      "description": "Self-reported, logged, never trusted (D11).",
+      "items": {
+        "$ref": "#/$defs/ReportedModel"
+      },
+      "title": "Models",
+      "type": "array"
+    }
+  },
+  "required": [
+    "role"
+  ],
+  "title": "ActorCardParams",
+  "type": "object"
+}

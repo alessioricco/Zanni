@@ -1,0 +1,17 @@
+{
+  "kind": "zanni.cue",
+  "cue": "round-1-specify-tester",
+  "scene": "Specify",
+  "instructions": "Write a failing test for every acceptance criterion in backlog/round-1.md.",
+  "reads": [
+    "backlog/round-1.md",
+    "spec/"
+  ],
+  "writes": [
+    "tests/"
+  ],
+  "verifiers": [
+    "every criterion has a test, and every new test fails"
+  ],
+  "deadline": "2026-10-24T10:30:00Z"
+}

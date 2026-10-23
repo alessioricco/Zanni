@@ -29,7 +29,13 @@ class Join(Wire):
     """An actor asks to join. The join token travels in the HTTP `Authorization` header, never in the body."""
 
     kind: Literal["zanni.join"]
-    card: dict[str, Any] = Field(description="The actor's whole Agent Card, in A2A's JSON form.")
+    card: dict[str, Any] = Field(
+        description="The actor's whole Agent Card, in A2A's JSON form.",
+        # So the published schema can check what the validator below checks: the card carries the extension.
+        json_schema_extra={"required": ["capabilities"], "properties": {"capabilities": {
+            "type": "object", "required": ["extensions"], "properties": {"extensions": {
+                "type": "array", "contains": {"type": "object", "required": ["uri", "params"],
+                                              "properties": {"uri": {"const": EXTENSION_URI}}}}}}}})
     part: str | None = Field(default=None, min_length=1,
                              description="The part to join, when the role is cast for more than one.")
 

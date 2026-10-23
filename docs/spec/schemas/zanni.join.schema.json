@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "zanni.join.schema.json",
+  "additionalProperties": false,
+  "description": "An actor asks to join. The join token travels in the HTTP `Authorization` header, never in the body.",
+  "properties": {
+    "kind": {
+      "const": "zanni.join",
+      "title": "Kind",
+      "type": "string"
+    },
+    "card": {
+      "additionalProperties": true,
+      "description": "The actor's whole Agent Card, in A2A's JSON form.",
+      "properties": {
+        "capabilities": {
+          "properties": {
+            "extensions": {
+              "contains": {
+                "properties": {
+                  "uri": {
+                    "const": "https://github.com/alessioricco/Zanni/blob/master/docs/spec/casting-extension.md#v1"
+                  }
+                },
+                "required": [
+                  "uri",
+                  "params"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "extensions"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "capabilities"
+      ],
+      "title": "Card",
+      "type": "object"
+    },
+    "part": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "The part to join, when the role is cast for more than one.",
+      "title": "Part"
+    }
+  },
+  "required": [
+    "kind",
+    "card"
+  ],
+  "title": "Join",
+  "type": "object"
+}

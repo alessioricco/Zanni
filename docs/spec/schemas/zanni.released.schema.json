@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "zanni.released.schema.json",
+  "additionalProperties": false,
+  "description": "The actor confirms it stopped and discarded its working memory.",
+  "properties": {
+    "kind": {
+      "const": "zanni.released",
+      "title": "Kind",
+      "type": "string"
+    },
+    "discarded": {
+      "title": "Discarded",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "kind",
+    "discarded"
+  ],
+  "title": "Released",
+  "type": "object"
+}

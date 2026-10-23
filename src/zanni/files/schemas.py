@@ -62,7 +62,10 @@ SeatRange = Annotated[Seats, BeforeValidator(_seats), PlainSerializer(str)]
 
 
 def covers(rule: str, path: str) -> bool:
-    """A rule ending in `/` covers a folder and everything under it; any other rule covers exactly one path."""
+    """`/` covers the whole stage; a rule ending in `/` covers a folder and everything under it;
+    any other rule covers exactly one path."""
+    if rule == "/":
+        return True
     return path.startswith(rule) if rule.endswith("/") else path == rule
 
 

@@ -7,6 +7,7 @@ The stage is a play's workspace: the shared state the actors work on, such as a 
 - **Location:** every stage item is addressed by a path relative to the stage's root, written with `/`, such as `backlog/round-1.md`.
 - **Rejected paths:** absolute paths, `..` segments, empty segments and backslashes are rejected with `invalid-path`.
 - **Folder rules:** a path rule ending in `/` means a folder and everything under it. A rule without it means exactly that file. `backlog/` covers `backlog/round-1.md`; `vision.md` covers only `vision.md`.
+- **The whole stage:** the rule `/` alone covers everything on the stage. It is a rule, not a path: stage paths still never start with `/`.
 
 ## Operations
 
@@ -55,7 +56,7 @@ Coding engines work on a real checkout, so a `git` stage may also give a seat di
 
 - **Branch:** the seat clones the repository and pushes only to its own branch, `zanni/<play>/<seat>`.
 - **Merging:** before merging a seat's branch, the director checks every path changed by its commits against the seat's write permissions. A branch that touches any path outside them isn't merged, and the refusal is logged.
-- **Who gets it:** a clone holds the whole repository, so direct access is offered only to seats whose read permissions cover the whole stage. Every other seat uses MCP only. This keeps read permissions enforceable.
+- **Who gets it:** a clone holds the whole repository, so direct access is offered only to seats whose read permissions cover the whole stage (the rule `/`). Every other seat uses MCP only. This keeps read permissions enforceable.
 
 ## Backends
 

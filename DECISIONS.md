@@ -383,3 +383,18 @@ Strings arrived exactly in every case. Approved by Alessio at ask point B.
 **Why:** Alessio's call at ask point C: make it work now, then make it better. Bearer tokens need nothing beyond what A2A's security schemes already declare.
 
 **Deferred** (`TODO.md`): mTLS, per-actor join tokens, how the director accepts actors beyond its checks, and whether the director's join tokens come from a director configuration.
+
+## D25. Protocol schemas generated from models; `jsonschema` for tests only (2026-10-24)
+
+**Decision:**
+
+- **Schemas:** the casting messages and card params are Pydantic models in `src/zanni/protocol/`, which never imports `a2a-sdk`. Their JSON Schemas (Draft 2020-12) are generated into `docs/spec/schemas/` with `uv run python -m zanni.protocol.schemas`, and a test fails if they drift.
+- **Conformance:** checks examples against those schemas with `jsonschema`, a dev-only dependency.
+- **Round-trip:** a separate test round-trips every valid example through `a2a-sdk`.
+- **The whole stage:** the stage spec gains the rule `/` for "the whole stage", which direct git access needs (D16).
+
+**Why:**
+
+- One source for the code and the published schemas.
+- Conformance that another implementation can run, with nothing but the schemas and a JSON Schema validator.
+- `jsonschema` stays out of Zanni's runtime dependencies, because only tests need it.

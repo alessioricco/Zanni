@@ -1,0 +1,65 @@
+{
+  "kind": "zanni.join",
+  "card": {
+    "name": "tester-1",
+    "description": "Turn acceptance criteria into tests.",
+    "version": "1.4.0",
+    "skills": [
+      {
+        "id": "write-test",
+        "name": "write-test",
+        "description": "How to write one test.",
+        "tags": [
+          "zanni"
+        ]
+      }
+    ],
+    "capabilities": {
+      "extensions": [
+        {
+          "uri": "https://github.com/alessioricco/Zanni/blob/master/docs/spec/casting-extension.md#v1",
+          "required": true,
+          "params": {
+            "kind": "zanni.actor-card",
+            "actor": "tester-1",
+            "role": {
+              "ref": "github.com/someone/tester@1.4.0",
+              "hash": "sha256:abababababababababababababababababababababababababababababababab",
+              "name": "tester",
+              "version": "1.4.0",
+              "needs": {
+                "stage_read": [
+                  "vision.md",
+                  "backlog/",
+                  "spec/"
+                ],
+                "stage_write": [
+                  "tests/",
+                  "findings/"
+                ],
+                "tools": [
+                  "browser",
+                  "test-runner"
+                ]
+              },
+              "never": [
+                "edit application code"
+              ],
+              "model_needs": {
+                "tools": true,
+                "tier": "judgement"
+              }
+            },
+            "models": [
+              {
+                "provider": "anthropic",
+                "model": "claude-sonnet-5-5"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "part": "tester"
+}

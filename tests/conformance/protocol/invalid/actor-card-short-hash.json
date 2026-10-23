@@ -1,0 +1,38 @@
+{
+  "kind": "zanni.actor-card",
+  "actor": "tester-1",
+  "role": {
+    "ref": "github.com/someone/tester@1.4.0",
+    "hash": "sha256:abc",
+    "name": "tester",
+    "version": "1.4.0",
+    "needs": {
+      "stage_read": [
+        "vision.md",
+        "backlog/",
+        "spec/"
+      ],
+      "stage_write": [
+        "tests/",
+        "findings/"
+      ],
+      "tools": [
+        "browser",
+        "test-runner"
+      ]
+    },
+    "never": [
+      "edit application code"
+    ],
+    "model_needs": {
+      "tools": true,
+      "tier": "judgement"
+    }
+  },
+  "models": [
+    {
+      "provider": "anthropic",
+      "model": "claude-sonnet-5-5"
+    }
+  ]
+}

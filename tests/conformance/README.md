@@ -31,3 +31,18 @@ ZANNI_CMD="/path/to/other-zanni" uv run pytest tests/conformance
 3. For an invalid file, add its `.expected` sidecar.
 
 A spec change and its conformance cases go in the same commit (golden rule 2).
+
+## Protocol conformance
+
+`test_protocol.py` checks casting messages (`docs/spec/casting-extension.md`) against the published JSON Schemas in `docs/spec/schemas/`. It uses no Zanni code, only the schemas and the examples.
+
+- **`protocol/valid/*.json`:** each must pass the schema named by its `kind`, such as `zanni.cast.schema.json`.
+- **`protocol/invalid/*.json`:** each must fail. Its `.expected` sidecar gives the JSON pointer of an error the schema must report, such as `path: /limits/budget/amount`. An empty path means the message itself, as for a missing or unknown field.
+
+To check another implementation's messages, put them in a folder laid out the same way and point `ZANNI_PROTOCOL_DIR` at it:
+
+```bash
+ZANNI_PROTOCOL_DIR=/path/to/their/messages uv run pytest tests/conformance/test_protocol.py
+```
+
+The schemas are generated from `src/zanni/protocol/`; `tests/test_protocol_schemas.py` fails if they drift. `tests/engine/test_a2a_roundtrip.py` proves that every valid example survives `a2a-sdk` unchanged (D23).

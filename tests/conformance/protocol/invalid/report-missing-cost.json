@@ -1,0 +1,15 @@
+{
+  "kind": "zanni.report",
+  "cue": "round-1-specify-tester",
+  "outcome": "done",
+  "summary": "Wrote 4 failing tests in tests/test_habits.py, one per criterion.",
+  "changes": [
+    "3f1d2c4b5a6978e0d1c2b3a4f5e6d7c8b9a0f1e2"
+  ],
+  "models": [
+    {
+      "provider": "anthropic",
+      "model": "claude-sonnet-5-5"
+    }
+  ]
+}
