@@ -1,0 +1,62 @@
+# Testing
+
+```bash
+uv run pytest                      # everything
+uv run pytest tests/conformance    # conformance only
+uv run pytest -k seats             # tests whose name matches "seats"
+```
+
+The full suite needs no API key, no network and no model. That is a hard rule: CI runs it with no secrets.
+
+## What's where
+
+| Path | What it tests |
+|---|---|
+| `tests/test_loading.py` | The loader and the plain-words errors: YAML syntax, unknown keys with suggestions, wrong types, missing fields, secrets, duplicate keys |
+| `tests/test_files.py` | The `zanni` command on the examples, which must be valid, and on broken copies of them, which must fail with the right message |
+| `tests/test_cli.py` | `--version` and usage |
+| `tests/conformance/` | The spec, through files and exit codes only |
+
+## Conformance tests
+
+The conformance suite checks an implementation of the `zanni` command against the [spec](spec/README.md). It doesn't import Zanni's code, so it can test any implementation.
+
+- **`valid/*.yaml`:** each must exit `0`.
+- **`invalid/*.yaml`:** each must exit `2`, and report a problem at the line and field path in its `.expected` sidecar:
+
+  ```
+  line: 4
+  path: cast.coder.seats
+  ```
+
+  An empty value means "anywhere", for problems with no single field.
+
+To test another implementation, set `ZANNI_CMD`:
+
+```bash
+ZANNI_CMD="/path/to/other-zanni" uv run pytest tests/conformance
+```
+
+To add a case:
+
+1. Add one small file that tests one rule.
+2. Name it after the rule, such as `play-seats-reversed.yaml`.
+3. For an invalid file, add its `.expected` sidecar.
+
+A spec change and its conformance cases go in the same commit (golden rule 2).
+
+## Writing tests
+
+- **Message tests:** test the user-facing message, not internals. A test like `test_broken_copies_fail_in_plain_words` runs the real command on a real file and checks the exact text users see.
+- **Examples stay valid:** `test_examples_validate` fails if a schema change breaks one.
+- **Tests that need a model** (coming with the engine adapter) must skip with a clear message when no model is configured, and must never be the only proof of a claim (golden rule 7).
+
+## CI
+
+`.github/workflows/test.yml` runs `uv sync --locked` and `uv run pytest` on Python 3.12 and 3.14, for every push and pull request. `UV_PYTHON` is set for the whole job, so the conformance tests' `uv run zanni` runs on the same Python as the test run. The workflow uses no secrets.
+
+To run the suite on another Python version locally, without touching your main environment:
+
+```bash
+UV_PYTHON=3.12 UV_PROJECT_ENVIRONMENT=/tmp/zanni-py312 sh -c 'uv sync --locked && uv run pytest'
+```

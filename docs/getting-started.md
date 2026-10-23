@@ -1,19 +1,27 @@
 # Getting started
 
+## What you need
+
+- **Python 3.12 or newer.**
+- **[uv](https://docs.astral.sh/uv/getting-started/installation/)**, which installs Zanni's dependencies and runs it.
+- **git**, to clone the repository.
+
+You don't need an API key or a local model server: nothing in Zanni calls a model yet.
+
 ## Install
 
-Zanni needs Python 3.12 or newer. From a clone of the repository:
+Zanni isn't installable from PyPI yet: the package there is a 0.0.1 placeholder that reserves the name. Install it from a clone:
 
 ```bash
+git clone https://github.com/alessioricco/zanni.git
+cd zanni
 uv sync
 uv run zanni --version
 ```
 
-The package on PyPI is still a placeholder (0.0.1), so install from the repository for now.
-
 ## Check a file
 
-The repository has examples of the three kinds of file in `examples/`:
+There is one command, `zanni <file>`. The repository has one example of each kind of file in `examples/`:
 
 ```bash
 uv run zanni examples/plays/habit-tracker/play.yaml
@@ -32,7 +40,7 @@ Play file: would start the director for the play 'habit-tracker'.
 Valid. Nothing was started: running files comes in a later version (see ROADMAP.md).
 ```
 
-`zanni` works out what kind of file it was given from the keys in the file, never from the name. It validates the file and prints what it would run.
+`zanni` works out what kind of file it was given from the keys in the file, never from the file's name. It validates the file and prints what it would run.
 
 If something is wrong, it lists every problem, each with its line and what to change, and exits with code 2:
 
@@ -42,17 +50,25 @@ play.yaml has 2 problems; nothing was started.
   play.yaml, line 11, house_rules.budget: should be at least 0, not -1
 ```
 
-| Exit code | Meaning |
+The other two examples:
+
+```bash
+uv run zanni examples/tester.yaml               # an actor file
+uv run zanni examples/roles/tester/role.yaml    # a role manifest
+```
+
+## What works today
+
+| Works | Not yet |
 |---|---|
-| 0 | The file is valid |
-| 2 | The file has problems, or no file was given |
+| Validating actor files, play files and role manifests | Starting an actor or a director |
+| Errors with their line and how to fix them | Fetching roles from git, or plays from URLs (only their shape is checked) |
+| Rejecting keys that look like secrets | Validating `AGENTS.md`, `skills/`, `mcp.json`, `script.yaml` or `roles.lock` |
+| A summary of what each file would run | Calling any model |
 
-## What doesn't work yet
+## Next steps
 
-- **Nothing starts:** no actors, directors or models.
-- **Nothing is fetched:** role references and play URLs are checked for shape only.
-- **Only the YAML files are checked:** `script.yaml`, `roles.lock` and the role folder's other files (`AGENTS.md`, `skills/`, `mcp.json`) aren't validated yet.
-
-## Secrets
-
-Zanni files never hold API keys. A key in a file that looks like a secret (`api_key`, `token`, `password` and similar) is rejected. Put secrets in the environment or a git-ignored `.env` file.
+- [Concepts](concepts.md): what the pieces are and how they fit together.
+- [Zanni files](files.md): every field of the three kinds of file.
+- [Writing a role](writing-a-role.md): build your own role folder.
+- [Contributing](contributing.md): if you want to work on Zanni itself.
