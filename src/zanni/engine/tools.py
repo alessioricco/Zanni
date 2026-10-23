@@ -57,4 +57,5 @@ def stage_toolset(stage: Stage) -> FunctionToolset:
             raise refuse(e) from None
         return {"changes": [{"path": p, "change": c} for p, c in changes], "marker": marker}
 
-    return FunctionToolset([stage_read, stage_write, stage_list, stage_delete, stage_changes])
+    # Sequential: several calls in one reply must reach the stage in the order the model wrote them.
+    return FunctionToolset([stage_read, stage_write, stage_list, stage_delete, stage_changes], sequential=True)
