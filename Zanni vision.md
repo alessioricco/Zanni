@@ -320,6 +320,11 @@ Out of scope for now:
 - [x] A2A fit: yes. The spike carried a role's needs, never-rules and model needs in an Agent Card extension, intact. Caveat: extension params are a protobuf `Struct` with no integer type, so seat counts and budgets need a typed encoding (D6 in `DECISIONS.md`).
 - [x] Stage: neither, as a definition. The stage is an abstract workspace; the spec defines its operations and permissions, and the play picks a backend: git for code, something else for documents (D12).
 - [ ] Who merges the coders' worktrees: the developer lead, the director, or the coding engine?
+- [ ] Connectors (after the first version): integrations such as web browsing, databases, GitHub or an SSH terminal are MCP servers, so MCP is already Zanni's plugin system. What a "connector" would add:
+  - **Capability names:** roles ask for capabilities by name (`browser`, `database`) and may suggest a default server; the actor's configuration binds each name to the server it actually runs, with that server's credentials (as it does for models).
+  - **Packages:** connectors are published and versioned like roles and scripts (`github.com/someone/postgres@1.2.0`): the MCP server definition, the credentials it needs, a description for the model, and a risk tier.
+  - **Risk tiers:** each connector or tool carries a risk tier (read, spend, external action, irreversible), and the play's house rules decide which tiers are allowed and which need a human's approval.
+  - **Remote servers:** MCP servers with OAuth sign-in, which needs the secrets management planned for cloud-hosted actors.
 - [x] Pydantic AI spike: go (D1). There is no built-in fallback for models without native tool calling, and a 64-line wrapper model is enough for one. Pydantic AI has no A2A support of its own, and FastA2A (now `datalayer/fasta2a`) is not used (D2).
 - [x] Who chooses the model: the actor, in its configuration, as an ordered list to fall back through. Roles only hint; scripts and plays never choose (D11).
 - [x] Licence: MIT.

@@ -13,4 +13,10 @@ The first version proves the shape with one script, played on machines the maint
 | 6 | **The software script** | A play of the software script runs one full round: the product owner, architect, UI designer, tester, developer lead, coders and director. A coding engine works through MCP, and verifiers on the director's side decide what is done. |
 | 7 | **Demo** | A short vision ("a habit tracker") runs three rounds unattended, with a published record of each round: backlog, verdicts, cost, and findings that became passing tests. |
 
+## After the first version
+
+| Milestone | Done when |
+|---|---|
+| **Connectors** | Roles ask for capabilities by name; actor configurations bind them to MCP servers; connectors are published and versioned packages with a risk tier, and house rules decide which tiers a play allows (see the vision's open question "Connectors"). |
+
 Out of scope for the first version: a role registry, actors hosted by other people, scripts other than software, high-risk scripts, secrets management for cloud-hosted actors, and a web interface (see the vision).
