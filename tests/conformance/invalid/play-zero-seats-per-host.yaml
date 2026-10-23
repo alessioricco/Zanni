@@ -1,0 +1,7 @@
+name: p
+script: ../fixtures/scripts/two-parts
+stage: ./s
+cast:
+  writer: roles/w
+house_rules:
+  max_seats_per_host: 0

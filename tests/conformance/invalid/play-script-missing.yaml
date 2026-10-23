@@ -1,0 +1,5 @@
+name: p
+script: ../fixtures/scripts/nope
+stage: ./s
+cast:
+  writer: roles/w

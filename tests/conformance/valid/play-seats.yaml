@@ -1,5 +1,5 @@
 name: ranges
-script: ./script.md
+script: github.com/someone/script@1.0.0
 stage: ./stage
 cast:
   coder: { role: roles/coder, seats: 3 }

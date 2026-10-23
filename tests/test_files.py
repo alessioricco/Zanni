@@ -13,6 +13,7 @@ PLAY = EXAMPLES / "plays/habit-tracker/play.yaml"
 ROLE = EXAMPLES / "roles/tester/role.yaml"
 SCRIPT = EXAMPLES / "scripts/software-team/SCRIPT.md"
 NEWSROOM = EXAMPLES / "scripts/newsroom"  # a folder holding SCRIPT.md
+NEWSROOM_PLAY = EXAMPLES / "plays/newsroom/play.yaml"  # a play with a local script and a play.lock
 
 
 def zanni(path: Path) -> subprocess.CompletedProcess:
@@ -33,11 +34,22 @@ def broken(tmp_path: Path, example: Path, old: str, new: str) -> Path:
     (ROLE, "Role manifest: the role 'tester' 1.4.0."),
     (SCRIPT, "Script: 'software-team' 1.0.0."),
     (NEWSROOM, "Script: 'newsroom' 0.1.0."),
+    (NEWSROOM_PLAY, "Play file: would start the director for the play 'city-desk'."),
 ])
 def test_examples_validate(example, first_line):
     result = zanni(example)
     assert result.returncode == 0, result.stderr
     assert result.stdout.splitlines()[0] == first_line
+
+
+def test_play_is_checked_against_its_local_script():
+    out = zanni(NEWSROOM_PLAY).stdout
+    assert "script: checked; the play casts its parts within their seats, and uses its gates" in out
+    assert "play.lock: every remote package is pinned" in out
+
+
+def test_play_with_remote_script_says_it_was_not_checked():
+    assert "script: remote, so the play wasn't checked against it" in zanni(PLAY).stdout
 
 
 def test_play_summary_shows_cast_and_house_rules():

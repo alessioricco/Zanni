@@ -1,0 +1,8 @@
+# Pins the play's packages (D18). Written by zanni when fetching packages comes; kept by hand here as an example.
+lock_version: 1
+script:
+  ../../scripts/newsroom: { hash: "sha256:9f2c4b6e8a0d1c3e5f7a9b1d3c5e7f9a1b3d5c7e9f1a3b5d7c9e1f3a5b7d9c1e" }
+roles:
+  github.com/zanni-roles/editor@0.1.0: { commit: 3f1d2c4b5a6978e0d1c2b3a4f5e6d7c8b9a0f1e2, hash: "sha256:0a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9" }
+  github.com/zanni-roles/reporter@0.1.0: { commit: 4e2d3c5b6a7089f1e2d3c4b5a6f7e8d9c0b1a2f3, hash: "sha256:1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90a" }
+  github.com/zanni-roles/fact-checker@0.1.0: { commit: 5f3e4d6c7b8190a2f3e4d5c6b7a8f9e0d1c2b3a4, hash: "sha256:2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90a1b" }

@@ -1,0 +1,12 @@
+# A play of the newsroom script, with a folder stage. Its script is local, so zanni checks the play against it.
+name: city-desk
+script: ../../scripts/newsroom
+stage: ./stage
+cast:
+  editor: github.com/zanni-roles/editor@0.1.0
+  reporter: { role: github.com/zanni-roles/reporter@0.1.0, seats: 2 }
+  fact-checker: github.com/zanni-roles/fact-checker@0.1.0
+house_rules:
+  budget: 5.00
+  gates: [publish]
+  max_seats_per_host: 2

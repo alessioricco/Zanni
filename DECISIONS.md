@@ -252,3 +252,22 @@ Both describe deterministic workflows run by machines, not work interpreted by a
 **Considered:** a fully structured YAML script, with every scene, cue and verifier as fields. It is more checkable, but rigid, and it would need new fields for every new kind of work.
 
 Approved by Alessio at ask point B, with the software round as the example.
+
+## D18. `play.lock` pins the script and roles; the log is JSON Lines (2026-10-23)
+
+**Decision:**
+
+- **The lockfile:** `roles.lock` becomes `play.lock`, because it now pins the script as well as the roles. Each remote reference is pinned to a commit and a content hash; a local folder only to a hash.
+  - **Content hash:** the SHA-256 of a `sha256sum`-style listing of the package's files, sorted by path, excluding `.git/`.
+  - **Checks:** the director refuses to start if a fetched package doesn't match its pin. `zanni play.yaml` checks that every remote package is pinned, whenever `play.lock` exists.
+- **The log:** `log/<run-id>.jsonl`, append-only, one JSON object per line, with a fixed set of event types. Costs are decimal strings, or `null` when unknown (D7).
+- **Checking a play against its script:** when the script is local, `zanni play.yaml` checks it against the script: every part is cast (unless optional), seats are within the script's limits, and gates are among the script's gates. A cast entry without `seats` takes its part's seats.
+- **Seat cap:** `house_rules.max_seats_per_host` caps the seats the director casts onto one machine, because they share its GPU. The vision's first version runs several actors on the DGX workstation.
+
+**Why:**
+
+- Pinning the script matters as much as pinning roles: a changed script changes the play.
+- A content hash catches a tag that was moved.
+- JSON Lines is append-only, readable with standard tools, and safe to write while a run is in progress.
+
+**Not in the first version:** risk tiers.

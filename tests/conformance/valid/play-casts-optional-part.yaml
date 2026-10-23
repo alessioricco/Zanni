@@ -1,0 +1,6 @@
+name: p
+script: ../fixtures/scripts/two-parts
+stage: ./s
+cast:
+  writer: roles/w
+  reviewer: roles/r

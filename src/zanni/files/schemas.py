@@ -4,7 +4,7 @@ import re
 from decimal import Decimal
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, PlainSerializer, model_validator
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, PlainSerializer, field_validator, model_validator
 
 REMOTE_REF = re.compile(r"^(?P<source>[a-z0-9-]+(\.[a-z0-9-]+)+/[^@\s]+)@(?P<version>[^@\s/]+)$")
 SEMVER = re.compile(r"^\d+\.\d+\.\d+([-+][0-9A-Za-z.-]+)?$")
@@ -75,7 +75,7 @@ class ActorConfiguration(Strict):
 
 class CastEntry(Strict):
     role: PackageRef
-    seats: SeatRange = Seats(min=1, max=1)
+    seats: SeatRange | None = None  # None: the script part's seats, or 1 when the script isn't known
     host: str | None = None  # "local": the director starts these seats itself
 
 
@@ -88,7 +88,8 @@ CastSeat = Annotated[CastEntry, BeforeValidator(_cast_entry)]
 
 class HouseRules(Strict):
     budget: Decimal | None = Field(default=None, ge=0)  # in USD, for the whole play
-    gates: list[str] = []  # moments that need human approval, e.g. plan, release
+    gates: list[str] = []  # moments that need human approval; must be among the script's gates
+    max_seats_per_host: int | None = Field(default=None, ge=1)  # actors on one machine share its GPU
 
 
 GIT_URL = re.compile(r"^(git@[^:\s]+:\S+|(ssh|git|https?)://\S+\.git/?|\S+\.git/?)$")
@@ -236,3 +237,38 @@ class Script(Strict):
     stage: ScriptStage = ScriptStage()
     gates: list[Name] = []
     stop: StopRules = StopRules()
+
+
+# Lockfile (play.lock): what each package reference resolved to
+
+COMMIT = re.compile(r"^[0-9a-f]{40}$")
+HASH = re.compile(r"^sha256:[0-9a-f]{64}$")
+
+
+def _pattern(regex: re.Pattern, what: str, example: str):
+    def check(value: object) -> object:
+        if isinstance(value, str) and not regex.match(value):
+            raise ValueError(f'"{value}" is not {what}; write it as {example}')
+        return value
+    return BeforeValidator(check)
+
+
+class Pin(Strict):
+    commit: Annotated[str, _pattern(COMMIT, "a full commit hash", "40 lowercase hex characters")] | None = None
+    hash: Annotated[str, _pattern(HASH, "a content hash", "sha256: followed by 64 lowercase hex characters")]
+
+
+class Lockfile(Strict):
+    """Pins the play's script and roles (D18). A remote reference needs a commit; a local folder only a hash."""
+
+    lock_version: Literal[1]
+    script: dict[PackageRef, Pin] = Field(min_length=1, max_length=1)
+    roles: dict[PackageRef, Pin] = {}
+
+    @field_validator("script", "roles")
+    @classmethod
+    def _remote_refs_have_commits(cls, pins: dict[str, Pin]) -> dict[str, Pin]:
+        for ref, pin in pins.items():
+            if REMOTE_REF.match(ref) and pin.commit is None:
+                raise ValueError(f"{ref} is a remote package, so it needs a `commit`; add the commit it resolved to")
+        return pins

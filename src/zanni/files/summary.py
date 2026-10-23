@@ -1,9 +1,9 @@
 """What `zanni <file>` would run, in a few lines."""
 
-from zanni.files.schemas import ActorConfiguration, PlayFile, RoleManifest, Script
+from zanni.files.schemas import ActorConfiguration, Lockfile, PlayFile, RoleManifest, Script, Seats
 
 
-def summarise(doc: ActorConfiguration | PlayFile | RoleManifest | Script) -> list[str]:
+def summarise(doc: ActorConfiguration | PlayFile | RoleManifest | Script | Lockfile) -> list[str]:
     if isinstance(doc, ActorConfiguration):
         who = f"'{doc.name}'" if doc.name else "an actor"
         return [f"Actor configuration: would start {who}, playing a role in a play.",
@@ -14,10 +14,17 @@ def summarise(doc: ActorConfiguration | PlayFile | RoleManifest | Script) -> lis
                  f"  director: {doc.director or 'this machine'}", f"  stage: {doc.stage}", "  cast:"]
         for name, entry in doc.cast.items():
             host = f", started here ({entry.host})" if entry.host == "local" else (f", on {entry.host}" if entry.host else "")
-            lines.append(f"    {name}: {entry.role}, {entry.seats} seat{'s' if entry.seats.max > 1 else ''}{host}")
+            seats = entry.seats or Seats(min=1, max=1)
+            lines.append(f"    {name}: {entry.role}, {seats} seat{'s' if seats.max > 1 else ''}{host}")
         rules = doc.house_rules
         budget = f"${rules.budget:.2f}" if rules.budget is not None else "none set"
-        lines.append(f"  house rules: budget {budget}; human gates: {', '.join(rules.gates) or 'none'}")
+        cap = f"; at most {rules.max_seats_per_host} seats per host" if rules.max_seats_per_host else ""
+        lines.append(f"  house rules: budget {budget}; human gates: {', '.join(rules.gates) or 'none'}{cap}")
+        return lines
+    if isinstance(doc, Lockfile):
+        lines = ["Lockfile: pins a play's script and roles."]
+        for ref, pin in [*doc.script.items(), *doc.roles.items()]:
+            lines.append(f"  {ref}: {('commit ' + pin.commit[:12]) if pin.commit else 'local'}, {pin.hash[:19]}…")
         return lines
     if isinstance(doc, Script):
         lines = [f"Script: '{doc.name}' {doc.version}.", f"  mission: {doc.mission}", "  parts:"]

@@ -6,7 +6,7 @@ import sys
 from zanni import __version__
 from zanni.files.check import check
 from zanni.files.errors import FileErrors
-from zanni.files.schemas import RoleManifest, Script
+from zanni.files.schemas import Lockfile, RoleManifest, Script
 from zanni.files.summary import summarise
 
 
@@ -20,15 +20,15 @@ def main(argv: list[str] | None = None) -> int:
         parser.print_usage()
         return 2
     try:
-        doc = check(args.file)
+        doc, notes = check(args.file)
     except FileErrors as e:
         print(f"{args.file} has {len(e.errors)} problem{'s' if len(e.errors) > 1 else ''}; nothing was started.",
               file=sys.stderr)
         for err in e.errors:
             print(f"  {err}", file=sys.stderr)
         return 2
-    print("\n".join(summarise(doc)))
-    if isinstance(doc, (RoleManifest, Script)):
+    print("\n".join(summarise(doc) + notes))
+    if isinstance(doc, (RoleManifest, Script, Lockfile)):
         print("Valid.")
     else:
         print("Valid. Nothing was started: running files comes in a later version (see ROADMAP.md).")

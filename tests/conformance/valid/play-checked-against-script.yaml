@@ -1,0 +1,7 @@
+name: p
+script: ../fixtures/scripts/two-parts
+stage: ./s
+cast:
+  writer: { role: roles/w, seats: 2 }
+house_rules:
+  gates: [publish]
