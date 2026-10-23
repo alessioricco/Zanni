@@ -60,7 +60,7 @@ def test_missing_field():
 def test_secret_looking_key_is_rejected(key):
     (msg,) = errors_for(f"name: a\nlimits:\n  {key}: x\n")
     assert msg.startswith(f"toy.yaml, line 3, limits.{key}: looks like a secret")
-    assert "environment or a git-ignored .env" in msg
+    assert "credentials" in msg
 
 
 @pytest.mark.parametrize("key", ["keywords", "monkey", "tokenizer_model"])

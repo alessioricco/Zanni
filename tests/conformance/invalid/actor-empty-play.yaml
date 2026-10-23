@@ -1,2 +1,4 @@
 role: roles/tester
 play: ""
+models:
+  - { provider: ollama, model: qwen3.8:27b }

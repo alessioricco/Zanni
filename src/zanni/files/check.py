@@ -3,6 +3,8 @@
 import difflib
 import json
 import re
+import stat
+import subprocess
 from pathlib import Path
 
 from pydantic import BaseModel
@@ -10,7 +12,9 @@ from pydantic import BaseModel
 from zanni.files.errors import FileError, FileErrors
 from zanni.files.kinds import detect
 from zanni.files.loader import Loaded, load_file, load_text
-from zanni.files.schemas import REMOTE_REF, Lockfile, McpConfig, PlayFile, RoleManifest, Script, SkillFrontmatter
+from zanni.files.schemas import (
+    REMOTE_REF, ActorConfiguration, Lockfile, McpConfig, PlayFile, RoleManifest, Script, SkillFrontmatter,
+)
 from zanni.files.validation import is_secret_name, validate
 
 FOLDER_FILES = ("role.yaml", "SCRIPT.md")  # a folder is checked through the first of these it holds
@@ -173,6 +177,36 @@ def check_role_folder(folder: Path, loaded: Loaded, role: RoleManifest) -> list[
     return [f"  folder: AGENTS.md; skills: {', '.join(skills) or 'none'}; mcp.json servers: {', '.join(servers) or 'none'}"]
 
 
+def git_tracks(path: Path) -> bool:
+    """Whether git tracks this file. False when git isn't installed or the file isn't in a repository."""
+    try:
+        result = subprocess.run(["git", "ls-files", "--error-unmatch", path.name], cwd=path.parent,
+                                capture_output=True, timeout=10)
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return result.returncode == 0
+
+
+def check_credentials(loaded: Loaded, actor: ActorConfiguration) -> None:
+    """A configuration storing credentials must be private to its owner and kept out of git (D15)."""
+    if not actor.stored_credentials():
+        return
+    path = Path(loaded.file)
+    line = loaded.line(("credentials",))
+    errors = []
+    mode = stat.S_IMODE(path.stat().st_mode)
+    if mode & 0o077:
+        errors.append(FileError(loaded.file, line, ("credentials",),
+                                f"holds credentials, but other users can read this file (mode {mode:o})",
+                                f"run: chmod 600 {path}"))
+    if git_tracks(path):
+        errors.append(FileError(loaded.file, line, ("credentials",), "holds credentials, but git tracks this file",
+                                f"remove it from git (git rm --cached {path.name}) and add it to .gitignore, "
+                                "or use ${VAR} references instead of values"))
+    if errors:
+        raise FileErrors(errors)
+
+
 def check(path: str | Path) -> tuple[BaseModel, list[str]]:
     """Validate a file or folder. Returns the document and notes on the extra checks that ran."""
     target = resolve(Path(path))
@@ -188,4 +222,6 @@ def check(path: str | Path) -> tuple[BaseModel, list[str]]:
         check_body(loaded)
     if isinstance(doc, PlayFile):
         notes = check_play(loaded, doc)
+    if isinstance(doc, ActorConfiguration):
+        check_credentials(loaded, doc)
     return doc, notes

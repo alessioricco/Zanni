@@ -1,0 +1,4 @@
+role: roles/tester
+play: ./play.yaml
+models:
+  - { provider: openai-compatible, model: x }

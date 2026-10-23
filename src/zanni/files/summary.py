@@ -6,8 +6,24 @@ from zanni.files.schemas import ActorConfiguration, Lockfile, PlayFile, RoleMani
 def summarise(doc: ActorConfiguration | PlayFile | RoleManifest | Script | Lockfile) -> list[str]:
     if isinstance(doc, ActorConfiguration):
         who = f"'{doc.name}'" if doc.name else "an actor"
-        return [f"Actor configuration: would start {who}, playing a role in a play.",
-                f"  role: {doc.role}", f"  play: {doc.play}"]
+        lines = [f"Actor configuration: would start {who}, playing a role in a play.",
+                 f"  role: {doc.role}", f"  play: {doc.play}", "  models, in order:"]
+        for i, m in enumerate(doc.models, start=1):
+            bits = [f"{m.provider} {m.model}"]
+            if m.base_url:
+                bits.append(f"at {m.base_url}")
+            if m.tool_format == "text":
+                bits.append("text tool format")
+            if m.price:
+                bits.append(f"${m.price.input}/${m.price.output} per million tokens")
+            lines.append(f"    {i}. {', '.join(bits)}")
+        stored = set(doc.stored_credentials())
+        # Credential values are never shown (D15): only their names, and where each one comes from.
+        creds = [f"{k} ({'stored, hidden' if k in stored else 'from the environment'})" for k in doc.credentials]
+        lines.append(f"  credentials: {', '.join(creds) or 'none; models use their usual environment variables'}")
+        state = doc.state_dir or f"~/.zanni/actors/{doc.name or '<name>'}"
+        lines.append(f"  state: {state}; port: {doc.port or 'any free port'}")
+        return lines
     if isinstance(doc, PlayFile):
         lines = [f"Play file: would start the director for the play '{doc.name}'.",
                  f"  script: {doc.script}",

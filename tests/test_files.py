@@ -60,8 +60,8 @@ def test_play_summary_shows_cast_and_house_rules():
 
 @pytest.mark.parametrize("example, old, new, expected", [
     (ACTOR, "tester@1.4.0", "tester",
-     'line 3, role: "github.com/someone/tester" has no version; write it as github.com/someone/tester@1.0.0'),
-    (ACTOR, "play:", "plya:", "line 4, plya: is not a known field; did you mean `play`?"),
+     'line 5, role: "github.com/someone/tester" has no version; write it as github.com/someone/tester@1.0.0'),
+    (ACTOR, "play:", "plya:", "line 6, plya: is not a known field; did you mean `play`?"),
     (PLAY, "seats: 1-4", "seats: 4-1", "line 9, cast.coder.seats: the range 4-1 goes down"),
     (PLAY, "host: local", "hots: local", "line 9, cast.coder.hots: is not a known field; did you mean `host`?"),
     (PLAY, "budget: 20.00", "budget: -1", "line 11, house_rules.budget: should be at least 0, not -1"),

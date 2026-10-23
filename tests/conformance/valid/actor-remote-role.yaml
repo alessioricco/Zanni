@@ -1,3 +1,5 @@
 # An actor configuration: which role to play, and in which play.
 role: github.com/someone/tester@1.4.0
 play: https://example.com/plays/habit-tracker/play.yaml
+models:
+  - { provider: ollama, model: qwen3.8:27b }

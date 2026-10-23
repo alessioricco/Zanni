@@ -1,3 +1,5 @@
 role: roles/tester
 play: ./play.yaml
 model: qwen
+models:
+  - { provider: ollama, model: qwen3.8:27b }

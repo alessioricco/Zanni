@@ -1,6 +1,6 @@
 # Models and keys
 
-> **Status:** nothing in Zanni calls a model yet. The rule about secrets in shared files holds today. The actor configuration's `models` and `credentials` are being specified ([actor configuration spec](spec/actor-configuration.md)). The engine adapter will follow ([roadmap](../ROADMAP.md), milestone 2); a spike has already tried it on real models ([spike report](spikes/pydantic-ai.md)).
+> **Status:** nothing in Zanni calls a model yet. `zanni` already validates an actor configuration's models and credentials, and enforces the safeguards below ([actor configuration spec](spec/actor-configuration.md)). Running models comes with the engine adapter ([roadmap](../ROADMAP.md), milestone 2); a spike has already tried it on real models ([spike report](spikes/pydantic-ai.md)).
 
 ## Each actor brings its own models and keys
 
@@ -11,7 +11,26 @@ An actor configuration lists its models in order. The first is used, and the nex
 - API keys for its models;
 - tokens or key paths for its tools, such as GitHub or an SSH terminal.
 
-Two actors on one machine have two configuration files, each with its own models and access.
+Two actors on one machine have two configuration files, each with its own models and access:
+
+```yaml
+# ~/zanni/dgx-coder.yaml (chmod 600, not in any repository)
+name: dgx-coder
+role: github.com/zanni-roles/coder@1.0.0
+play: https://example.com/plays/habit-tracker/play.yaml
+models:
+  - { provider: ollama, model: qwen3-coder:30b, base_url: "${OLLAMA_BASE_URL}", price: { input: 0, output: 0 } }
+  - { provider: anthropic, model: claude-sonnet-5-5, credential: ANTHROPIC_API_KEY }
+credentials:
+  ANTHROPIC_API_KEY: sk-ant-…
+  GITHUB_TOKEN: ghp_…
+```
+
+- **Order:** the first model is used; the next is tried when one fails with an error, a timeout, a rate limit, or a request too long for its context. A refusal moves to the next model only if you add `refusal` to `fall_back_on`.
+- **Other servers:** `openai-compatible` reaches any OpenAI-compatible server, with its `base_url`.
+- **Where credentials go:** a model entry's `credential` names the credential it uses. The role's `mcp.json` picks up `${GITHUB_TOKEN}` and the like from `credentials` first, then from the environment.
+
+Every field is in the [actor configuration spec](spec/actor-configuration.md).
 
 ## Secrets: only in actor configurations
 

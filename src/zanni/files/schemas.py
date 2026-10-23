@@ -2,7 +2,7 @@
 
 import re
 from decimal import Decimal
-from typing import Annotated, Literal
+from typing import Annotated, ClassVar, Literal
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, PlainSerializer, field_validator, model_validator
 
@@ -68,12 +68,68 @@ def covers(rule: str, path: str) -> bool:
 
 # Actor configuration
 
+ENV_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+ENV_REF = re.compile(r"^\$\{(?P<name>[A-Za-z_][A-Za-z0-9_]*)(:-[^}]*)?\}$")
+FALLBACK_REASONS = ("error", "timeout", "rate-limit", "context", "refusal")
+
+
+def _env_name(value: object) -> object:
+    if isinstance(value, str) and not ENV_NAME.match(value):
+        raise ValueError(f'"{value}" is not a credential name; use letters, digits and underscores, e.g. ANTHROPIC_API_KEY')
+    return value
+
+
+EnvName = Annotated[str, BeforeValidator(_env_name)]
+
+
+class Price(Strict):
+    input: Decimal = Field(ge=0)  # USD per million input tokens
+    output: Decimal = Field(ge=0)  # USD per million output tokens
+
+
+class ModelEntry(Strict):
+    """One model the actor may run. The list is tried in order (D11)."""
+
+    provider: Literal["anthropic", "openai", "google", "ollama", "openai-compatible"]
+    model: str = Field(min_length=1)
+    base_url: str | None = Field(default=None, min_length=1)  # a URL, or ${VAR}
+    credential: EnvName | None = None  # a name in `credentials`; default: the provider's usual variable
+    tool_format: Literal["native", "text"] = "native"  # text: the opt-in format for models without tool calling (D5)
+    price: Price | None = None  # for models published prices don't cover, such as local ones (D7)
+    fall_back_on: list[Literal["error", "timeout", "rate-limit", "context", "refusal"]] = \
+        ["error", "timeout", "rate-limit", "context"]
+
+    @model_validator(mode="after")
+    def _endpoint(self) -> "ModelEntry":
+        if self.provider == "openai-compatible" and not self.base_url:
+            raise ValueError("an openai-compatible model needs a `base_url`; add the server's URL, e.g. http://gpu-box:8000/v1")
+        return self
+
+
 class ActorConfiguration(Strict):
-    """One actor instance: which role it plays and which play it joins. Never the role's capabilities (D14)."""
+    """One actor instance: its role, its play, its models and its credentials. Never the role's capabilities (D14)."""
+
+    SECRET_SECTIONS: ClassVar[tuple[str, ...]] = ("credentials",)
 
     name: str | None = Field(default=None, min_length=1)
     role: PackageRef
     play: str = Field(min_length=1)
+    models: list[ModelEntry] = Field(min_length=1)
+    credentials: dict[EnvName, str] = {}  # this instance's own; protected by D15's safeguards
+    state_dir: str | None = None  # default: ~/.zanni/actors/<name>
+    port: int = Field(default=0, ge=0, le=65535)  # 0: any free port
+
+    @model_validator(mode="after")
+    def _credentials_exist(self) -> "ActorConfiguration":
+        for i, entry in enumerate(self.models):
+            if entry.credential and entry.credential not in self.credentials:
+                raise ValueError(f"models[{i}] uses the credential {entry.credential}, which isn't in `credentials`; "
+                                 f"add {entry.credential} to `credentials`, or remove `credential` to use the environment")
+        return self
+
+    def stored_credentials(self) -> list[str]:
+        """Credentials whose values are in this file, not references to the environment."""
+        return [k for k, v in self.credentials.items() if not ENV_REF.match(v)]
 
 
 # Play file

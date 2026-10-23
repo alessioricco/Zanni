@@ -293,3 +293,22 @@ Approved by Alessio at ask point B, with the software round as the example.
 - **Tiers:** models change faster than a spec should, and the tier is only a hint (D11).
 - **Version tags:** subfolder tags follow the convention of repositories that hold several packages.
 - **Mismatched tags:** a version resolving two ways is refused, rather than guessed.
+
+## D20. The actor configuration's models and credentials (2026-10-23)
+
+**Decision:**
+
+- **`models`:** an ordered list, with at least one entry.
+  - **Provider:** each entry has a provider: `anthropic`, `openai`, `google`, `ollama`, or `openai-compatible` for any server with an OpenAI-compatible API, which needs a `base_url`.
+  - **Optional fields:** `credential`, `tool_format` (`native` or `text`, D5), `price` (D7) and `fall_back_on`.
+  - **Falling back:** the actor moves to the next model on the entry's reasons: `error`, `timeout`, `rate-limit`, `context` (the default four) and `refusal` (opt-in).
+- **`credentials`:** a map of names to values, each stored or `${VAR}`. A model entry's `credential` names one. Every `${NAME}` in the role's `mcp.json` is looked up in `credentials` first, then in the environment.
+- **Safeguards:** a configuration storing any value is refused if other users can read it or git tracks it. Values never appear in output or in error messages (D15).
+- **Defaults:** `state_dir` defaults to `~/.zanni/actors/<name>`; `port` to `0`, meaning any free port.
+- **Not in the first version:** the shared `models_list.yaml`. Each configuration holds its own list.
+
+**Why:**
+
+- **Lookup order:** one lookup rule for models and tools gives each actor its own credentials, without a shared `.env`.
+- **`refusal` is opt-in:** a refusal is often the right answer, and shouldn't silently be retried elsewhere.
+- **Provider names:** they are allowed here because the actor configuration is the one file that is about an instance. Roles, scripts and plays still never name a vendor (golden rule 4).

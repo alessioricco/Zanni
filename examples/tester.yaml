@@ -1,4 +1,17 @@
 # An actor configuration: one instance's own file. It stays on the actor's machine, never in a repository.
+# This example is in a repository, so its credentials are ${VAR} references; a real one may hold the values,
+# and zanni then refuses it if other users can read it or git tracks it.
 name: tester-1
 role: github.com/someone/tester@1.4.0
 play: https://example.com/plays/habit-tracker/play.yaml
+models:
+  - provider: anthropic
+    model: claude-sonnet-5-5
+    credential: ANTHROPIC_API_KEY
+  - provider: ollama
+    model: qwen3.8:27b
+    base_url: ${OLLAMA_BASE_URL}
+    price: { input: 0, output: 0 }
+credentials:
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+  GITHUB_TOKEN: ${GITHUB_TOKEN}

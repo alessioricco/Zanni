@@ -1,0 +1,5 @@
+role: roles/tester
+play: ./play.yaml
+models:
+  - { provider: ollama, model: x }
+port: 70000

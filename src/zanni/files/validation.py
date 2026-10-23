@@ -23,7 +23,12 @@ _TYPE_NAMES = {
 }
 
 
+HIDDEN = object()
+
+
 def _describe(value: Any) -> str:
+    if value is HIDDEN:
+        return "a value (hidden)"
     if isinstance(value, bool):
         return "true/false"
     if isinstance(value, (int, float)):
@@ -55,9 +60,11 @@ def _known_fields(model: type[BaseModel], path: Path) -> list[str]:
     return sorted({name for m in models for name in m.model_fields})
 
 
-def _message(err: dict, loaded: Loaded, model: type[BaseModel]) -> FileError:
+def _message(err: dict, loaded: Loaded, model: type[BaseModel], hidden: tuple[str, ...] = ()) -> FileError:
     path: Path = tuple(p for p in err["loc"] if p != "[key]")  # Pydantic marks an invalid dict key with "[key]"
     kind = err["type"]
+    if path and path[0] in hidden:
+        err = {**err, "input": HIDDEN}  # a credential's value never appears in a message (D15)
     if kind == "missing":
         return FileError(loaded.file, loaded.line(path[:-1]) or 1, path, "is required but missing",
                          f"add a `{path[-1]}:` line" + (f" under `{path[-2]}`" if len(path) > 1 else ""))
@@ -90,16 +97,21 @@ def is_secret_name(name: str) -> bool:
     return bool(words & SECRET_WORDS) or "apikey" in name.lower().replace("_", "").replace("-", "")
 
 
-def find_secrets(loaded: Loaded) -> list[FileError]:
+def find_secrets(loaded: Loaded, allowed: tuple[str, ...] = ()) -> list[FileError]:
+    """Secret-looking keys anywhere, except under the top-level sections in `allowed`."""
     found: list[FileError] = []
 
     def walk(value: Any, path: Path) -> None:
         if isinstance(value, dict):
             for k, v in value.items():
+                if not path and k in allowed:
+                    continue
                 if isinstance(k, str) and is_secret_name(k):
+                    fix = ("move it to this file's `credentials` section" if "credentials" in allowed
+                           else "remove it; secrets belong in an actor configuration's `credentials`, or the environment")
                     found.append(FileError(loaded.file, loaded.line((*path, k)), (*path, k),
-                                           "looks like a secret, and Zanni files never hold secrets",
-                                           "remove it and set the value in the environment or a git-ignored .env"))
+                                           "looks like a secret, and only an actor configuration's `credentials` may hold one",
+                                           fix))
                 else:
                     walk(v, (*path, k))
         elif isinstance(value, list):
@@ -111,12 +123,13 @@ def find_secrets(loaded: Loaded) -> list[FileError]:
 
 
 def validate(loaded: Loaded, model: type[M], *, reject_secrets: bool = True) -> M:
-    errors = find_secrets(loaded) if reject_secrets else []
+    secret_sections = getattr(model, "SECRET_SECTIONS", ())  # top-level sections allowed to hold secrets (D15)
+    errors = find_secrets(loaded, secret_sections) if reject_secrets else []
     try:
         result = model.model_validate(loaded.data)
     except ValidationError as e:
         secret_paths = {x.path for x in errors}  # a secret is reported once, as a secret, not also as unknown
-        errors += [_message(err, loaded, model) for err in e.errors(include_url=False)
+        errors += [_message(err, loaded, model, secret_sections) for err in e.errors(include_url=False)
                    if tuple(err["loc"]) not in secret_paths]
     if errors:
         errors.sort(key=lambda x: (x.line or 0, str(x.path)))
