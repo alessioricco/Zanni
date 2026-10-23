@@ -177,9 +177,11 @@ zanni tester.yaml
 ```
 
 1. **Join.** Only the director listens. The actor connects to it and presents its A2A Agent Card, built from its role, with the play's join token.
-2. **Casting.** The director checks the role against the play's cast, assigns a seat, and sends the play, the stage's location and credentials scoped to that seat.
-3. **Cues and reports.** The director sends a cue; the actor works on the stage and reports back. Heartbeats run in between.
+2. **Casting.** The director checks the role against the part it is cast for, assigns a seat, and sends the seat's permissions, the stage's location and credentials scoped to that seat.
+3. **Cues and reports.** The director gives a cue; the actor works on the stage and reports back. The actor's contact with the director is its heartbeat.
 4. **Release.** The director ends the seat and revokes its credentials.
+
+A seat is one A2A task on the director, from join to release, and every Zanni payload is a data part in it (D21). The actor never listens, so it can run behind NAT.
 
 - **Actors bring their own model and keys,** set in their configuration. A coder on a GPU workstation runs a local model; an architect on a cloud server runs a cloud model. The director never holds anyone's API keys. Several actors can run on one machine, each with its own configuration and state folder; the director knows which actors share a host and caps seats per host, since they share its GPU.
 - **Failure is ordinary.** If an actor stops answering, the director recasts its seat. The work survives on the stage.

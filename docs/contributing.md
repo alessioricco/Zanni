@@ -49,6 +49,13 @@ This touches four places, all in one commit:
 3. **Conformance cases:** add at least one valid file, and one invalid file with its `.expected` sidecar, under `tests/conformance/` ([Testing](testing.md#conformance-tests)).
 4. **User docs:** update `docs/files.md`, or the matching page, if users need to know.
 
+### Changing a casting message
+
+1. Change the model in `src/zanni/protocol/`.
+2. Regenerate the schemas: `uv run python -m zanni.protocol.schemas`.
+3. Update `docs/spec/casting-extension.md`, and bump the extension's version (`#v2`) if any field changed (D22).
+4. Add valid and invalid examples under `tests/conformance/protocol/`.
+
 ### Version updates of the engine's dependencies
 
 `pydantic-ai-slim`, `mcp` and `a2a-sdk` are pinned to exact versions (D8). To upgrade one:

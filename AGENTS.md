@@ -14,12 +14,13 @@ The full design is in the vision doc ("Zanni: vision"). Decisions and their reas
 
 ## Current state
 
-Milestone 1 (the spec) is half done: the file formats are specified (actor configuration, role package, script, play, stage), and the casting extension is next (prompt 03). The PyPI package is still the 0.0.1 placeholder. Don't assume a module, command or file exists; check.
+Milestone 1 (the spec) is done: the file formats and the casting extension are specified. Next is milestone 2, the engine adapter: one actor running its role on its models. The PyPI package is still the 0.0.1 placeholder. Don't assume a module, command or file exists; check.
 
 - `src/zanni/cli.py`: the `zanni` command. It detects the kind of file or folder, validates it and prints what it would run (D9).
 - `src/zanni/files/`: the loader (YAML and Markdown frontmatter, with line numbers), the plain-words errors (D10), the schemas for every format, and `check.py` (role folders, a play against its script and lockfile, credential safeguards).
 - `src/zanni/engine/`: the engine adapter, the only place that may import Pydantic AI, `mcp` or `a2a-sdk`. It is empty for now.
-- `docs/spec/`: the spec. `tests/conformance/`: the conformance suite, which can run against any implementation (`ZANNI_CMD`).
+- `src/zanni/protocol/`: the casting messages as Pydantic models (no `a2a-sdk` import), and the generator of `docs/spec/schemas/`.
+- `docs/spec/`: the spec. `tests/conformance/`: the conformance suite, which can run against any implementation (`ZANNI_CMD` for files, `ZANNI_PROTOCOL_DIR` for messages).
 - `examples/`: an actor configuration, two plays, two scripts and a whole role folder, all valid.
 
 ## Vocabulary
@@ -75,6 +76,7 @@ The engine speaks theatre; each script speaks its own domain (a software script 
 uv sync                 # install
 uv run pytest           # full suite, no API key needed
 uv run pytest tests/conformance          # conformance only; ZANNI_CMD=... to test another implementation
+uv run python -m zanni.protocol.schemas  # regenerate docs/spec/schemas/ after changing src/zanni/protocol/
 uv run zanni --version
 uv run zanni examples/plays/habit-tracker/play.yaml   # validate a file and show what it would run
 uv build                # sdist and wheel into dist/

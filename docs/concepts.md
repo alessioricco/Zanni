@@ -43,10 +43,12 @@ Two actors on the same machine can play different roles with different models an
 ## How a play runs
 
 1. **Start the director.** You start the director with the play file: `zanni play.yaml`. It fetches the script. Seats marked `host: local` are started by the director itself, so one command can run a whole play on one machine.
-2. **Actors join.** Each actor starts from its configuration: `zanni tester.yaml`. It connects to the director and presents a card built from its role.
-3. **Casting.** The director checks the role against the part it is cast for and assigns a seat. It then sends the actor where the stage is, and credentials scoped to that seat.
-4. **Cues and reports.** The director follows the script and sends cues. Each actor works on the stage and reports back. Actors never read the whole script, only their cue.
+2. **Actors join.** Each actor starts from its configuration: `zanni tester.yaml`. Only the director listens: the actor connects to it, presents a card built from its role, and shows the play's join token. Actors never open a port, so they can run behind a firewall.
+3. **Casting.** The director checks the role against the part it is cast for (the right role, the pinned version, needs within the part's limits) and assigns a seat. It sends the actor the seat's permissions, where the stage is, and credentials scoped to that seat.
+4. **Cues and reports.** The director follows the script and gives cues, one at a time. Each actor works on the stage and reports back. Actors never read the whole script, only their cue. The actor stays in touch with the director, and that contact is its heartbeat.
 5. **Release.** The director ends each seat and revokes the credentials it gave. If an actor stops answering, the director recasts its seat; the work survives on the stage.
+
+Under the hood, all of this is plain A2A: a seat is one A2A task on the director, from join to release. Zanni adds only the casting extension (see the [spec](spec/casting-extension.md)).
 
 Actors can run anywhere: a laptop, a GPU workstation, a cloud server. The director never holds anyone's model keys.
 

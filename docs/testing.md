@@ -15,7 +15,9 @@ The full suite needs no API key, no network and no model. That is a hard rule: C
 | `tests/test_loading.py` | The loader and the plain-words errors: YAML syntax, unknown keys with suggestions, wrong types, missing fields, secrets, duplicate keys |
 | `tests/test_files.py` | The `zanni` command on the examples, which must be valid, and on broken copies of them, which must fail with the right message |
 | `tests/test_cli.py` | `--version` and usage |
-| `tests/conformance/` | The spec, through files and exit codes only |
+| `tests/conformance/` | The spec: files through the `zanni` command and exit codes; casting messages through the published JSON Schemas (`test_protocol.py`) |
+| `tests/test_protocol_*.py` | The protocol models: the encoding, the card fit checks, and that `docs/spec/schemas/` matches the models |
+| `tests/engine/` | Casting messages survive `a2a-sdk` unchanged |
 
 ## Conformance tests
 
@@ -44,6 +46,8 @@ To add a case:
 3. For an invalid file, add its `.expected` sidecar.
 
 A spec change and its conformance cases go in the same commit (golden rule 2).
+
+For casting messages, add a JSON file to `tests/conformance/protocol/valid/` or `invalid/`; an invalid one gets a `.expected` sidecar with the JSON pointer of the error (`path: /limits/budget/amount`). Another implementation's messages can be checked with `ZANNI_PROTOCOL_DIR=<folder>`. After changing `src/zanni/protocol/`, regenerate the schemas with `uv run python -m zanni.protocol.schemas`.
 
 ## Writing tests
 

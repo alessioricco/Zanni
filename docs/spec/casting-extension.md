@@ -1,7 +1,5 @@
 # Casting extension
 
-**Draft: being written (milestone 1, part 2).** The schemas and conformance cases are still to come.
-
 Casting is how an actor joins a play, is cast into a part, receives cues and reports, and is released. Everything else between the director and its actors is plain A2A 1.0, through the official `a2a-sdk` (D2, D21).
 
 ## Extension URI
@@ -202,3 +200,28 @@ The director ends a seat:
 3. The director marks the task `completed`, and revokes the seat's tokens.
 
 If no answer arrives within one heartbeat interval, the director completes the task and revokes the tokens anyway. Revoking the tokens is what enforces the release, not the actor's answer.
+
+## Schemas and conformance
+
+Every message and card has a JSON Schema (Draft 2020-12) in [`schemas/`](schemas/), generated from `src/zanni/protocol/`:
+
+| Schema | For |
+|---|---|
+| `zanni.director-card.schema.json` | The params on the director's card |
+| `zanni.actor-card.schema.json` | The params on an actor's card |
+| `zanni.join.schema.json`, `zanni.cast.schema.json`, `zanni.refused.schema.json` | Joining |
+| `zanni.cue.schema.json`, `zanni.report.schema.json` | Work |
+| `zanni.release.schema.json`, `zanni.released.schema.json` | Ending a seat |
+
+- **Strict:** every schema rejects fields it doesn't define (D22).
+- **Conformance:** valid and invalid examples are under `tests/conformance/protocol/`, and `tests/conformance/test_protocol.py` checks any implementation's messages against the schemas alone (`ZANNI_PROTOCOL_DIR`).
+- **Round-trip:** a test sends every valid example through `a2a-sdk` and checks that nothing changes.
+
+## Not in the first version
+
+These are listed in `TODO.md`:
+
+- **mTLS:** in place of bearer tokens (D24).
+- **Accepting actors:** how the director accepts actors beyond its checks, such as human approval of joins or allowlists.
+- **Join tokens:** one per actor, instead of one per play.
+- **Reaching the director:** a tunnel or relay for a director that actors can't reach directly.

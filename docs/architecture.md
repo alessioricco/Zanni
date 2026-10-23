@@ -18,6 +18,12 @@ src/zanni/
                     #   SkillFrontmatter, McpConfig
     kinds.py        # which kind of file this is, from its keys
     summary.py      # what a valid file would run, in a few lines
+  protocol/         # the casting extension's messages and card params, as Pydantic models (no a2a-sdk)
+    encoding.py     # numbers as decimal strings: Count, Seconds, Timestamp, Money, Range (D23)
+    card.py         # what each Agent Card carries in the extension's params
+    messages.py     # join, cast, refused, cue, report, release, released
+    fit.py          # does an actor's card fit a part: role, hash, needs within ceilings
+    schemas.py      # generates docs/spec/schemas/*.schema.json
   engine/           # the engine adapter (empty for now)
 examples/           # one valid file of each kind
 tests/              # unit tests, CLI tests
@@ -75,5 +81,6 @@ The [spike report](spikes/pydantic-ai.md) shows a working prototype of each part
 | `pyyaml` | YAML parsing, with node marks for line numbers | lower bound |
 | `pydantic-ai-slim[anthropic,openai,mcp]` | The agent engine (not used yet) | exact (D8) |
 | `mcp` | Zanni's own MCP servers (not used yet) | exact (D8) |
-| `a2a-sdk` | Director-to-actor messages (not used yet) | exact (D8) |
+| `a2a-sdk` | Director-to-actor messages (not used yet; tests round-trip the protocol through it) | exact (D8) |
+| `jsonschema` (dev) | Protocol conformance against the published schemas | lower bound |
 | `pytest` (dev) | Tests | lower bound |

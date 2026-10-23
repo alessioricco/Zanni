@@ -15,11 +15,11 @@ The spec covers only what existing standards don't:
 | A production of a script: script, director, cast, stage, house rules | — | [Play](play.md) |
 | The play's workspace: operations, permissions, backends | MCP (transport) | [Stage](stage.md) |
 | Director to actor | A2A | — |
-| Joining, seats, scoped credentials, release | A2A extension | [Casting extension](casting-extension.md) |
+| Joining, seats, cues, reports, release | A2A 1.0, plus an extension | [Casting extension](casting-extension.md), [schemas](schemas/) |
 
 ## Status
 
-Version 0 is a draft, and anything may change until 1.0. The file formats are specified for the first version's scope; the casting extension is still a draft (milestone 1, part 2).
+Version 0 is a draft, and anything may change until 1.0. Every format and the casting extension are specified for the first version's scope (milestone 1). What is deliberately left for later is in `TODO.md`.
 
 - **Normative:** each field table describes what the reference implementation validates today. The conformance tests check it.
 - **Draft:** sections marked this way aren't decided. They link to the open question in the vision doc.
