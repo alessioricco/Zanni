@@ -21,11 +21,17 @@ def check_path(path: str) -> str:
 
 
 class FolderStage:
-    def __init__(self, root: Path, read: list[str], write: list[str]):
+    """One seat's view of a folder stage. Seats of one play share `record`, so markers mean the same to all."""
+
+    def __init__(self, root: Path, read: list[str], write: list[str], record: list[tuple[str, str]] | None = None):
         self.root = root.resolve()
         self.read_rules = list(read) + list(write)  # writing implies reading
         self.write_rules = list(write)
-        self.record: list[tuple[str, str]] = []  # (path, "written" | "deleted"), append-only
+        self.record: list[tuple[str, str]] = [] if record is None else record  # (path, change), append-only
+
+    def seat(self, read: list[str], write: list[str]) -> "FolderStage":
+        """The same stage and record, with another seat's permissions."""
+        return FolderStage(self.root, read, write, self.record)
 
     def _may(self, rules: list[str], path: str) -> bool:
         return any(covers(rule, path) for rule in rules)

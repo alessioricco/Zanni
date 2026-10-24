@@ -1,7 +1,6 @@
 """Run an actor on a rehearsal: its cues, against a fresh copy of the rehearsal's stage, with no director (D26)."""
 
 import asyncio
-import json
 import shutil
 import subprocess
 from collections.abc import Callable
@@ -20,23 +19,8 @@ from zanni.engine.run import run_cue
 from zanni.files.check import load_rehearsal
 from zanni.files.schemas import ActorConfiguration, Rehearsal, RehearsalCue
 from zanni.protocol.encoding import money
+from zanni.log import Log
 from zanni.protocol.messages import Report
-
-
-def now() -> str:
-    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
-class Log:
-    """The run's log: one JSON object per line, in the play log's format (D18). Never holds a credential (D15)."""
-
-    def __init__(self, path: Path, run_id: str):
-        self.path, self.run_id = path, run_id
-        path.parent.mkdir(parents=True, exist_ok=True)
-
-    def event(self, event: str, **fields) -> None:
-        with self.path.open("a") as f:
-            f.write(json.dumps({"ts": now(), "run": self.run_id, "event": event, **fields}) + "\n")
 
 
 def cue_prompt(cue: RehearsalCue) -> str:
