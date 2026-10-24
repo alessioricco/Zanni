@@ -72,5 +72,5 @@ def test_check_flag_validates_without_running(tmp_path):
     config = setup(tmp_path)
     result = subprocess.run([sys.executable, "-m", "zanni", "--check", str(config)], capture_output=True, text=True)
     assert result.returncode == 0
-    assert "play: the rehearsal 'smoke', 1 cue, run with a director started for it" in result.stdout
+    assert "runs: the rehearsal 'smoke', 1 cue, with a director started for it here" in result.stdout
     assert result.stdout.strip().endswith("Valid.")

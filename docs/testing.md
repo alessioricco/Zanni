@@ -17,8 +17,10 @@ The full suite needs no API key, no network and no model. That is a hard rule: C
 | `tests/test_cli.py` | `--version` and usage |
 | `tests/conformance/` | The spec: files through the `zanni` command and exit codes; casting messages through the published JSON Schemas (`test_protocol.py`) |
 | `tests/test_protocol_*.py` | The protocol models: the encoding, the card fit checks, and that `docs/spec/schemas/` matches the models |
-| `tests/engine/` | The engine with scripted models (`FunctionModel`): the run loop, fallback, the text tool format, MCP servers, the Ollama check; and casting messages surviving `a2a-sdk` |
-| `tests/test_actor_*.py`, `tests/test_rehearsal.py` | Roles, credential resolution, the folder stage, and a whole rehearsal with a scripted model |
+| `tests/engine/` | The engine with scripted models (`FunctionModel`): the run loop, fallback, the text tool format, MCP servers, the Ollama check; casting messages surviving `a2a-sdk`; a seat's whole life over A2A against a fake director (`test_a2a_seat.py`); the stage's MCP server and its tokens (`test_stage_mcp.py`) |
+| `tests/test_actor_*.py`, `tests/test_rehearsal.py` | Roles, credential resolution, the folder stage (against the local folder and the MCP server, through `tests/stage_over_mcp.py`), an actor joining a director over loopback, and a whole rehearsal with a scripted model |
+| `tests/test_director.py` | The director's casting side on its own: every refusal, tokens, cues and reports, release, heartbeats on a fake clock |
+| `tests/test_join.py`, `tests/test_serve.py` | Joining by URL or play file from an actor configuration, `--serve` in another process, and a director stopping while an actor's task stream is open |
 | `tests/test_engine_guard.py` | Only `src/zanni/engine/` imports Pydantic AI, `mcp`, `a2a-sdk` and their providers |
 | `tests/live/` | A real rehearsal on a real model; skipped unless `ZANNI_LIVE_CONFIG` names an actor configuration |
 

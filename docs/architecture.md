@@ -1,6 +1,6 @@
 # Architecture
 
-Zanni is one Python package with one command. Today it validates Zanni files; the engine that runs actors comes later ([roadmap](../ROADMAP.md)).
+Zanni is one Python package with one command. It validates Zanni files, runs actors that join a director over A2A, and serves rehearsals as a director. A director that runs a play's script comes in milestone 4 ([roadmap](../ROADMAP.md)).
 
 ## Layout
 
@@ -24,7 +24,14 @@ src/zanni/
     resolve.py      # ${NAME} from the actor's credentials, then the environment (D20); models resolved
     mcp_config.py   # a role's mcp.json, with every ${NAME} resolved
     stage.py        # the folder stage backend: operations, permissions, change markers (D12)
-    rehearsal.py    # runs an actor on a rehearsal: stage copy, cues, reports, log, verify (D26)
+    seat.py         # an actor in a play: the director's card, its own card, join, cues, reports, release (D30)
+    join.py         # where to join (a URL or a play file's director), and the set-up rehearsals share
+    rehearsal.py    # an actor on a rehearsal, with a director started for it on loopback (D26, D29)
+  director/         # the director's casting side (no engine imports)
+    contract.py     # Casting: what the engine's A2A server asks of the director; Outgoing, DirectorInfo
+    casting.py      # Director: joins and refusals, seats and tokens, cues and reports, heartbeats, release
+    rehearsal.py    # a rehearsal's one part, conducting its cues, verify, and --serve (D29)
+  log.py            # the JSON Lines logs: the play's and each actor's own (D18, D32)
   protocol/         # the casting extension's messages and card params, as Pydantic models (no a2a-sdk)
     encoding.py     # numbers as decimal strings: Count, Seconds, Timestamp, Money, Range (D23)
     card.py         # what each Agent Card carries in the extension's params
@@ -39,6 +46,11 @@ src/zanni/
     tools.py        # load_skill and the stage_* tools
     mcp.py          # a role's MCP servers as toolsets
     capabilities.py # asks Ollama whether a model can call tools
+    a2a_wire.py     # casting messages in and out of A2A messages, validated both ways
+    a2a_server.py   # the director's card, a task per seat, the token on every call (D21, D31)
+    a2a_client.py   # the actor's side: fetch the card, join, follow the task (stream, then polling)
+    stage_mcp.py    # the stage's MCP server (Streamable HTTP, a token per seat), and RemoteStage
+    serve.py        # serves a Director: A2A and the stage's MCP server on one address, plus the heartbeat watch
 examples/           # one valid file of each kind
 tests/              # unit tests, CLI tests
 tests/conformance/  # data-driven tests that any implementation can run
@@ -73,27 +85,32 @@ Each step raises `FileErrors` with every problem it found. `cli.main` catches it
 - **Strict models.** Every model inherits from `Strict` (`extra="forbid"`, frozen). For unknown keys, `validation._known_fields` walks the model tree to find the allowed names, and `difflib` suggests the closest.
 - **Secrets have one home.** `find_secrets` rejects secret-looking keys anywhere, except in the sections a model lists in `SECRET_SECTIONS` (only `ActorConfiguration.credentials`). Inputs under those sections are replaced by `a value (hidden)` in every message (D15).
 - **Standards are checked, not tightened.** `SkillFrontmatter` and `McpConfig` ignore fields they don't define, because SKILL.md and `mcp.json` are shared with other tools (D19).
+- **The director decides, the engine carries.** The engine's A2A server never decides who is cast or what a seat does next: it calls the `Casting` interface (`director/contract.py`), which `director/casting.py` implements. Milestone 4 adds a script to drive it, not a new server.
+- **One stage tool set.** The actor's `stage_*` tools are the same code for a local `FolderStage` and a `RemoteStage` over MCP, and the remote stage turns tool errors back into the same `StageError`. So a model sees the same tools and errors either way.
 - **Shorthand is normalised before validation.** A cast entry can be a plain package reference. A `BeforeValidator` turns it into `{role: …}`, so there is one model and error paths stay clean.
 
 ## The engine adapter
 
-`src/zanni/engine/` is the only place that imports Pydantic AI, `mcp` and `a2a-sdk` (golden rule 4, D1). `tests/test_engine_guard.py` fails if anything else does. Zanni hands it a `CueTask` (plain data in `zanni.actor.contract`) and gets back a `CueResult`:
+`src/zanni/engine/` is the only place that imports Pydantic AI, `mcp` and `a2a-sdk` (golden rule 4, D1). `tests/test_engine_guard.py` fails if anything else does. Zanni hands it a `CueTask` (plain data in `zanni.actor.contract`) and gets back a `CueResult`.
+
+## An actor and a director
 
 ```
-zanni slug-tester.yaml
-  └─ actor.rehearsal.run_rehearsal
-       ├─ actor.roles.load_role         instructions + skills (D4)
-       ├─ actor.resolve.resolve_models  models with credentials and URLs resolved (D20)
-       ├─ engine.models.build_model     every model built, and Ollama asked about tools, before anything runs
-       ├─ actor.stage.FolderStage       a fresh stage copy, with the role's permissions
-       ├─ for each cue: engine.run.run_cue(CueTask) -> CueResult
-       │     an Agent with load_skill, the stage_* tools (sequential) and the role's MCP servers;
-       │     on a failure, classify it and fall back if the entry lists the reason (D27)
-       ├─ protocol.messages.Report      each result as a validated zanni.report; cost or null (D7)
-       └─ verify commands, then the log: run-started, cue, report, cost, fallback, verdict, run-stopped
+zanni actor.yaml                                   zanni smoke.yaml --serve        (or both in one process,
+  └─ actor.join.join_play                            └─ director.rehearsal              for a rehearsal)
+       ├─ the director's URL (D30)                         ├─ the stage, copied fresh
+       ├─ ready_actor: role, models, built and checked     ├─ Director: one part, the role's name and hash
+       └─ actor.seat.play_seat                              └─ engine.serve.serving
+            ├─ engine.a2a_client: fetch the card ───────────▶ engine.a2a_server: the card
+            ├─ join with the actor's card + join token ─────▶ Director.join: token, card, fit, seats → zanni.cast
+            ├─ engine.stage_mcp.remote_stage ───────────────▶ engine.stage_mcp: the stage's MCP server
+            ├─ follow the task (stream; polling) ◀─────────── director.rehearsal.conduct: each zanni.cue
+            ├─ each cue: engine.run.run_cue → zanni.report ─▶ Director.report
+            └─ zanni.release → zanni.released ──────────────▶ Director.release; then verify
 ```
 
-Joining a director over A2A comes in milestone 3.
+- **Two logs:** the director keeps the play's log (`log.jsonl`); the actor keeps its own, on its own machine (D32).
+- **Contact:** the director's heartbeat watch ends a seat that has had no contact for `misses × interval`, with an open stream counting as contact (D31), and revokes its tokens.
 
 ## Dependencies
 
@@ -101,8 +118,9 @@ Joining a director over A2A comes in milestone 3.
 |---|---|---|
 | `pydantic` | Schemas and validation | lower bound |
 | `pyyaml` | YAML parsing, with node marks for line numbers | lower bound |
-| `pydantic-ai-slim[anthropic,openai,mcp]` | The agent engine (not used yet) | exact (D8) |
-| `mcp` | Zanni's own MCP servers (not used yet) | exact (D8) |
-| `a2a-sdk` | Director-to-actor messages (not used yet; tests round-trip the protocol through it) | exact (D8) |
+| `pydantic-ai-slim[anthropic,openai,mcp]` | The agent loop, model providers, cost, and a role's MCP servers | exact (D8) |
+| `mcp` | The stage's MCP server, and the actor's client for it (D31) | exact (D8) |
+| `a2a-sdk[http-server]` | The director's A2A server and the actor's client (D21) | exact (D8) |
+| `uvicorn` | Serves the director (already required by `mcp`) | lower bound |
 | `jsonschema` (dev) | Protocol conformance against the published schemas | lower bound |
 | `pytest` (dev) | Tests | lower bound |

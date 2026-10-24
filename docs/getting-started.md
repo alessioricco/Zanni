@@ -62,7 +62,7 @@ uv run zanni examples/plays/newsroom/play.yaml  # a play, checked against its lo
 
 ## Run an actor: a rehearsal
 
-A rehearsal runs one actor on cues from a file, against a fresh copy of a local stage, with no director. The repository's example is the `slug-tester` role's `smoke` rehearsal, run through `examples/slug-tester.yaml`. That actor configuration lists `qwen3.8:27b` on Ollama, then `claude-haiku-5-5`, and takes `OLLAMA_BASE_URL` and `ANTHROPIC_API_KEY` from the environment. Edit its `models` to match yours, then:
+A rehearsal runs one actor on cues from a file, against a fresh copy of a local stage. `zanni` starts a director for it on your machine, and the actor joins it over A2A, as it would join any director. The repository's example is the `slug-tester` role's `smoke` rehearsal, run through `examples/slug-tester.yaml`. That actor configuration lists `qwen3.8:27b` on Ollama, then `claude-haiku-5-5`, and takes `OLLAMA_BASE_URL` and `ANTHROPIC_API_KEY` from the environment. Edit its `models` to match yours, then:
 
 ```bash
 set -a; . ./.env; set +a          # if your keys live in a .env: zanni reads the environment
@@ -70,11 +70,11 @@ uv run zanni examples/slug-tester.yaml
 ```
 
 ```
-Rehearsal 'smoke' with slug-tester-1 (slug-tester 0.1.0); run 20261024T001644Z
-  cue 1/1: Specify
-    done on ollama qwen3.8:27b: 4 tool calls, 3361 in / 344 out tokens, cost $0
+Rehearsal 'smoke' with slug-tester-1 (slug-tester 0.1.0); run 20261024T114513Z
+  cue smoke-1: Specify
+    done on ollama qwen3.8:27b: 4 tool calls, 3356 in / 294 out tokens, cost $0
   verify tests-pass: passed (2 passed in 0.01s)
-Rehearsal passed. Stage and log: ~/.zanni/actors/slug-tester-1/rehearsals/smoke/20261024T001644Z
+Rehearsal passed. Stage and log: ~/.zanni/actors/slug-tester-1/rehearsals/smoke/20261024T114513Z
 ```
 
 - **Order:** the actor runs on the first model in its configuration, and falls back to the next when one fails.
@@ -84,12 +84,69 @@ Rehearsal passed. Stage and log: ~/.zanni/actors/slug-tester-1/rehearsals/smoke/
 
 See [Writing a role](writing-a-role.md#6-rehearse-it) to rehearse your own role, and [Models and keys](models-and-keys.md) to set up models.
 
+## Join a director on another machine
+
+The director and the actor can run on different machines. Where an actor runs is up to whoever runs it (D32). Here one machine serves the `smoke` rehearsal, and an actor on another machine joins it.
+
+1. **On the director's machine**, pick a join token, and serve the rehearsal on an address the other machine can reach:
+
+   ```bash
+   export ZANNI_JOIN_TOKEN=$(python3 -c "import secrets; print(secrets.token_urlsafe(24))")
+   uv run zanni examples/roles/slug-tester/rehearsals/smoke.yaml --serve --listen 0.0.0.0:8765
+   ```
+
+   ```
+   Serving rehearsal 'smoke' for the role slug-tester at http://0.0.0.0:8765 (actors on other machines use this machine's address, port 8765); waiting for an actor
+   ```
+
+2. **On the actor's machine**, install Zanni (above), with the same version of the role: the director checks the role's hash, so a changed file is refused. Write an actor configuration whose `play` is the director's address, and give it the same join token:
+
+   ```yaml
+   # slug-tester-remote.yaml (chmod 600 if it stores the token)
+   name: slug-tester-remote
+   role: ./Zanni/examples/roles/slug-tester
+   play: http://<director's address>:8765
+   models:
+     - { provider: ollama, model: qwen3.8:27b, base_url: "${OLLAMA_BASE_URL:-http://127.0.0.1:11434}", price: { input: 0, output: 0 } }
+   credentials:
+     ZANNI_JOIN_TOKEN: ${ZANNI_JOIN_TOKEN}
+   ```
+
+   `qwen3.8:27b` stands for any model with tool calling on this machine's own server, or a cloud model; see [Models and keys](models-and-keys.md).
+
+3. **Run the actor:**
+
+   ```bash
+   export ZANNI_JOIN_TOKEN=<the same token>
+   uv run --project Zanni zanni slug-tester-remote.yaml
+   ```
+
+   ```
+   Joining the play 'rehearsal:smoke' (script …/rehearsals/smoke.yaml) at http://<director's address>:8765
+   Cast as slug-tester-1 (part slug-tester); stage at http://<director's address>:8765/stage/mcp
+     cue smoke-1: Specify
+       done on ollama qwen3.8:27b: 4 tool calls, 3469 in / 404 out tokens, cost $0
+   Released (done)
+   The actor's log: ~/.zanni/actors/slug-tester-remote/plays
+   ```
+
+   The director then prints `Released slug-tester-1 (done)`, runs `verify`, and exits with `Rehearsal passed.`
+
+- **Two logs:** the director keeps the run's log on its machine, under `~/.zanni/rehearsals/smoke/`; the actor keeps its own on its machine, under its state folder (D32).
+- **Reaching the director:** only the director must be reachable; the actor connects out to it. A firewall on the director's machine may ask to allow incoming connections.
+- **Plain HTTP:** `--serve` doesn't encrypt, so tokens cross the network in the clear. Use it on a network you trust, or behind a TLS proxy.
+- **If it fails:** see [Troubleshooting](troubleshooting.md#joining-a-director).
+
+The recorded runs of this layout are in [docs/runs/milestone-3.md](runs/milestone-3.md).
+
 ## What works today
 
 | Works | Not yet |
 |---|---|
-| Validating actor configurations, plays, scripts, lockfiles, rehearsals and whole role folders | Joining a director, or starting one (milestones 3 and 4) |
+| Validating actor configurations, plays, scripts, lockfiles, rehearsals and whole role folders | Starting a play's director from its play file, and casting a whole play (milestone 4) |
 | Running one actor on a rehearsal, on local or cloud models, with fallback | Fetching remote roles (use a local folder for now) |
+| An actor joining a director over A2A, by URL or through a play file's `director` | Renewing a seat's tokens: a seat ends when they expire, after 24 hours |
+| Serving a rehearsal to an actor on another machine (`--serve`), with the stage over MCP | TLS: `--serve` speaks plain HTTP |
 | Errors with their line and how to fix them | Fetching roles and scripts from git, or plays from URLs (only their shape is checked) |
 | Rejecting secrets in shared files | Checking a play against a remote script (it needs fetching) |
 | A summary of what each file would run | |

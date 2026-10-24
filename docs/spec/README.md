@@ -13,8 +13,8 @@ The spec covers only what existing standards don't:
 | One actor instance: role, play, models, credentials | — | [Actor configuration](actor-configuration.md) |
 | The reusable work: mission, parts, gates, stop rules, acts and scenes | Markdown with frontmatter, like SKILL.md | [Script](script.md) |
 | A production of a script: script, director, cast, stage, house rules | — | [Play](play.md) |
-| One actor on cues, with no director: a role's own tests | — | [Rehearsal](rehearsal.md) |
-| The play's workspace: operations, permissions, backends | MCP (transport) | [Stage](stage.md) |
+| One actor on cues from a file, with a director started for it: a role's own tests, and served with `--serve` | — | [Rehearsal](rehearsal.md) |
+| The play's workspace: operations, permissions, backends, its MCP server | MCP (transport) | [Stage](stage.md) |
 | Director to actor | A2A | — |
 | Joining, seats, cues, reports, release | A2A 1.0, plus an extension | [Casting extension](casting-extension.md), [schemas](schemas/) |
 

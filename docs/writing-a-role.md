@@ -116,7 +116,7 @@ A role lives in a git repository, at the root or in a folder of one. Tag each ve
 
 ## 6. Rehearse it
 
-A rehearsal runs your role on cues, against a copy of a stage folder, with no director. It is the role's own test, and it ships with the package:
+A rehearsal runs your role on cues, against a copy of a stage folder, with a director started for it on your machine (D29). It is the role's own test, and it ships with the package:
 
 ```
 roles/slug-tester/
@@ -154,4 +154,5 @@ uv run zanni slug-tester.yaml
 
 - **Comparing models:** the same rehearsal, run with different `models`, is how to compare models on your role. [`docs/runs/milestone-2.md`](runs/milestone-2.md) shows one comparison.
 - **Checking the folder:** `zanni <role folder>` also checks every rehearsal in `rehearsals/`.
+- **On another machine:** `zanni rehearsals/smoke.yaml --serve --listen 0.0.0.0:8765` serves the rehearsal; an actor anywhere joins it by pointing its `play` at `http://<this machine>:8765`. Both sides need the same `ZANNI_JOIN_TOKEN` ([Getting started](getting-started.md#join-a-director-on-another-machine)).
 - **Safety:** a rehearsal's `verify` commands run on your machine, so run rehearsals only from roles you trust. See the [rehearsal spec](spec/rehearsal.md).

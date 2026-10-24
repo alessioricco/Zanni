@@ -171,14 +171,14 @@ def check_actor_play(loaded: Loaded, actor: ActorConfiguration) -> list[str]:
                                     f'"{actor.play}" is not an address zanni can join',
                                     "use an http:// or https:// URL, a play file or a rehearsal (D30)")])
     if kind == "director":
-        return [f"  play: join the director at {where}"]
+        return [f"  joins: the director at {where}"]
     if kind == "play-url":
-        return [f"  play: join the director named in the play file {where}"]
+        return [f"  joins: the director named in the play file {where}"]
     if kind != "rehearsal":
         return []
     _, rehearsal = load_rehearsal(Path(where))
     cues = f"{len(rehearsal.cues)} cue{'s' if len(rehearsal.cues) > 1 else ''}"
-    return [f"  play: the rehearsal '{rehearsal.rehearsal}', {cues}, run with a director started for it"]
+    return [f"  runs: the rehearsal '{rehearsal.rehearsal}', {cues}, with a director started for it here"]
 
 
 def check_role_folder(folder: Path, loaded: Loaded, role: RoleManifest) -> list[str]:

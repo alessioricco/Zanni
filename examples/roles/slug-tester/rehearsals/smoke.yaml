@@ -1,4 +1,4 @@
-# A rehearsal: runs the slug-tester role with no director. An actor configuration's `play` points here.
+# A rehearsal: runs the slug-tester role on cues, with a director started for it (or served with --serve). An actor configuration's `play` points here.
 rehearsal: smoke
 description: The tester turns two acceptance criteria into passing pytest tests.
 stage: ./smoke-stage

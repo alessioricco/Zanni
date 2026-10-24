@@ -1,6 +1,6 @@
 # Models and keys
 
-> **Status:** an actor runs its models today, in a [rehearsal](spec/rehearsal.md). Recorded runs on `qwen3.8:27b`, `gemma3:4b` and `claude-haiku-5-5` are in [docs/runs/milestone-2.md](runs/milestone-2.md).
+> **Status:** an actor runs its models today, in a [rehearsal](spec/rehearsal.md) or in a seat it joined over A2A. Recorded runs are in [docs/runs/milestone-2.md](runs/milestone-2.md) and [docs/runs/milestone-3.md](runs/milestone-3.md).
 
 ## Each actor brings its own models and keys
 
@@ -14,8 +14,8 @@ An actor configuration lists its models in order. The first is used, and the nex
 Two actors on one machine have two configuration files, each with its own models and access:
 
 ```yaml
-# ~/zanni/dgx-coder.yaml (chmod 600, not in any repository)
-name: dgx-coder
+# ~/zanni/gpu-coder.yaml (chmod 600, not in any repository)
+name: gpu-coder
 role: github.com/zanni-roles/coder@1.0.0
 play: https://example.com/plays/habit-tracker/play.yaml
 models:
@@ -31,6 +31,16 @@ credentials:
 - **Where credentials go:** a model entry's `credential` names the credential it uses. The role's `mcp.json` picks up `${GITHUB_TOKEN}` and the like from `credentials` first, then from the environment.
 
 Every field is in the [actor configuration spec](spec/actor-configuration.md).
+
+## The join token
+
+An actor joins a director with the play's join token (D24):
+
+- **On the actor's side:** it goes in the actor configuration's `credentials`, as `ZANNI_JOIN_TOKEN`, either stored or as `${ZANNI_JOIN_TOKEN}` from the environment.
+- **On the director's side:** `zanni <rehearsal> --serve` reads it from `ZANNI_JOIN_TOKEN` in its environment.
+- **Who sees it:** it travels only in the `Authorization` header of the join. After that, the actor uses the seat's own tokens, which the director gives it and revokes at release. No token is ever logged.
+- **On untrusted networks:** `--serve` speaks plain HTTP, so put it behind a TLS proxy (`TODO.md`).
+- **A rehearsal run from an actor configuration needs no join token:** its director runs in the same process, and makes one up for the run.
 
 ## Secrets: only in actor configurations
 

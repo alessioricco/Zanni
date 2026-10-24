@@ -215,6 +215,56 @@ The actor moved to the next model in its configuration, because the failure's re
 
 The actor ran, but its work didn't pass the rehearsal's `verify` checks. Look at the stage copy and `log.jsonl` in the folder the last line names. In the recorded runs, this is how a small model's broken tool block was caught ([docs/runs/milestone-2.md](runs/milestone-2.md)).
 
+## Joining a director
+
+### "Refused: not-authorised"
+
+```
+Refused: not-authorised: the join token is missing, or isn't this play's
+```
+
+The actor's `ZANNI_JOIN_TOKEN` isn't the one the director was started with. Give both sides the same value. The actor exits with code 2; the director keeps waiting for an actor that fits.
+
+### "Refused: hash-mismatch"
+
+```
+Refused: hash-mismatch: the actor's slug-tester has hash sha256:ce04…6715, and this rehearsal's package has sha256:9d59…f097: they are different versions of the role
+```
+
+A served rehearsal accepts only the role it belongs to, byte for byte. Some file in the actor's copy of the role differs from the director's. Copy the role again, or check out the same version on both machines. A `role-mismatch` refusal means the actor plays a different role altogether.
+
+### "couldn't fetch the director's card"
+
+```
+nodirector.yaml: couldn't join: couldn't fetch the director's card from http://127.0.0.1:9: Network communication error fetching agent card from http://127.0.0.1:9/.well-known/agent-card.json: All connection attempts failed
+```
+
+Nothing answered at the configuration's `play` address. Check that the director is running, and that its address and port are right. From the actor's machine, `curl http://<director's address>:<port>/.well-known/agent-card.json` should print the card. If it doesn't, the director may be listening on `127.0.0.1` only (serve with `--listen 0.0.0.0:<port>`), or a firewall on its machine may be blocking the port.
+
+### "ZANNI_JOIN_TOKEN isn't in the actor configuration's `credentials`"
+
+```
+notoken.yaml: ZANNI_JOIN_TOKEN isn't in the actor configuration's `credentials`; add it, e.g. ZANNI_JOIN_TOKEN: ${ZANNI_JOIN_TOKEN}, with the play's join token in the environment; nothing was started.
+```
+
+An actor joining a director needs the play's join token. Add it to `credentials`, as a `${ZANNI_JOIN_TOKEN}` reference or a stored value. When the reference is there but the environment doesn't set it, the message is `${ZANNI_JOIN_TOKEN} has no value` instead.
+
+### "ZANNI_JOIN_TOKEN isn't set", when serving
+
+```
+smoke.yaml: ZANNI_JOIN_TOKEN isn't set; set it to the play's join token, and give actors the same value in their configuration's credentials; nothing was started.
+```
+
+`--serve` reads the join token from its environment. Export it before serving.
+
+### "is not an address zanni can join"
+
+```
+scheme.yaml, line 3, play: "ws://127.0.0.1:9" is not an address zanni can join; use an http:// or https:// URL, a play file or a rehearsal (D30)
+```
+
+A director's address is an `http://` or `https://` URL (D30).
+
 ## Role folders
 
 `zanni <role folder>` checks the whole package.

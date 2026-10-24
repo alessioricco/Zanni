@@ -399,7 +399,7 @@ class McpConfig(BaseModel):
     mcpServers: dict[str, McpServer]
 
 
-# Rehearsal: one actor, run on cues against a local stage, with no director (D26)
+# Rehearsal: one actor, run on cues against a local stage, with a director that plays only its cues (D26, D29)
 
 class RehearsalCue(Strict):
     """One cue, as the director would give it (the `zanni.cue` message, without the ids)."""

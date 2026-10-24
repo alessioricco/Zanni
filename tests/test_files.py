@@ -105,7 +105,7 @@ def test_role_folder_reports_a_tool_missing_from_mcp_json(tmp_path):
 
 
 def test_actor_pointing_at_a_rehearsal_says_it_runs_with_no_director():
-    assert "play: the rehearsal 'smoke', 1 cue, run with a director started for it" in zanni(REHEARSAL_ACTOR).stdout
+    assert "runs: the rehearsal 'smoke', 1 cue, with a director started for it here" in zanni(REHEARSAL_ACTOR).stdout
 
 
 def test_role_folder_lists_its_rehearsals():

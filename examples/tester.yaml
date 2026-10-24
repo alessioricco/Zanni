@@ -15,3 +15,4 @@ models:
 credentials:
   ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
   GITHUB_TOKEN: ${GITHUB_TOKEN}
+  ZANNI_JOIN_TOKEN: ${ZANNI_JOIN_TOKEN}    # the play's join token, presented when joining (D24)
