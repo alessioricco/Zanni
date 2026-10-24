@@ -16,7 +16,7 @@ Run on 2026-10-23, in one Claude Code session. Every result below ran in that se
 | fastmcp-slim (Pydantic AI's MCP client) | 4.1.3 |
 | a2a-sdk (official) | 1.2.3 |
 | genai-prices | 0.1.13 |
-| Ollama server | 0.40.6, on a separate DGX workstation |
+| Ollama server | 0.40.6, on a separate machine on the same network |
 | Local model | `qwen3.8:27b` (digest aaee06c39dcf, 27.3B, Q4_K_M) |
 | Model without tool calling | `gemma3:4b` (digest 68ceab7e468a, 3.9B, Q4_K_M, 3.35 GB), pulled for item 4 |
 | Cloud model | `claude-haiku-5-5` (Anthropic API) |
@@ -92,7 +92,7 @@ The A2A actor process, measured 3 times on the laptop:
   The agent loop, the toolsets and the scope checks run unchanged.
 - **It is opt-in per model entry** (`tool_format: text` in `models.yaml`), so cloud models are never affected.
 - **What it doesn't cover yet:** streaming, structured output types (only `str` output was tested), a model that writes text and a tool block in the same reply, and repair of malformed blocks. A malformed block is currently left as text.
-- **None of the DGX models needed it.** All eight report `tools` in Ollama's `/api/show`; `gemma3:4b` was pulled only for this item.
+- **None of the other local models needed it.** All eight report `tools` in Ollama's `/api/show`; `gemma3:4b` was pulled only for this item.
 
 ## Gaps Zanni must fill on top of Pydantic AI, by effort (largest first)
 

@@ -95,3 +95,44 @@ def test_a_bad_listen_address_is_refused(tmp_path):
 def test_check_with_serve_only_validates(tmp_path):
     result = zanni(roles(tmp_path), "--serve", "--check", home=tmp_path)
     assert result.returncode == 0 and result.stdout.strip().endswith("Valid.")
+
+
+def test_stopping_the_director_ends_an_open_task_stream_cleanly(tmp_path):
+    """An actor may still be following its task when the director stops: the stream must end, not be cut."""
+    import asyncio
+
+    from a2a.types import SubscribeToTaskRequest
+
+    from tests.test_director import director, join_message
+    from tests.test_director import JOIN_TOKEN as DIRECTOR_TOKEN
+    from zanni.director.contract import DirectorInfo
+    from zanni.engine.a2a_client import DirectorClient, _context
+    from zanni.engine.serve import serving
+
+    d, _ = director(tmp_path)
+    info = DirectorInfo(name="d", description="d", version="0", play="p", script="s")
+    ended = {}
+
+    async def scenario():
+        async with serving(d, info) as server:
+            client = DirectorClient(server.url)
+            await client.fetch_card()
+            task_id, cast = await client.join(join_message().card, DIRECTOR_TOKEN)
+
+            async def follow():
+                try:
+                    async for _ in client._stream.subscribe(SubscribeToTaskRequest(id=task_id),
+                                                            context=_context(cast.seat_token)):
+                        pass
+                    ended["how"] = "ended"
+                except Exception as e:
+                    ended["how"] = f"{type(e).__name__}: {e}"
+
+            following = asyncio.create_task(follow())
+            while not d.seats[task_id].streams:  # the director has seen the stream open
+                await asyncio.sleep(0.02)
+        await asyncio.wait_for(following, 10)
+        await client.close()
+
+    asyncio.run(asyncio.wait_for(scenario(), 30))
+    assert ended["how"] == "ended"

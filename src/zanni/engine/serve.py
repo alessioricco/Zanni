@@ -30,3 +30,6 @@ async def serving(director: Director, info: DirectorInfo, host: str = "127.0.0.1
             watcher.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await watcher
+            # End every task's event queue before the server stops, so an actor's open task stream finishes
+            # cleanly instead of being cut by the shutdown (`listening` then waits for it).
+            await handlers[0].aclose()

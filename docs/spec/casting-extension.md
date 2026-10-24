@@ -212,6 +212,8 @@ The director ends a seat:
 
 If no answer arrives within one heartbeat interval, the director completes the task and revokes the tokens anyway. Revoking the tokens is what enforces the release, not the actor's answer.
 
+Once it has sent `zanni.released`, the actor's seat is over: it doesn't wait for the task's `completed` status, which a director that stops at once may never send ([recorded runs](../runs/milestone-3.md)). A director that stops ends its open task streams first, so they close cleanly rather than being cut.
+
 ## Schemas and conformance
 
 Every message and card has a JSON Schema (Draft 2020-12) in [`schemas/`](schemas/), generated from `src/zanni/protocol/`:

@@ -1,4 +1,4 @@
-name: dgx-coder
+name: gpu-coder
 role: github.com/zanni-roles/coder@1.0.0
 play: https://director.example.com:8765
 models:
@@ -7,4 +7,4 @@ models:
 credentials:
   ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
   SSH_KEY_PATH: ${SSH_KEY_PATH:-~/.ssh/id_ed25519}
-state_dir: /var/lib/zanni/dgx-coder
+state_dir: /var/lib/zanni/gpu-coder

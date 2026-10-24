@@ -3,8 +3,8 @@
 An actor configuration is one actor instance's own file. A zanni is an empty shell; this file tells it which role to play, which play to join, which models to run and which credentials to use. It holds what is specific to this instance, never the role's capabilities (D14). It stays on the actor's machine and never goes in a repository.
 
 ```yaml
-# ~/zanni/dgx-coder.yaml
-name: dgx-coder
+# ~/zanni/gpu-coder.yaml
+name: gpu-coder
 role: github.com/zanni-roles/coder@1.0.0
 play: https://example.com/plays/habit-tracker/play.yaml
 models:

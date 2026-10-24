@@ -166,3 +166,25 @@ async def _last_status(client, task_id, token) -> str:
         return (await client.poll(task_id, token)).state
     except NotAuthorised:
         return "not-authorised"
+
+
+def test_the_actor_is_done_when_released_even_if_the_director_stops_at_once(setup):
+    """Recorded run 1 of milestone 3: the director exited right after the release, and the actor waited 90 s for a
+    `completed` status that never came. Released means done."""
+    tmp_path, actor, role, rehearsal, rehearsal_path, models = setup
+    model = writer()
+
+    async def go():
+        director = rehearsal_director(rehearsal, rehearsal_path, role.manifest.name, package_hash(role.folder),
+                                      tmp_path / "run", "r1", join_token="join-token-fake")
+        async with serving(director, INFO) as server:
+            conducting = asyncio.create_task(conduct(director, rehearsal, rehearsal_path, tmp_path / "run",
+                                                     "slug-tester", lambda _: None))
+            seat = asyncio.create_task(play_seat(server.url, actor, role, models, [], join_token="join-token-fake",
+                                                 log_at=lambda play: tmp_path / "actor-log.jsonl", run_id="r1",
+                                                 say=lambda _: None, runner=lambda t: run_cue(t, build=lambda rm: model)))
+            await conducting
+        return await asyncio.wait_for(seat, 10)  # the server is gone; the actor must not wait for it
+
+    outcome = asyncio.run(go())
+    assert outcome.exit_code == 0 and outcome.reason == "done"

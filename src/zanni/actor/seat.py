@@ -131,7 +131,8 @@ async def _play(client, task_id, cast, stage, role, models, servers, log, say, r
     async def follow():  # in the background, so the seat keeps its contact while a cue runs
         try:
             async for status in client.follow(task_id, cast.seat_token, poll_every=max(1, interval / 3),
-                                              give_up_after=interval * int(cast.heartbeat.misses)):
+                                              give_up_after=interval * int(cast.heartbeat.misses),
+                                              on_drop=lambda why: say(f"  the task's stream dropped ({why}); polling")):
                 await statuses.put(status)
         except Exception as e:
             await statuses.put(e)
@@ -160,8 +161,10 @@ async def _play(client, task_id, cast, stage, role, models, servers, log, say, r
             elif isinstance(message, Release):
                 reason = message.reason
                 if status.state == "input-required":  # asked to stop: discard, then confirm
-                    await client.send(task_id, cast.seat_token, Released(kind="zanni.released", discarded=True))
+                    with contextlib.suppress(DirectorError):  # the director may already have revoked the seat
+                        await client.send(task_id, cast.seat_token, Released(kind="zanni.released", discarded=True))
                 say(f"Released ({message.reason}{': ' + message.message if message.message else ''})")
+                break  # the seat is over once released: the director may stop before the task's last status
             if status.state in ("completed", "canceled", "rejected", "failed"):
                 break
     finally:

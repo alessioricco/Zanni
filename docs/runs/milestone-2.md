@@ -1,6 +1,6 @@
 # Milestone 2: recorded runs
 
-Run on 2026-10-24, on the maintainer's machines: a MacBook running `zanni`, and an Ollama server on a separate DGX workstation. Every result below ran; nothing is projected. Claims about milestone 2 in the docs point here.
+Run on 2026-10-24 on two machines: one running `zanni`, and a local model server (Ollama) on a second machine on the same network. Every result below ran; nothing is projected. Claims about milestone 2 in the docs point here.
 
 ## What ran
 
@@ -58,7 +58,7 @@ These are three runs per model on one small task: they show the mechanisms work,
 
 ### Falling back
 
-The configuration listed two entries: `qwen3.8:27b` at an unreachable address (`http://127.0.0.1:9`), then `qwen3.8:27b` on the DGX. The first failed with a connection error, classified as `error`. The actor moved to the second, which passed (✅ 2 passed, 25.2 s, including the failed attempt). The log recorded a `fallback` event naming the model and the reason.
+The configuration listed two entries: `qwen3.8:27b` at an unreachable address (`http://127.0.0.1:9`), then `qwen3.8:27b` on the model server. The first failed with a connection error, classified as `error`. The actor moved to the second, which passed (✅ 2 passed, 25.2 s, including the failed attempt). The log recorded a `fallback` event naming the model and the reason.
 
 ### Refusing a model that can't call tools
 

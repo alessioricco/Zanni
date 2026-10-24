@@ -195,6 +195,14 @@ def director_app(casting: Casting, info: DirectorInfo, url: str,
     return Starlette(routes=routes, lifespan=lifespan), handler
 
 
+async def _drain(server: uvicorn.Server, seconds: float) -> None:
+    """Give requests still in flight (a stream ending, a last reply) a moment to finish before shutting down."""
+    loop = asyncio.get_running_loop()
+    until = loop.time() + seconds
+    while server.server_state.tasks and loop.time() < until:
+        await asyncio.sleep(0.02)
+
+
 class Listening:
     """A running uvicorn server, on the address it actually bound (port 0 picks a free one)."""
 
@@ -208,7 +216,8 @@ class Listening:
 
 
 @contextlib.asynccontextmanager
-async def listening(app_for_url, host: str = "127.0.0.1", port: int = 0) -> AsyncIterator[Listening]:
+async def listening(app_for_url, host: str = "127.0.0.1", port: int = 0,
+                    drain_for: float = 2.0) -> AsyncIterator[Listening]:
     """Bind first, then build the app for the bound URL (the card must name it), then serve until the block ends."""
     import socket
 
@@ -228,6 +237,7 @@ async def listening(app_for_url, host: str = "127.0.0.1", port: int = 0) -> Asyn
     try:
         yield Listening(server, task, public, bound)
     finally:
+        await _drain(server, drain_for)
         server.should_exit = True
         with contextlib.suppress(asyncio.CancelledError):
             await task

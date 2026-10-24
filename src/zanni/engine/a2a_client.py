@@ -122,8 +122,8 @@ class DirectorClient:
             raise _call_error(e) from None
         return _status(task)
 
-    async def follow(self, task_id: str, token: str, *, poll_every: float = 10.0,
-                     give_up_after: float = 120.0) -> AsyncIterator[Status]:
+    async def follow(self, task_id: str, token: str, *, poll_every: float = 10.0, give_up_after: float = 120.0,
+                     on_drop=lambda reason: None) -> AsyncIterator[Status]:
         """Every new status of the seat's task, until it ends. Streams, and polls while the stream is down."""
         last, failing_since = None, None
         loop = asyncio.get_running_loop()
@@ -146,6 +146,9 @@ class DirectorClient:
             except Exception as e:  # the stream dropped, or couldn't open: poll, then try again
                 if isinstance(_call_error(e), NotAuthorised):
                     raise _call_error(e) from None
+                on_drop(f"{type(e).__name__}: {e}"[:200])
+            else:
+                on_drop("the stream ended before the task did")
             try:
                 status = await self.poll(task_id, token)
                 failing_since = None
