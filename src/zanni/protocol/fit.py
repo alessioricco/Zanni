@@ -20,6 +20,11 @@ def refusal(card: ActorCardParams, entry: CastEntry, part: Part, pin: Pin | None
         return "role-mismatch", f"this part is cast for {entry.role}, and the actor plays {role.ref}"
     if pin is not None and role.hash != pin.hash:
         return "hash-mismatch", f"{role.ref} has hash {role.hash}, and play.lock pins {pin.hash}"
+    return _ceilings(card, part)
+
+
+def _ceilings(card: ActorCardParams, part: Part) -> tuple[str, str] | None:
+    role = card.role
     for kind, rules, ceilings in (("write", role.needs.stage_write, part.writes),
                                   ("read", role.needs.stage_read, part.reads)):
         if ceilings is None:
@@ -29,3 +34,15 @@ def refusal(card: ActorCardParams, entry: CastEntry, part: Part, pin: Pin | None
             return "needs-beyond-part", (f"the role asks to {kind} {', '.join(outside)}, beyond the part's "
                                          f"{kind}s: {', '.join(ceilings) or 'nothing'}")
     return None
+
+
+def refusal_local(card: ActorCardParams, name: str, role_hash: str, part: Part) -> tuple[str, str] | None:
+    """For a local cast entry, whose path differs from machine to machine (D36): the role's name and content hash
+    must be those of the folder the play names; then the part's ceilings, as for a remote entry."""
+    role = card.role
+    if role.name != name:
+        return "role-mismatch", f"this part is cast for the role {name}, and the actor plays {role.name}"
+    if role.hash != role_hash:
+        return "hash-mismatch", (f"the actor's {name} has hash {role.hash}, and the play's folder has {role_hash}: "
+                                 "they are different versions of the role")
+    return _ceilings(card, part)

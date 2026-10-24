@@ -79,8 +79,8 @@ def test_serving_needs_a_role_around_the_rehearsal(tmp_path):
 
 
 @pytest.mark.parametrize("args,message", [
-    (["--serve"], "--serve and --listen work with a rehearsal only"),
-    (["--listen", "8765"], "--serve and --listen work with a rehearsal only"),
+    (["--serve"], "--serve works with a rehearsal only"),
+    (["--listen", "8765"], "--listen works with a rehearsal (with --serve), a play file or a director configuration only"),
 ])
 def test_serve_flags_on_other_files_are_refused(tmp_path, args, message):
     result = zanni(EXAMPLES / "slug-tester.yaml", *args, home=tmp_path)

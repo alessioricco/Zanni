@@ -67,7 +67,7 @@ async def local_play(tmp_path, models: list[str], base_url, body, *, coder_seats
 
 
 def test_a_local_seat_is_started_plays_its_cue_and_is_stopped_at_the_end(home):
-    with fake_openai() as (url, calls):
+    with fake_openai() as (url, calls, _):
         async def body(p):
             assert await p.cast("coder", 1) == "coder: 0 seat(s) cast, 1 local seat(s) starting"
             await until(lambda: len(p.active_seats("coder")) == 1, timeout=60)
@@ -86,7 +86,7 @@ def test_a_local_seat_is_started_plays_its_cue_and_is_stopped_at_the_end(home):
 
 
 def test_cast_beyond_the_listed_local_seats_is_refused(home):
-    with fake_openai() as (url, _):
+    with fake_openai() as (url, _, _):
         async def body(p):
             p.state.play.cast["coder"] = p.state.play.cast["coder"].model_copy(update={"host": "local"})
             await p.cast("coder", 1)
@@ -97,7 +97,7 @@ def test_cast_beyond_the_listed_local_seats_is_refused(home):
 
 
 def test_a_local_seat_exits_mid_cue_when_its_directors_pipe_closes(home):
-    with fake_openai() as (url, calls):
+    with fake_openai() as (url, calls, _):
         async def body(p):
             await p.cast("coder", 1)
             await until(lambda: len(p.active_seats("coder")) == 1, timeout=60)
@@ -115,7 +115,7 @@ def test_a_local_seat_exits_mid_cue_when_its_directors_pipe_closes(home):
 
 
 def test_a_seat_that_keeps_crashing_is_restarted_twice_then_left_to_joining_actors(home):
-    with fake_openai() as (url, _):
+    with fake_openai() as (url, _, _):
         async def body(p):
             p.recast_wait = 0.5
             await p.cast("coder", 1)
@@ -148,7 +148,7 @@ def test_the_play_flag_overrides_a_configurations_play(home):
     joined = run(str(config), "--play", "http://127.0.0.1:9")
     assert joined.returncode == 2 and "couldn't fetch the director's card from http://127.0.0.1:9" in joined.stderr
     refused = run(str(Path(__file__).parent / "conformance/valid/play-minimal.yaml"), "--play", "http://x")
-    assert refused.returncode == 2 and "--play overrides an actor configuration's `play` only" in refused.stderr
+    assert refused.returncode == 2 and "--play works with an actor configuration only" in refused.stderr
 
 
 # Recasting a lost seat (in process, over loopback)
