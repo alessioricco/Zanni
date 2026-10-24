@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "zanni.verdict.schema.json",
+  "additionalProperties": false,
+  "description": "A verifier seat's answer: the command's exit code decides, never a model (D45).",
+  "properties": {
+    "kind": {
+      "const": "zanni.verdict",
+      "title": "Kind",
+      "type": "string"
+    },
+    "verify": {
+      "minLength": 1,
+      "title": "Verify",
+      "type": "string"
+    },
+    "verifier": {
+      "minLength": 1,
+      "title": "Verifier",
+      "type": "string"
+    },
+    "passed": {
+      "description": "Whether the command exited with 0.",
+      "title": "Passed",
+      "type": "boolean"
+    },
+    "exit_code": {
+      "anyOf": [
+        {
+          "description": "A whole number, at least 0, as a decimal string, e.g. \"4\".",
+          "pattern": "^(0|[1-9][0-9]*)$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The command's exit code; null when it timed out or couldn't start.",
+      "title": "Exit Code"
+    },
+    "output": {
+      "default": "",
+      "description": "The end of the command's output.",
+      "title": "Output",
+      "type": "string"
+    },
+    "marker": {
+      "description": "The stage's change marker the snapshot was read at.",
+      "minLength": 1,
+      "title": "Marker",
+      "type": "string"
+    }
+  },
+  "required": [
+    "kind",
+    "verify",
+    "verifier",
+    "passed",
+    "exit_code",
+    "marker"
+  ],
+  "title": "Verdict",
+  "type": "object"
+}

@@ -1,0 +1,13 @@
+# A director that trusts two verifier seats: one it starts, one that joins from elsewhere (D45).
+name: director
+role: zanni:director
+play: ../fixtures/verifiers/play.yaml
+models:
+  - { provider: anthropic, model: claude-haiku-5-5 }
+credentials:
+  ZANNI_JOIN_TOKEN: ${ZANNI_JOIN_TOKEN}
+  ZANNI_OWNER_TOKEN: ${ZANNI_OWNER_TOKEN}
+  ZANNI_VERIFIER_TOKEN: ${ZANNI_VERIFIER_TOKEN}
+verifier_seats:
+  local: [../fixtures/verifiers/checker.yaml]
+  remote: [ci-box]

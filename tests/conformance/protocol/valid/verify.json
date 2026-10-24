@@ -1,0 +1,8 @@
+{
+  "kind": "zanni.verify",
+  "verify": "v3",
+  "verifier": "tests-pass",
+  "command": ["uv", "run", "--no-project", "--with", "pytest", "python", "-m", "pytest", "-q", "tests"],
+  "timeout": "300",
+  "marker": "12"
+}

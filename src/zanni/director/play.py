@@ -242,7 +242,7 @@ class Production:
             return stopped
         if refusal := rules.may_run_verifier(self.state, name, self.writing_cues()):
             return self._refuse("run_verifier", refusal)
-        command, timeout, source = self.verifiers[name]
+        command, timeout, source, _ = self.verifiers[name]
         marker = self.marker()
         passed, detail = await run_command(command, self.stage.root, timeout)
         self.state.verdicts[name] = Verdict(name, passed, detail, source, marker, self.state.round)
@@ -254,9 +254,9 @@ class Production:
     async def ask_gate(self, name: str, summary: str) -> str:
         if stopped := self._stopped():
             return stopped
-        if name not in self.state.script.gates:
+        if name not in self.state.script.gate_names:
             return self._refuse("ask_gate", f"the script has no gate {name!r}; its gates are: "
-                                            f"{', '.join(self.state.script.gates) or 'none'}")
+                                            f"{', '.join(self.state.script.gate_names) or 'none'}")
         if name not in self.state.play.house_rules.gates:
             self.state.gates[name] = "skipped"
             self.log.event("gate", gate=name, decision="skipped", by=None, note="this play doesn't enforce it")

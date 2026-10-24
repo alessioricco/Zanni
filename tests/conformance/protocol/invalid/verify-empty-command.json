@@ -1,0 +1,8 @@
+{
+  "kind": "zanni.verify",
+  "verify": "v3",
+  "verifier": "tests-pass",
+  "command": [],
+  "timeout": "300",
+  "marker": "12"
+}

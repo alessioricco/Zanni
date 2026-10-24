@@ -108,7 +108,7 @@ def test_the_slug_kata_runs_end_to_end_from_a_copy(tmp_path):
             director.kill()
     assert approved.returncode == 0, approved.stderr
     assert director.returncode == 0, out + err
-    assert "tests-fail: " in out and "(from the play; timeout 300 s)" in out
+    assert "tests-fail: " in out and "(from the play; timeout 300 s; runs here)" in out
     assert "The play is done." in out and "tests-pass passed" in out
     assert (play / "stage/tests/test_slug.py").read_text() == TESTS and (play / "stage/app/slug.py").read_text() == SLUG
     log = [json.loads(line) for line in next((play / "log").glob("*.jsonl")).read_text().splitlines()]

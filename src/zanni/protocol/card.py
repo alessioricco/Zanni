@@ -11,7 +11,7 @@ from pydantic import Field
 
 from zanni.protocol.encoding import Wire
 
-EXTENSION_URI = "https://github.com/alessioricco/Zanni/blob/master/docs/spec/casting-extension.md#v2"
+EXTENSION_URI = "https://github.com/alessioricco/Zanni/blob/master/docs/spec/casting-extension.md#v3"
 HASH = r"^sha256:[0-9a-f]{64}$"
 Hash = Annotated[str, Field(pattern=HASH, description="A package's content hash, as in play.lock (D18).")]
 

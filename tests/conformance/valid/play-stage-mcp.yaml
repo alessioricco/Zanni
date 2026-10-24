@@ -1,0 +1,6 @@
+# A stage that is any MCP server offering the five stage tools (D47). Its token is the director's, not the play's.
+name: notes
+script: github.com/someone/script@1.0.0
+stage: { backend: mcp, url: http://docs.internal:8800/mcp }
+cast:
+  writer: roles/writer

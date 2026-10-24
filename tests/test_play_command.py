@@ -132,7 +132,7 @@ def test_a_play_runs_to_done_with_a_gate_decided_from_another_process(tmp_path):
             director.kill()
     assert approved.returncode == 0 and approved.stdout.startswith("Approved.")
     assert director.returncode == 0, out + err
-    assert "verifiers, run in the stage folder with your permissions:" in out
+    assert "verifiers, run on a snapshot of the stage" in out
     assert "The play is done. Rounds: 1;" in out and "tests-pass passed" in out
     assert (folder / "stage/app/slug.py").is_file() and (folder / "play.lock").is_file()
     assert not (folder / "log/director.json").exists()

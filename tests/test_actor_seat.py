@@ -125,7 +125,7 @@ def test_another_version_of_the_role_is_refused_with_hash_mismatch(setup):
 
 
 def test_the_actor_refuses_a_director_on_another_version():
-    card = {"capabilities": {"extensions": [{"uri": EXTENSION_URI.replace("#v2", "#v3"), "params": {}}]}}
+    card = {"capabilities": {"extensions": [{"uri": EXTENSION_URI.replace("#v3", "#v4"), "params": {}}]}}
     with pytest.raises(CannotJoin, match="#v3"):
         director_params(card)
     with pytest.raises(CannotJoin, match="isn't a Zanni director"):

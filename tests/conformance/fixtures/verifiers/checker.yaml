@@ -1,0 +1,6 @@
+# A local verifier seat: Zanni's built-in role, no models (D45).
+name: checker
+role: zanni:verifier
+play: ./play.yaml
+credentials:
+  ZANNI_VERIFIER_TOKEN: ${ZANNI_VERIFIER_TOKEN}

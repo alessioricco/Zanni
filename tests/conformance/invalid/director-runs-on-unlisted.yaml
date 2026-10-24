@@ -1,0 +1,7 @@
+name: director
+role: zanni:director
+play: ../fixtures/verifiers/play.yaml
+models:
+  - { provider: anthropic, model: claude-haiku-5-5 }
+verifier_seats:
+  remote: [ci-box]

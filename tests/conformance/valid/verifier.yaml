@@ -1,0 +1,6 @@
+# A verifier seat's configuration: Zanni's built-in role zanni:verifier, which runs no model (D45).
+name: ci-box
+role: zanni:verifier
+play: https://director.example.com
+credentials:
+  ZANNI_VERIFIER_TOKEN: ${ZANNI_VERIFIER_TOKEN}

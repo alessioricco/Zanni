@@ -30,10 +30,11 @@ It is recognised by having both `role` and `play`, and it is the file passed to 
 | `name` | text | no | none | the actor | This instance's name, used in the log and in summaries. |
 | `role` | package reference | yes | — | the director, at casting | The role this actor plays. The director casts the actor only into a part whose cast entry names this role. |
 | `play` | URL or path | yes | — | the actor | Where to join: a director's URL, a play file, or a local [rehearsal](rehearsal.md) ([below](#where-the-actor-joins)). The actor decides which plays and directors it is willing to join. |
-| `models` | list of model entries, at least one | yes | — | the actor | The models this actor runs, in order (D11). |
+| `models` | list of model entries, at least one | yes, except for a [verifier seat](#verifier-seats) | — | the actor | The models this actor runs, in order (D11). A verifier seat runs no model, and has none. |
 | `credentials` | map of name → value | no | none | the actor, and `zanni` | This instance's credentials ([below](#credentials)). |
 | `state_dir` | path | no | `~/.zanni/actors/<name>` | the actor | Where the actor keeps its working memory and state. It is discarded or kept by the actor; the play's shared state lives on the stage. |
 | `seats` | map of part → list of actor configuration files | no | none | the director | Only in a [director's configuration](#a-directors-configuration): the local seats it starts. |
+| `verifier_seats` | `{ local, remote }` | no | none | the director | Only in a director's configuration: the [verifier seats](#verifier-seats) it trusts. |
 
 ## Where the actor joins
 
@@ -75,14 +76,38 @@ credentials:
 seats:                                      # local seats, one actor configuration each (D36)
   tester: [./tester-1.yaml]
   coder: [./coder-1.yaml, ./coder-2.yaml]
+verifier_seats:                             # optional: where verifiers may run, besides here (D45)
+  local: [./checker.yaml]                   # started by the director
+  remote: [ci-box]                          # joins from elsewhere, with ZANNI_VERIFIER_TOKEN
 ```
 
-- **`role`:** `zanni:director` is the only built-in role. Any other `zanni:` name is refused.
+- **`role`:** `zanni:director`. Zanni's built-in roles are `zanni:director` and `zanni:verifier` ([below](#verifier-seats)); any other `zanni:` name is refused.
 - **`play`:** a local play file. `zanni director.yaml` runs it, like `zanni play.yaml`.
 - **Where `zanni play.yaml` finds it:** `--director <file>`, or else `director.yaml` beside the play file. Nowhere else, because its tokens belong to one play. A configuration whose `play` names another play is refused.
 - **`models`:** the director's own, in order with fallback (D27). Under a budget, each must have a price.
-- **`credentials`:** `ZANNI_JOIN_TOKEN` and `ZANNI_OWNER_TOKEN`, one of each per play, plus the models' keys, under the same [safeguards](#safeguards).
+- **`credentials`:** `ZANNI_JOIN_TOKEN` and `ZANNI_OWNER_TOKEN`, one of each per play, plus the models' keys, under the same [safeguards](#safeguards). Also, when needed:
+  - `ZANNI_STAGE_TOKEN`: the director's token for an `mcp` stage (D47);
+  - `ZANNI_VERIFIER_TOKEN`: the token verifier seats present (D45). Required when `verifier_seats.remote` lists any; for local verifier seats only, the director makes one for the run when it's absent.
 - **`seats`:** for each part, the actor configurations the director starts as local seats, one file per seat. A part the play casts with `host: local` must have at least one. The director reads only each file's `name` and `role`: the role must be the one the play casts for that part (the same remote reference, or the same local folder), and the names must be unique. Each local seat resolves its own credentials; the director never holds them.
+
+- **`verifier_seats`:** where the play's verifiers may run besides the director's machine ([below](#verifier-seats)). `local` lists configuration files the director starts, as for `seats`; `remote` lists the names of verifier seats that join from elsewhere. Names must be unique.
+
+## Verifier seats
+
+A verifier seat runs a play's verifiers somewhere other than the director's machine, such as in a container or on a machine with the right tools (D45). It is a zanni with Zanni's built-in role `zanni:verifier`: it runs no model, and decides nothing. The director sends it a verifier's command in `zanni.verify`; it pulls a snapshot of the stage over MCP, with read-only access to the whole stage, runs the command there within its timeout, and answers `zanni.verdict` with the exit code and the end of the output ([Casting extension](casting-extension.md#zanniverify-and-zanniverdict)).
+
+```yaml
+# ci-box.yaml, on the machine that runs the checks
+name: ci-box
+role: zanni:verifier
+play: http://director.example.com:8765
+credentials:
+  ZANNI_VERIFIER_TOKEN: ${ZANNI_VERIFIER_TOKEN}
+```
+
+- **No models:** a verifier seat's configuration has no `models`.
+- **Trust:** the director believes the exit code a verifier seat reports, so it accepts only the verifier seats its own configuration lists in `verifier_seats`, each presenting `ZANNI_VERIFIER_TOKEN` in place of the join token. A seat that joins with the join token can never run a verifier; one whose name isn't listed is refused with `not-authorised`.
+- **Exit codes:** as an actor's.
 
 ## The actor's log
 

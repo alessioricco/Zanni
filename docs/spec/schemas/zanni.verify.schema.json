@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "zanni.verify.schema.json",
+  "additionalProperties": false,
+  "description": "The director asks a verifier seat to run one verifier's command on a snapshot of the stage (D45).",
+  "properties": {
+    "kind": {
+      "const": "zanni.verify",
+      "title": "Kind",
+      "type": "string"
+    },
+    "verify": {
+      "description": "This request's id, quoted back in the verdict.",
+      "minLength": 1,
+      "title": "Verify",
+      "type": "string"
+    },
+    "verifier": {
+      "description": "The script verifier's name.",
+      "minLength": 1,
+      "title": "Verifier",
+      "type": "string"
+    },
+    "command": {
+      "description": "The command to run, exactly as given.",
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Command",
+      "type": "array"
+    },
+    "timeout": {
+      "description": "A duration in whole seconds, as a decimal string, e.g. \"30\".",
+      "pattern": "^(0|[1-9][0-9]*)$",
+      "title": "Timeout",
+      "type": "string"
+    },
+    "marker": {
+      "description": "The stage's change marker when the director sent it.",
+      "minLength": 1,
+      "title": "Marker",
+      "type": "string"
+    }
+  },
+  "required": [
+    "kind",
+    "verify",
+    "verifier",
+    "command",
+    "timeout",
+    "marker"
+  ],
+  "title": "Verify",
+  "type": "object"
+}

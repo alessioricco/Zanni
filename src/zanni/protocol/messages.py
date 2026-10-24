@@ -9,6 +9,8 @@ Who sends what, and in which A2A construct:
   report    actor -> director   SendMessage on the seat's task
   release   director -> actor   the task's status message, state `input-required`
   released  actor -> director   SendMessage on the seat's task; then the task is `completed`
+  verify    director -> verifier seat   the task's status message, state `input-required` (D45)
+  verdict   verifier seat -> director   SendMessage on the seat's task
 """
 
 from typing import Annotated, Any, Literal
@@ -60,10 +62,10 @@ class Permissions(Wire):
 
 
 class DirectAccess(Wire):
-    """For a git stage, a seat whose reads cover the whole stage may also clone it (D16)."""
+    """Reserved: direct access to a git stage, for a coding engine, planned for milestone 6 (D46)."""
 
     clone_url: Text
-    branch: Text = Field(description="The seat's own branch, zanni/<play>/<seat>.")
+    branch: Text = Field(description="The branch the seat may push.")
 
 
 class StageAccess(Wire):
@@ -147,5 +149,28 @@ class Released(Wire):
     discarded: bool
 
 
+class Verify(Wire):
+    """The director asks a verifier seat to run one verifier's command on a snapshot of the stage (D45)."""
+
+    kind: Literal["zanni.verify"]
+    verify: Text = Field(description="This request's id, quoted back in the verdict.")
+    verifier: Text = Field(description="The script verifier's name.")
+    command: list[Text] = Field(min_length=1, description="The command to run, exactly as given.")
+    timeout: Seconds
+    marker: Text = Field(description="The stage's change marker when the director sent it.")
+
+
+class Verdict(Wire):
+    """A verifier seat's answer: the command's exit code decides, never a model (D45)."""
+
+    kind: Literal["zanni.verdict"]
+    verify: Text
+    verifier: Text
+    passed: bool = Field(description="Whether the command exited with 0.")
+    exit_code: Count | None = Field(description="The command's exit code; null when it timed out or couldn't start.")
+    output: str = Field(default="", description="The end of the command's output.")
+    marker: Text = Field(description="The stage's change marker the snapshot was read at.")
+
+
 MESSAGES: dict[str, type[Wire]] = {m.model_fields["kind"].annotation.__args__[0]: m
-                                   for m in (Join, Cast, Refused, Cue, Report, Release, Released)}
+                                   for m in (Join, Cast, Refused, Cue, Report, Release, Released, Verify, Verdict)}

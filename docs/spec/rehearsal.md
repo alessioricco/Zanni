@@ -38,7 +38,7 @@ models:
 `zanni slug-tester.yaml` then:
 
 1. **Copies the stage:** copies the rehearsal's `stage` folder to a fresh run folder, `<state_dir>/rehearsals/<rehearsal>/<run-id>/stage`. The role package is never written to.
-2. **Starts a director:** in the same process, on `127.0.0.1`, with a join token made up for the run. Its one part is the actor's role, and the part's ceilings are the role's needs (`needs.stage_read`, `needs.stage_write`). The stage enforces them (D12).
+2. **Starts a director:** in the same process, on `127.0.0.1`, with a join token made up for the run. Its one part is the actor's role, and the part's ceilings are the role's needs (`needs.stage_read`, `needs.stage_write`). The director enforces them on every stage operation (D43).
 3. **Joins it:** the actor joins over A2A, exactly as it would join a remote director, and reaches the stage through the director's MCP server.
 4. **Runs the cues:** the director sends each cue in order as a `zanni.cue`; the actor answers each with a `zanni.report`, which is printed.
 5. **Releases the seat:** after the last report.

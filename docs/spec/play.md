@@ -38,10 +38,10 @@ house_rules:
 | `name` | text | yes | — | the director | The play's name, used in the log and in summaries. |
 | `script` | package reference ([references](actor-configuration.md#package-references)) | yes | — | the director | The script this play performs. A local path may point to `SCRIPT.md` or to its folder, relative to the play file. |
 | `director` | `http` or `https` URL | no | this machine | the actor | Where actors connect to join: the director's A2A address, where its card is served (D30). Each actor decides whether it trusts this address. |
-| `stage` | git URL, folder path, or `{ backend, … }` ([stage](stage.md#in-the-play-file)) | yes | — | the stage | The play's workspace, and the backend that stores it and enforces each seat's permissions. |
+| `stage` | git URL, folder path, or `{ backend, … }` ([stage](stage.md#in-the-play-file)) | yes | — | the director | The play's workspace, and the backend that stores it: `folder`, `git` or `mcp`. The director enforces each seat's permissions above every backend (D43). |
 | `cast` | map of part name → cast entry | yes, at least one | — | the director | A role for each of the script's parts. |
 | `house_rules` | house rules | no | no limits | the director | Limits set when the director starts. Nothing in a role, the script or an actor can loosen them. |
-| `verifiers` | map of a script verifier's name → `{ command, timeout }` | no | the script's commands | the director | This play's commands for its script's verifiers ([below](#verifiers)). |
+| `verifiers` | map of a script verifier's name → `{ command, timeout, runs_on }` | no | the script's commands, on the director | the director | This play's commands for its script's verifiers, and where each runs ([below](#verifiers)). |
 
 ### Cast entry
 
@@ -62,6 +62,8 @@ A cast entry is either a package reference (shorthand for `{ role: … }`) or:
 | `max_seats_per_host` | whole number, at least 1 | no | no cap | the director | The most seats the director casts onto one machine, because actors on one machine share its GPU. A machine is told by the address its actors join from. |
 | `gate_timeout` | duration: whole seconds, or a number with `s`, `m` or `h`, such as `30m` | no | none: a gate waits | the director | How long a gate, or a pause, may wait for a person. When it passes, the run stops with reason `gate` (or `paused`) (D38). |
 | `max_director_turns` | whole number, at least 1 | no | `30` | the director | The most model turns the director takes in one round. When it is reached, the round ends; if the round's work isn't verified, the run stops with reason `director-turns` (D33). |
+| `requests_per_turn` | whole number, at least 1 | no | `25` | the director | The most model requests in one director turn (D49). |
+| `cast_timeout` | duration, as `gate_timeout` | no | `10m` | the director | How long a part below its minimum seats, with no local seat left to start, waits for an actor to join, at the start or after losing a seat. When it passes, the run stops with reason `uncastable` (D50). |
 
 **Not in the first version:** risk tiers (read, spend, external action, irreversible). The vision keeps high-risk scripts out of the first version.
 
@@ -71,12 +73,19 @@ A script names its verifiers and what each checks; only the play knows its proje
 
 ```yaml
 verifiers:
-  tests-pass: { command: [npm, test], timeout: 600 }
+  tests-pass: { command: [npm, test], timeout: 600, runs_on: ci-box }
 ```
+
+| Field | Type | Required | Default | Meaning |
+|---|---|---|---|---|
+| `command` | list of text, at least one | no | the script's | The command to run. |
+| `timeout` | whole seconds, at least 1 | no | the script's | How long it may run before it fails. |
+| `runs_on` | a verifier seat's name | no | the director | Where it runs: a verifier seat listed in the director's configuration ([Actor configuration: verifier seats](actor-configuration.md#verifier-seats)) (D45). |
 
 - **Only the script's names:** a play gives commands for its script's verifiers; it can't add or remove one.
 - **Every verifier needs a command:** the play's, or else the script's default. One with neither is refused before anything runs.
-- **`timeout`:** whole seconds; the script's when left out.
+- **A snapshot:** every verifier runs on a snapshot of the stage, a fresh folder, never on the stage itself (D45).
+- **`runs_on`:** a name the director's configuration doesn't list stops the play before it starts. The verdict comes from the verifier seat's exit code, and the log names the seat that ran it.
 
 ## Checking a play against its script
 
@@ -133,19 +142,22 @@ It is recognised by having `lock_version`.
 
 1. **The director's configuration:** from `--director <file>`, or else `director.yaml` beside the play file ([Actor configuration: a director's configuration](actor-configuration.md#a-directors-configuration)). Its models must all be priced when the play has a budget.
 2. **The packages:** the script and every role are resolved, fetched when remote, and checked against `play.lock`, which is written when missing ([The lockfile](#the-lockfile)).
-3. **The checks:** the play is checked against its script, as `--check` does, and the stage must hold the script's `stage.expects`.
-4. **Serving:** the director serves its A2A card and its stage's MCP server on one address (`--listen host:port`, default `127.0.0.1` on a free port), and writes `log/director.json` with that address and the run's id, never a token, so `zanni gate` can find it. It removes the file when the run ends.
-5. **Casting:** it starts the local seats its configuration lists, and accepts actors joining with the join token. Before its first turn, every part has at least its minimum seats. A local seat the director released can be started again by a later `cast`.
-6. **The script:** the director's turns follow the script, through its tools ([Script: how the director follows a script](script.md#how-the-director-follows-a-script)).
-7. **The end:** every seat is released, local seats are stopped, and the command exits with:
+3. **The checks:** the play is checked against its script, as `--check` does.
+4. **The stage:** a folder stage must exist; a git stage is cloned into the run's folder, on a new branch (D46); an `mcp` stage's server must answer with the director's token (D47). Then the stage must hold the script's `stage.expects`.
+5. **Serving:** the director serves its A2A card and its stage's MCP server on one address (`--listen host:port`, default `127.0.0.1` on a free port), and writes `log/director.json` with that address and the run's id, never a token, so `zanni gate` can find it. It removes the file when the run ends.
+6. **Casting:** it starts the local seats and local verifier seats its configuration lists, and accepts actors joining with the join token, and remote verifier seats with the verifier token. Before its first turn, every part has at least its minimum seats, within `cast_timeout`. A local seat the director released can be started again by a later `cast`. A local seat refused at join isn't restarted (D50).
+7. **The script:** the director's turns follow the script, through its tools ([Script: how the director follows a script](script.md#how-the-director-follows-a-script)).
+8. **The end:** every seat is released, local seats are stopped, and the command exits with:
    - 0 when the director stopped the play as `done`, and the rules accepted it;
-   - 1 when it ran and stopped for any other reason: a failed verifier, the budget, a rejected or unanswered gate, an unanswered pause, the turn cap, the round cap, or the director's own reason;
-   - 2 when it couldn't start: a file problem, a package that can't be fetched or doesn't match `play.lock`, a missing director configuration, or an unpriced director under a budget.
+   - 1 when it ran and stopped for any other reason: a failed verifier, the budget, a rejected or unanswered gate, an unanswered pause, the turn cap, the round cap, a part that couldn't be cast, or the director's own reason;
+   - 2 when it couldn't start: a file problem, a package that can't be fetched or doesn't match `play.lock`, a missing director configuration, an unpriced director under a budget, a stage that can't be reached or cloned, or a verifier seat the director's configuration doesn't list.
+
+   A git stage's run branch is pushed as its `push` setting says ([Stage: pushing](stage.md#pushing)).
 
 ### Gates and pauses
 
 - **A gate pauses the play.** At a gate in `house_rules.gates`, the director logs `gate-pending` with a summary (the scene, the files changed since the last gate, the verdicts) and sends no new cue until a person decides. Seats stay cast, and keep their heartbeats. A gate the play doesn't list is skipped, and logged as skipped.
-- **A pause:** when every one of the director's own models fails, the play pauses the same way, until the owner resumes it (D33).
+- **A pause:** when every one of the director's own models fails, or an `mcp` stage stays unreachable (D47), the play pauses the same way, until the owner resumes it (D33).
 - **Deciding:** with `zanni gate <play file or director URL> approve | reject | resume`, from any machine that can reach the director, with the play's owner token ([Casting extension: the owner's endpoint](casting-extension.md#the-owners-endpoint)). On a rejection, the director gets the note, and may revise or stop.
 - **`gate_timeout`:** stops the run when a gate or a pause has waited that long.
 
@@ -173,11 +185,15 @@ The play's spend is every report's cost plus the director's own (D39):
 |---|---|---|
 | `run-started` | `play`, `script` (reference and commit) | The director starts the run. |
 | `seat-started`, `seat-exited` | `seat` (its configuration's `name`), `part`, and `exit_code` when it exits | The director starts or sees the end of a local seat's process (D36). |
+| `seat-not-restarted` | `seat`, `reason` | A local seat that ended isn't restarted: it was refused at join, or was restarted twice already (D36, D50). |
+| `verifier-joined` | `seat`, `actor` | A verifier seat joins (D45). |
+| `push` | `branch`, `ok`, `detail` | The director pushes a git stage's run branch, or fails to (D46). |
+| `stage-unavailable` | `detail` | An `mcp` stage stopped answering (D47). |
 | `actor-joined` | `seat`, `part`, `role`, `actor` (its configuration's `name`) | An actor is cast into a seat. |
 | `join-refused` | `reason`, `actor`, `role` | The director refuses an actor (D24). |
 | `cue` | `seat`, `scene`, `cue`, `budget` | The director gives a cue. |
 | `report` | `seat`, `scene`, `outcome`, `summary`, `changes` (from the stage's record, D41) | An actor reports back. |
-| `verdict` | `scene`, `verifier`, `kind` (`hard` or `soft`), `passed`, `detail`, `source` (`script` or `play`) | A verifier runs. |
+| `verdict` | `scene`, `verifier`, `kind` (`hard` or `soft`), `passed`, `detail`, `source` (`script` or `play`), `marker` (the stage's change marker it ran against), `by` (`director`, or the verifier seat) | A verifier runs (D45). |
 | `gate-pending` | `gate`, `summary` | The play waits at a gate. |
 | `gate` | `gate`, `decision` (`approved`, `rejected` or `skipped`), `by`, `note` | A human decides a gate, or the play doesn't enforce it. |
 | `paused`, `resumed` | `reason`; `by` and `note` when resumed | Every one of the director's models failed; the owner resumed it (D33). |
@@ -186,7 +202,7 @@ The play's spend is every report's cost plus the director's own (D39):
 | `tool-refused` | `tool`, `reason` | The rules refused one of the director's tool calls (D33). |
 | `round-ended` | `round`, `reason` | A round ends. |
 | `seat-released` | `seat`, `reason` | The director ends a seat. |
-| `run-stopped` | `reason` (`done`, `budget`, `gate`, `paused`, `director-turns`, `max-rounds`, or the director's own), `completed` | The run ends. |
+| `run-stopped` | `reason` (`done`, `budget`, `gate`, `paused`, `director-turns`, `max-rounds`, `uncastable`, or the director's own), `completed` | The run ends. |
 
 - **No credentials:** an actor's credentials never appear in the log (D15).
 - **Actor text is data:** text an actor wrote, such as a report's `summary`, is logged as data.

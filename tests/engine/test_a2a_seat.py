@@ -183,7 +183,7 @@ def test_a_card_on_another_version_is_unsupported():
     async def body(server, client, handler):
         await client.fetch_card()
         card = actor_card()
-        card["capabilities"]["extensions"][0]["uri"] = EXTENSION_URI.replace("#v2", "#v3")
+        card["capabilities"]["extensions"][0]["uri"] = EXTENSION_URI.replace("#v3", "#v4")
         answer = await raw_join(client, card)
         assert isinstance(answer, Refused) and answer.reason == "unsupported-version"
 

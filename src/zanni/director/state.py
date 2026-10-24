@@ -61,7 +61,7 @@ class PlayState:
         return f"{'at least ' if self.unknown_cost else ''}${self.spend:.4f}"
 
     def enforced_gates(self) -> list[str]:
-        return [g for g in self.script.gates if g in self.play.house_rules.gates]
+        return [g for g in self.script.gate_names if g in self.play.house_rules.gates]
 
     def charge(self, amount: Decimal | None) -> None:
         if amount is None:

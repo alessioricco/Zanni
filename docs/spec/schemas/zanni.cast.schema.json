@@ -4,7 +4,7 @@
   "$defs": {
     "DirectAccess": {
       "additionalProperties": false,
-      "description": "For a git stage, a seat whose reads cover the whole stage may also clone it (D16).",
+      "description": "Reserved: direct access to a git stage, for a coding engine, planned for milestone 6 (D46).",
       "properties": {
         "clone_url": {
           "minLength": 1,
@@ -12,7 +12,7 @@
           "type": "string"
         },
         "branch": {
-          "description": "The seat's own branch, zanni/<play>/<seat>.",
+          "description": "The branch the seat may push.",
           "minLength": 1,
           "title": "Branch",
           "type": "string"

@@ -1,0 +1,9 @@
+{
+  "kind": "zanni.verdict",
+  "verify": "v4",
+  "verifier": "tests-pass",
+  "passed": false,
+  "exit_code": null,
+  "output": "timed out after 300 s, and was stopped",
+  "marker": "12"
+}

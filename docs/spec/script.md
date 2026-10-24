@@ -47,7 +47,7 @@ The repository has two examples: `examples/scripts/software-team/SCRIPT.md`, the
 | `mission` | text | yes | — | — (for the director and the log) | One sentence on what the work achieves. |
 | `parts` | map of part name → part | yes, at least one | — | the director, at casting | The parts the work needs. |
 | `stage.expects` | list of paths | no | none | the director, before the first cue | Paths the stage must hold before the play starts, such as `vision.md`. |
-| `gates` | list of names | no | none | the director | The moments that need a human's approval. A play's `house_rules.gates` must name only these. |
+| `gates` | list of names, or of [gates](#a-gate) | no | none | the director | The moments that need a human's approval. A play's `house_rules.gates` must name only these. |
 | `verifiers` | map of name → [verifier](#a-verifier) | no | none | the director | The checks the director runs on the stage, by name (D35). |
 | `stop.max_rounds` | whole number, at least 1 | no | none | the director | The most rounds the work may take. |
 | `stop.budget_per_round` | number, at least 0, in USD | no | none | the director | The most one round may spend. The play's budget still applies on top. |
@@ -64,9 +64,27 @@ The repository has two examples: `examples/scripts/software-team/SCRIPT.md`, the
 | `writes` | list of paths | no | no limit | the stage | The most this part may write. |
 | `optional` | true or false | no | `false` | the director | Whether a play may leave the part uncast. |
 
+### A gate
+
+A gate is a name, such as `release`, or a map that says when it applies (D48):
+
+| Field | Type | Required | Default | Enforced by | Meaning |
+|---|---|---|---|---|---|
+| `name` | name | yes | — | the director | The gate's name. |
+| `every` | `play` or `round` | no | `play` | the director | `round`: an approval counts only in the round it was given, so the gate is asked again each round. `end_round` and "done" are refused while the round's gate is unapproved. |
+| `before` | list of part names | no | none | the director | A cue to any of these parts is refused until the gate is approved (in this round, for `every: round`). Each must be one of `parts`. |
+
+```yaml
+gates:
+  - { name: plan, every: round, before: [coder] }   # the plan, approved each round before anyone builds
+  - release                                          # once per play
+```
+
+A rejection stands until the gate is asked again and approved. A gate the play doesn't enforce is skipped, and never blocks a cue.
+
 ### A verifier
 
-A verifier is a check the director runs in the stage's folder, on the director's side. It passes when its command exits with 0 (D35).
+A verifier is a check the director runs on a snapshot of the stage: a fresh folder holding every file of the stage as it is (D45). It passes when its command exits with 0 (D35).
 
 | Field | Type | Required | Default | Enforced by | Meaning |
 |---|---|---|---|---|---|
@@ -89,7 +107,8 @@ stop:
 - **Not every verifier must pass at the end:** "every new test fails" checks one scene's work, and is meant to fail once the code exists. Only `stop.done_when` names what "done" means.
 - **Stale verdicts:** a verdict counts for "done" only if no change was made on the stage after it.
 - **No verdict while work is in flight:** the director runs no verifier while a cue that writes to the stage is pending.
-- **They run with the user's permissions,** like a rehearsal's `verify` commands, so `zanni --check` lists every command that will run before anything does. Sandboxing them is not in the first version (`TODO.md`).
+- **Where they run:** on the director's machine by default, with the user's permissions, like a rehearsal's `verify` commands; `zanni --check` lists every command that will run before anything does. A play may run a verifier on a **verifier seat** instead, somewhere else, such as a container or a machine with the right tools ([Play: verifiers](play.md#verifiers)). Either way the verdict is the command's exit code, never a model's words.
+- **A snapshot, not the stage:** a verifier can't change the stage, and every verdict records the change marker it ran against.
 - **Not in the first version:** soft verifiers, where a model judges the work; a verifier run on one workstream rather than the whole stage.
 
 `reads` and `writes` are ceilings. A seat's real permissions are what its role asks for, within its part's ceilings (see [Stage: permissions](stage.md#permissions)). Leaving them out sets no ceiling, so the role's needs alone apply.
@@ -111,22 +130,23 @@ The director is an agent (D33). Its instructions are the script's prose and fron
 
 | Tool | What it does | What code checks first |
 |---|---|---|
-| `cue` | Gives a seat (or an idle seat of a part) a cue, with a budget | The part and seat exist; the cue's `reads` and `writes` are within the seat's permissions; the budget left (D39); the stage holds `stage.expects` before the first cue |
+| `cue` | Gives a seat (or an idle seat of a part) a cue, with a budget | The part and seat exist; the cue's `reads` and `writes` are within the seat's permissions; the budget left (D39); the stage holds `stage.expects` before the first cue; every gate with the part in its `before` is approved (D48) |
 | `wait_for_reports` | Waits for the pending cues' reports | — |
-| `run_verifier` | Runs one of the script's verifiers | The name is in `verifiers`; no writing cue is pending |
+| `run_verifier` | Runs one of the script's verifiers on a snapshot, on the director or on the verifier seat the play names (D45) | The name is in `verifiers`; no writing cue is pending |
 | `ask_gate` | Pauses the play at a gate, until a person decides (D38) | The gate is in the play's `house_rules.gates`, or it is skipped |
 | `cast` | Casts more seats of a part | Within the part's seats, the play's cast and the local seats listed |
 | `release` | Ends a seat | — |
-| `end_round` | Ends the round | `stop.max_rounds`, `stop.budget_per_round` |
-| `stop` | Ends the play, with a reason; `done` marks it as done | `done` only when every enforced gate was approved and every `stop.done_when` verifier passed after the last change (D42) |
+| `end_round` | Ends the round | `stop.max_rounds`, `stop.budget_per_round`; every enforced `every: round` gate approved in this round (D48) |
+| `stop` | Ends the play, with a reason; `done` marks it as done | `done` only when every enforced gate was approved (an `every: round` gate in this round) and every `stop.done_when` verifier passed after the last change (D42, D48) |
 
-Each turn of the director is a fresh model run, given a summary of the play's state and the reports since its last turn. Actors' reports are data, never instructions. The house rule `max_director_turns` caps its turns in one round.
+Each turn of the director is a fresh model run, given a summary of the play's state and the reports since its last turn. A turn ends when its model is done, after `wait_for_reports` returns reports, or after `ask_gate` returns a decision, so no turn carries a whole play's tool results (D49). Actors' reports are data, never instructions. The house rules `max_director_turns` and `requests_per_turn` cap its turns in one round and its model requests in one turn.
 
 ## Checking a script
 
 `zanni SCRIPT.md`, or `zanni <folder>` for a folder holding `SCRIPT.md`, checks:
 
 - the frontmatter, strictly, under D10: unknown keys and secrets are rejected;
+- that every `stop.done_when` names one of `verifiers`, and every gate's `before` names one of `parts`;
 - that the prose is present.
 
 ```

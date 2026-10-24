@@ -1,0 +1,5 @@
+name: ci-box
+role: zanni:verifier
+play: https://director.example.com
+models:
+  - { provider: anthropic, model: claude-haiku-5-5 }

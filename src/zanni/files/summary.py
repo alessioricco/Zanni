@@ -9,6 +9,9 @@ def summarise(doc: ActorConfiguration | PlayFile | RoleManifest | Script | Lockf
         if doc.is_director:
             lines = [f"Director configuration: would start the director for the play {doc.play}.",
                      f"  role: {doc.role} (built in)", "  models, in order:"]
+        elif doc.is_verifier:
+            lines = [f"Verifier seat configuration: would start {who}, running a play's verifiers; no model.",
+                     f"  role: {doc.role} (built in)", f"  play: {doc.play}"]
         else:
             lines = [f"Actor configuration: would start {who}, playing a role in a play.",
                      f"  role: {doc.role}", f"  play: {doc.play}", "  models, in order:"]
@@ -67,7 +70,9 @@ def summarise(doc: ActorConfiguration | PlayFile | RoleManifest | Script | Lockf
             if part.suggested:
                 bits.append(f"suggested role {part.suggested}")
             lines.append(f"    {name}: {'; '.join(bits)}")
-        lines.append(f"  gates: {', '.join(doc.gates) or 'none'}")
+        gates = [f"{g.name} ({'every round' if g.every == 'round' else 'once'}"
+                 + (f", before {', '.join(g.before)})" if g.before else ")") for g in doc.gates]
+        lines.append(f"  gates: {', '.join(gates) or 'none'}")
         if doc.verifiers:
             lines.append("  verifiers:")
             for name, v in doc.verifiers.items():

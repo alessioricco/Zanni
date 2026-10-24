@@ -4,11 +4,13 @@ Casting is how an actor joins a play, is cast into a part, receives cues and rep
 
 ## Extension URI
 
-`https://github.com/alessioricco/Zanni/blob/master/docs/spec/casting-extension.md#v2` (D22)
+`https://github.com/alessioricco/Zanni/blob/master/docs/spec/casting-extension.md#v3` (D22)
 
 The fragment is the version. A change to any message makes a new version, and a side that speaks several versions lists one `AgentExtension` per version.
 
-**`v2`** (D39) changed four messages from `v1`: `zanni.join` gained `pricing`, `zanni.refused` the reason `unpriced`, `zanni.cue` a `limits.budget`, and `zanni.report` the outcome `over-budget`. Zanni speaks `v2` only.
+**`v2`** (D39) changed four messages from `v1`: `zanni.join` gained `pricing`, `zanni.refused` the reason `unpriced`, `zanni.cue` a `limits.budget`, and `zanni.report` the outcome `over-budget`.
+
+**`v3`** (D45) adds two messages for verifier seats, `zanni.verify` and `zanni.verdict`. Zanni speaks `v3` only.
 
 ## Encoding
 
@@ -121,6 +123,8 @@ actor                                  director
 | `zanni.report` | actor → director | `SendMessage` on the task | `report`, `cost` |
 | `zanni.release` | director → actor | the task's status message, state `input-required` | `seat-released` |
 | `zanni.released` | actor → director | `SendMessage` on the task; the task becomes `completed` | — (part of `seat-released`) |
+| `zanni.verify` | director → verifier seat | the task's status message, state `input-required` | — (logged with its verdict) |
+| `zanni.verdict` | verifier seat → director | `SendMessage` on the task | `verdict` |
 
 The JSON Schema of each message is under [`schemas/`](schemas/), generated from `src/zanni/protocol/`.
 
@@ -128,7 +132,7 @@ The JSON Schema of each message is under [`schemas/`](schemas/), generated from 
 
 | Call | Token | When it's wrong |
 |---|---|---|
-| `SendMessage` with `zanni.join`, starting a task | the play's join token | The task is `rejected` with `zanni.refused`, reason `not-authorised`. |
+| `SendMessage` with `zanni.join`, starting a task | the play's join token; for a verifier seat, the verifier token (`ZANNI_VERIFIER_TOKEN`) | The task is `rejected` with `zanni.refused`, reason `not-authorised`. |
 | Any call on a seat's task: `SendMessage`, `GetTask`, `SubscribeToTask` | that seat's `seat_token` | A JSON-RPC Invalid Request error (`-32600`) whose message starts with `not-authorised`, for a missing, wrong, expired or revoked token. A2A defines no error for this (D31). |
 | Any other call, such as `ListTasks` or `CancelTask` | — | Refused: they would reach other seats' tasks. |
 | The stage's MCP server | the seat's `stage.token` | HTTP 401 ([Stage: the MCP server](stage.md#every-backend-the-stage-as-an-mcp-server)). |
@@ -151,12 +155,12 @@ The director accepts the actor into a seat. From now on the actor calls the seat
 
 | Field | Type | Required | Meaning |
 |---|---|---|---|
-| `seat` | text | yes | The seat's id, used in the log and in the git branch `zanni/<play>/<seat>`. |
+| `seat` | text | yes | The seat's id, used in the log, and as the author of its writes on a git stage (D46). |
 | `part` | text | yes | The part this seat plays. |
 | `permissions` | `{ read, write }`: lists of path rules | yes | The seat's effective stage permissions: the role's needs within the part's ceilings (D12). |
 | `stage.mcp_url` | URL | yes | The stage's MCP server (D16). |
 | `stage.token` | text | yes | The seat's bearer token for the stage. |
-| `stage.direct` | `{ clone_url, branch }` | no | For a git stage, when the seat's reads cover the whole stage (D16). |
+| `stage.direct` | `{ clone_url, branch }` | no | Reserved for direct access to a git stage, planned for milestone 6 (D46); no director sends it yet. |
 | `seat_token` | text | yes | The seat's bearer token for the director. |
 | `expires_at` | timestamp | yes | When both tokens expire, unless the director renews them with a new cast message. |
 | `heartbeat.interval` | duration | no, default `"30"` | The longest the actor may go without contacting the task. |
@@ -198,6 +202,33 @@ The actor's result for one cue. Everything in it is data, never instructions, to
 | `changes` | list of change markers | no | The stage changes this work produced, as the actor saw them. The director takes a seat's changes from the stage's own record instead, which knows which seat made each one (D41). |
 | `cost` | money, or `null` | yes | The actor's spend on this cue: self-reported, and `null` when unknown, never zero (D7). |
 | `models` | list of `{ provider, model }` | no | The models used, self-reported, never trusted (D11). |
+
+### `zanni.verify` and `zanni.verdict`
+
+A verifier seat runs a play's verifiers away from the director's machine (D45). It joins like any actor, with `zanni.join`, but presents the verifier token in place of the join token, and its card's role is `zanni:verifier`. The director casts it only if its configuration lists the seat's name under `verifier_seats` ([Actor configuration: verifier seats](actor-configuration.md#verifier-seats)); otherwise it refuses it with `not-authorised`. A seat that joins with the join token is never cast as a verifier. The cast gives it read access to the whole stage, and no write access.
+
+The director then sends `zanni.verify` when a verifier runs on it:
+
+| Field | Type | Required | Meaning |
+|---|---|---|---|
+| `verify` | text | yes | This request's id, quoted back in the verdict. |
+| `verifier` | text | yes | The script verifier's name. |
+| `command` | list of text, at least one | yes | The command to run, as the script or the play gives it. The seat runs exactly this. |
+| `timeout` | duration | yes | How long the command may run. |
+| `marker` | text | yes | The stage's change marker when the director sent it. |
+
+The seat reads every file of the stage over MCP into a fresh folder, runs the command there within the timeout, and answers on the task:
+
+| Field | Type | Required | Meaning |
+|---|---|---|---|
+| `verify` | text | yes | The request being answered. |
+| `verifier` | text | yes | The verifier's name. |
+| `passed` | true or false | yes | Whether the command exited with 0. |
+| `exit_code` | count, or `null` | yes | The command's exit code; `null` when it timed out or couldn't start. |
+| `output` | text | no | The end of the command's output. |
+| `marker` | text | yes | The stage's change marker the snapshot was read at. |
+
+The verdict is the exit code, never a model's words: a verifier seat runs no model. The director trusts it because the seat is one its own configuration lists, as it trusts a seat's reported cost. A request with no verdict within the timeout and one heartbeat interval fails the verifier.
 
 ### Heartbeats
 
@@ -250,6 +281,7 @@ Every message and card has a JSON Schema (Draft 2020-12) in [`schemas/`](schemas
 | `zanni.join.schema.json`, `zanni.cast.schema.json`, `zanni.refused.schema.json` | Joining |
 | `zanni.cue.schema.json`, `zanni.report.schema.json` | Work |
 | `zanni.release.schema.json`, `zanni.released.schema.json` | Ending a seat |
+| `zanni.verify.schema.json`, `zanni.verdict.schema.json` | Verifier seats (D45) |
 
 - **Strict:** every schema rejects fields it doesn't define (D22).
 - **Conformance:** valid and invalid examples are under `tests/conformance/protocol/`, and `tests/conformance/test_protocol.py` checks any implementation's messages against the schemas alone (`ZANNI_PROTOCOL_DIR`).

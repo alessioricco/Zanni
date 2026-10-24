@@ -692,3 +692,115 @@ The loop is about 25 lines.
 **Why:** the first recorded run of milestone 4 (`docs/runs/milestone-4.md`) found it. A local director finished the slug kata correctly, then called `stop("done: Round 2 was the last backlog file; …")`. Read as a reason other than `done`, the run ended as not completed, with exit 1. A flag can't be misread by a model that writes a sentence.
 
 **Supersedes:** `stop("done")` in D33.
+
+## D43. A stage backend is storage only; permissions and the record sit above every backend (2026-10-24)
+
+**Decision:** a backend stores and retrieves the stage's files, and nothing else. Permissions per seat, path checks, revocation, and the record of who changed what (D41) are written once, in a layer the director puts above every backend. Zanni's implementation has three backends, `folder`, `git` and `mcp`, in `src/zanni/stage/`, behind one interface: `read`, `write`, `delete`, `list`, `changes`, plus `snapshot` (the stage as a real folder, D45) and `close`.
+
+- **No seat in a backend:** `write` and `delete` take the seat and the cue as labels (`author`, `note`), so git can write them into commits; a backend never decides with them.
+- **Errors:** a backend raises `not-found` and `unavailable`, `not-text` for content it holds that isn't text, and `invalid-path` for a path it can't store (such as `.git/`). `not-permitted` belongs to the layer.
+- **Change markers:** the layer's record gives the markers seats and the director see, the same on every backend. A backend's own marker (a commit hash, a server's marker) is kept beside each entry of the record.
+- **Text only:** the five operations carry text, as before. Binary content is deferred (`TODO.md`).
+- **No Python plugins:** a new kind of stage is an MCP server offering the five stage tools (D47), so no one else's code runs inside the director.
+
+**Why:** Alessio's call at milestone 5's ask point A. Each backend enforcing permissions itself would repeat the same checks, and a bug in one copy would loosen one backend unnoticed (golden rule 5).
+
+**Considered and set aside:** backends in `actor/` (the actor only ever sees MCP); backends enforcing permissions themselves, as `stage.md` first read; Python packages registering backends.
+
+**Amends:** D12 and `stage.md`'s "the backend enforces each seat's permissions".
+
+## D44. Stage writes are shared (2026-10-24)
+
+**Decision:** on every backend, a seat's write is on the stage for every seat at once, applied in the order the director receives it, as on the folder stage. There are no per-seat workspaces, no merges and no merge conflicts. Parallel seats stay apart through their write permissions; when two seats may write the same path, the last write wins, and the record shows who wrote what.
+
+**Why:** Alessio's call at milestone 5's ask point B. No script yet needs seats editing the same files in parallel, and a merge step would hand conflicts to the director's model.
+
+**Considered and set aside:** two write modes, `shared` and `isolated`, declared by each backend; isolation only on git (a play would behave differently depending on where its stage is stored).
+
+**Deferred** (`TODO.md`): isolated writes, a workspace per seat merged by the director.
+
+**Amends:** the branch per seat and the merges in `stage.md`'s first draft of the git backend.
+
+## D45. Verifiers run on a snapshot, on the director or on a trusted verifier seat (2026-10-24)
+
+**Decision:** a verdict that counts for "done" comes from a command's exit code, never from a model's words. Who runs the command may change; who authors the verdict may not.
+
+- **On the director, by default:** before each verifier, the director makes a snapshot of the stage, a fresh folder holding every file (`snapshot`, D43), and runs the command there. A verifier can't change the stage. A verdict records the change marker it ran against.
+- **On a verifier seat, when the play says so:** a play's `verifiers.<name>.runs_on` names a verifier seat. A verifier seat is a zanni with Zanni's built-in role `zanni:verifier`: it runs no model, reads the whole stage over MCP and writes nothing, pulls its own snapshot, runs the command the director sends in a new message, `zanni.verify`, and answers `zanni.verdict` with the exit code and the output.
+- **Only trusted seats:** the director believes the exit code a verifier seat reports, so a verifier seat is accepted only from the director's own configuration, under `verifier_seats`: `local`, configuration files it starts itself, or `remote`, names of seats that join from elsewhere. Every verifier seat presents its own token, `ZANNI_VERIFIER_TOKEN`, never the join token; an actor with the join token can't become one. The log records which seat produced each verdict.
+- **Model judges stay out:** a model judging work is `kind: soft`, still deferred; it may inform the director or a person at a gate, never `done_when`.
+- **A new extension version:** `zanni.verify` and `zanni.verdict` are new messages, so the casting extension's URI moves to `#v3`.
+
+**Why:** Alessio's call at milestone 5's ask point C, and his question whether a verifier could be an actor. Only a folder stage has a folder to run a command in, and a verifier run on the director's machine runs someone else's script commands with the user's permissions. A verifier seat moves the command elsewhere, without letting a model decide what passed. Alessio chose the director's configuration as where verifier seats are listed, and a token of their own as how a remote one proves it is listed.
+
+**Considered and set aside:** verifiers only on folder and git stages (an `mcp` stage could never be done); a model-driven actor whose report is the verdict; listing verifier seats in the play (a shared file would decide which machines are trusted); remote verifier seats joining with the join token and matched by name (names are self-declared).
+
+**Deferred** (`TODO.md`): a stage server's own checks, as a sixth tool such as `stage_verify`; model judges.
+
+**Amends:** D35 ("run in the stage folder").
+
+## D46. The git backend: a branch per run, a commit per write, pushes by the director (2026-10-24)
+
+**Decision:**
+
+1. **Where:** the director clones the stage's `url`, any git remote or a local path, into `log/<run-id>-stage/` in the play's folder. A clone that fails is exit 2, nothing started, as fetching is (D37).
+2. **The run's branch:** a new branch `zanni/<play>/<run-id>` from the tip of `branch` (default `main`). A run never commits to `branch`.
+3. **One commit per write:** each `write` and `delete` is a commit on the run's branch, with the seat as author (`<seat> <<seat>@zanni.invalid>`), the director as committer, and the cue as its message.
+4. **Pushing:** the director pushes the run's branch, and only it. The stage's `push` setting says when: `approved` (the default) pushes at each approved gate and at the end when the play is done, and prints the `git push` command for an unfinished run; `always` also pushes at the end of an unfinished run. A push that fails stops nothing: it is logged and printed, and the work stays in the run's folder. Merging the run's branch into `branch` is a person's decision, outside Zanni.
+5. **Authentication:** git's own on the director's machine, with `GIT_TERMINAL_PROMPT=0` and SSH `BatchMode`. Zanni stores no git credential. Seats never touch git.
+6. **What the stage shows:** paths under `.git/` are `invalid-path`; binary files are listed, and refused on `read` with `not-text`; a path `.gitignore` ignores is refused on write, as it would never be committed.
+
+**Why:** Alessio's call at milestone 5's ask point D, after D44. A run's work is reviewable as one branch, with git's own history of who wrote what, and no actor holds repository credentials (D15). Whether a run that didn't finish should be pushed by default is for the recorded runs to show; Alessio decides the default from them.
+
+**Considered and set aside:** committing to `branch`; one commit per cue (a seat lost mid-cue would leave its writes uncommitted); actors pushing themselves; opening pull requests (ties Zanni to one forge); hiding binary files.
+
+**Deferred to milestone 6:** direct access, a real checkout for a coding engine, served by the director with tokens per seat.
+
+## D47. The `mcp` backend: any MCP server offering the five stage tools (2026-10-24)
+
+**Decision:** a stage may be any MCP server, reached over Streamable HTTP, that offers the five stage operations as tools, `stage_read`, `stage_write`, `stage_list`, `stage_delete` and `stage_changes`: the same contract the director serves to its seats (D31). The play names it with `stage: { backend: mcp, url }`. The director connects with its own token, `ZANNI_STAGE_TOKEN` in its configuration's `credentials`, sent as a bearer token; seats never see it, and reach the stage only through the director, as on every backend.
+
+- **Who wrote what:** `stage_write` and `stage_delete` take optional `author` and `note` arguments; a server may record them, or ignore them.
+- **Unreachable:** an operation that gets `unavailable` is retried briefly. If the server stays away, the play pauses as when every director model fails (D33), until the owner resumes it with `zanni gate … resume`.
+- **The example:** `examples/stage-servers/sqlite/`, a small stage server keeping documents in SQLite.
+
+**Why:** Alessio's call at milestone 5's ask point E. It makes the stage's contract the extension point: a wiki, a ticket system or a bucket can be a stage, in any language, with no change to Zanni, and it reuses MCP (golden rule 3).
+
+**Considered and set aside:** an object store such as S3 (vendor-specific, and an account for every test); a database backend built into Zanni; counting the folder stage as the non-git backend.
+
+## D48. Gates may be asked every round, and before a part's work (2026-10-24)
+
+**Decision:** an entry of a script's `gates` may be `{ name, every, before }`; a plain name means `every: play`, as before.
+
+- **`every: round`:** an approval counts only in the round it was given; `end_round` and "done" are refused while the round's gate is unapproved.
+- **`before: [parts]`:** a cue to any of those parts is refused until the gate is approved in the current round (`every: round`) or in the play (`every: play`).
+- **A rejection** stands until the gate is asked again and approved.
+
+**Why:** Alessio's call at milestone 5's ask point F. In milestone 4's recorded runs, gates counted once per play, and round 2's coders twice started with no round-2 plan approved. `before` makes "approve the plan before anyone builds" a rule in code, not a hope.
+
+**Considered and set aside:** every gate per round; `every: round` without `before`; the play choosing the rhythm.
+
+## D49. A director's turn ends after each long wait (2026-10-24)
+
+**Decision:** the director's turn ends when `wait_for_reports` returns reports, and when `ask_gate` returns a decision. The next turn starts fresh from the state summary (D33). A house rule `requests_per_turn` (default 25) caps the model requests in one turn.
+
+**Why:** Alessio's call at milestone 5's ask point G. In milestone 4's recorded runs, directors played the whole kata in one or two turns of 80k to 180k input tokens, and were 66–77% of the cloud spend. The summary already holds what the model needs; old tool results don't. The effect is measured in `docs/runs/milestone-5.md`.
+
+**Considered and set aside:** trimming old tool results inside a turn; a token cap per turn.
+
+## D50. Seats refused at join aren't restarted; a part that can't be cast stops the play (2026-10-24)
+
+**Decision:**
+
+- **No restart after a refusal:** a local seat that exits with code 2 (refused at join, or couldn't start) isn't restarted. Crashes are still restarted twice (D36).
+- **`cast_timeout`:** a house rule, default 10 minutes. A part below its minimum seats, with no local seat left to start, waits that long for an actor to join; then the run stops with reason `uncastable`. It also bounds how long a lost seat's part waits to be recast, replacing a fixed 180 s.
+
+**Why:** Alessio's call at milestone 5's ask point H. In milestone 4's recorded runs, a seat refused as `unpriced` was restarted twice for nothing, and its part waited until the run was stopped by hand.
+
+**Considered and set aside:** stopping as soon as a local seat is refused (an actor from elsewhere may still join); two separate timeouts.
+
+## D51. The example plays for milestone 5: the slug kata on git, and release notes on the `mcp` backend (2026-10-24)
+
+**Decision:** `examples/plays/slug-kata-git/` runs the slug kata's script and roles on a git stage, whose remote is a bare repository that a small setup script makes from the stage folder (a repository can't ship inside this one). `examples/plays/release-notes/` is a play whose work isn't code: a writer turns a changelog into release notes, an editor revises them, and a verifier checks their structure on a verifier seat. Its stage is `examples/stage-servers/sqlite/`.
+
+**Why:** Alessio's call at milestone 5's ask point I. Each example needs no account and no network, and together they run every new piece: the git backend, the `mcp` backend, a verifier seat, gates per round and shorter turns.

@@ -110,22 +110,32 @@ class ModelEntry(Strict):
 
 
 DIRECTOR_ROLE = "zanni:director"  # Zanni's built-in director role, shipped in the package (D34)
+VERIFIER_ROLE = "zanni:verifier"  # Zanni's built-in verifier seat: runs verifiers' commands, no model (D45)
+BUILT_IN_ROLES = (DIRECTOR_ROLE, VERIFIER_ROLE)
 
 
 def _role_ref(value: object) -> object:
-    """A package reference, or one of Zanni's built-in roles: only `zanni:director` exists."""
+    """A package reference, or one of Zanni's built-in roles."""
     if isinstance(value, str) and value.startswith("zanni:"):
-        if value != DIRECTOR_ROLE:
-            raise ValueError(f'"{value}" is not one of Zanni\'s built-in roles; the only one is {DIRECTOR_ROLE}')
+        if value not in BUILT_IN_ROLES:
+            raise ValueError(f'"{value}" is not one of Zanni\'s built-in roles; use {" or ".join(BUILT_IN_ROLES)}')
         return value
     return _package_ref(value)
+
+
+class VerifierSeats(Strict):
+    """Where a director lets its play's verifiers run, besides its own machine (D45)."""
+
+    local: list[Annotated[str, Field(min_length=1)]] = []  # verifier configurations the director starts
+    remote: list[Annotated[str, Field(min_length=1)]] = []  # names of verifier seats that join from elsewhere
 
 
 class ActorConfiguration(Strict):
     """One actor instance: its role, its play, its models and its credentials. Never the role's capabilities (D14).
 
     With `role: zanni:director` it is a director configuration: the director's own models and credentials, and the
-    actor configurations it starts for local seats (D34, D36).
+    actor configurations it starts for local seats (D34, D36). With `role: zanni:verifier` it is a verifier seat's,
+    which runs no model (D45).
     """
 
     SECRET_SECTIONS: ClassVar[tuple[str, ...]] = ("credentials",)
@@ -133,10 +143,22 @@ class ActorConfiguration(Strict):
     name: str | None = Field(default=None, min_length=1)
     role: Annotated[str, BeforeValidator(_role_ref)]
     play: str = Field(min_length=1)
-    models: list[ModelEntry] = Field(min_length=1)
+    models: list[ModelEntry] = Field(default_factory=list, validate_default=True)
     credentials: dict[EnvName, str] = {}  # this instance's own; protected by D15's safeguards
     state_dir: str | None = None  # default: ~/.zanni/actors/<name>
     seats: dict[str, list[Annotated[str, Field(min_length=1)]]] = {}  # director only: part -> actor configurations
+    verifier_seats: VerifierSeats = VerifierSeats()  # director only: verifier seats it trusts (D45)
+
+    @field_validator("models")
+    @classmethod
+    def _models_unless_verifier(cls, models: list, info) -> list:
+        if info.data.get("role") == VERIFIER_ROLE:
+            if models:
+                raise ValueError("a verifier seat runs no model; remove `models`")
+        elif not models:
+            raise ValueError("is required: list at least one model this actor runs, e.g. "
+                             "- { provider: anthropic, model: claude-haiku-5-5 }")
+        return models
 
     @model_validator(mode="after")
     def _credentials_exist(self) -> "ActorConfiguration":
@@ -154,9 +176,21 @@ class ActorConfiguration(Strict):
                              f"role: {DIRECTOR_ROLE} may have it. Remove it, or make this the director's configuration")
         return seats
 
+    @field_validator("verifier_seats")
+    @classmethod
+    def _verifier_seats_for_a_director(cls, seats: "VerifierSeats", info) -> "VerifierSeats":
+        if (seats.local or seats.remote) and info.data.get("role") != DIRECTOR_ROLE:
+            raise ValueError(f"`verifier_seats` lists the verifier seats a director trusts; only a configuration with "
+                             f"role: {DIRECTOR_ROLE} may have it")
+        return seats
+
     @property
     def is_director(self) -> bool:
         return self.role == DIRECTOR_ROLE
+
+    @property
+    def is_verifier(self) -> bool:
+        return self.role == VERIFIER_ROLE
 
     def stored_credentials(self) -> list[str]:
         """Credentials whose values are in this file, not references to the environment."""
@@ -199,6 +233,8 @@ class HouseRules(Strict):
     max_seats_per_host: int | None = Field(default=None, ge=1)  # actors on one machine share its GPU
     gate_timeout: Duration | None = None  # seconds a gate or a pause may wait; none: it waits (D38)
     max_director_turns: int = Field(default=30, ge=1)  # the director's model turns in one round (D33)
+    requests_per_turn: int = Field(default=25, ge=1)  # model requests in one director turn (D49)
+    cast_timeout: Duration = 600  # seconds a part may wait below its minimum seats for an actor to join (D50)
 
 
 GIT_URL = re.compile(r"^(git@[^:\s]+:\S+|(ssh|git|https?)://\S+\.git/?|\S+\.git/?)$")
@@ -212,29 +248,40 @@ def _stage(value: object) -> object:
 
 
 class Stage(Strict):
-    """The play's workspace. The backend enforces each seat's permissions (D12)."""
+    """The play's workspace and the backend that stores it; the director enforces each seat's permissions (D43)."""
 
-    backend: Literal["git", "folder"]
-    url: str | None = Field(default=None, min_length=1)  # git: the repository
-    branch: str = Field(default="main", min_length=1)  # git: the branch seats start from and merge into
+    backend: Literal["git", "folder", "mcp"]
+    url: str | None = Field(default=None, min_length=1)  # git: the repository; mcp: the server's endpoint
+    branch: str = Field(default="main", min_length=1)  # git: the branch each run starts from
+    push: Literal["approved", "always"] = "approved"  # git: when the director pushes the run's branch (D46)
     path: str | None = Field(default=None, min_length=1)  # folder: a folder on the director's machine
 
     @model_validator(mode="after")
     def _fields_match_backend(self) -> "Stage":
+        git_only = [f for f in ("branch", "push") if f in self.model_fields_set]
         if self.backend == "git":
             if not self.url:
                 raise ValueError("a git stage needs a `url`; add the repository, e.g. url: git@github.com:you/app.git")
             if self.path:
-                raise ValueError("`path` is for folder stages; a git stage takes `url` and `branch`")
+                raise ValueError("`path` is for folder stages; a git stage takes `url`, `branch` and `push`")
+        elif self.backend == "mcp":
+            if not self.url or not re.match(r"^https?://\S+$", self.url):
+                raise ValueError("an mcp stage needs a `url`, the server's http(s) endpoint, e.g. "
+                                 "url: http://docs.internal:8800/mcp")
+            if self.path or git_only:
+                raise ValueError("an mcp stage takes only `url`; `path` is for folder stages, `branch` and `push` "
+                                 "for git stages")
         else:
             if not self.path:
                 raise ValueError("a folder stage needs a `path`; add the folder, e.g. path: ./stage")
-            if self.url or "branch" in self.model_fields_set:
-                raise ValueError("`url` and `branch` are for git stages; a folder stage takes `path`")
+            if self.url or git_only:
+                raise ValueError("`url`, `branch` and `push` are for git stages; a folder stage takes `path`")
         return self
 
     def __str__(self) -> str:
-        return f"git {self.url} (branch {self.branch})" if self.backend == "git" else f"folder {self.path}"
+        if self.backend == "git":
+            return f"git {self.url} (branch {self.branch}; pushes {self.push})"
+        return f"mcp server {self.url}" if self.backend == "mcp" else f"folder {self.path}"
 
 
 StageSpec = Annotated[Stage, BeforeValidator(_stage)]
@@ -248,10 +295,11 @@ def _director(value: object) -> object:
 
 
 class PlayVerifier(Strict):
-    """A play's own command for one of its script's verifiers: the project-specific part (D35)."""
+    """A play's own command for one of its script's verifiers, and where it runs (D35, D45)."""
 
-    command: list[str] = Field(min_length=1)
+    command: list[str] | None = Field(default=None, min_length=1)  # default: the script's
     timeout: int | None = Field(default=None, ge=1)  # seconds; default: the script's
+    runs_on: str | None = Field(default=None, min_length=1)  # a verifier seat's name; default: the director
 
 
 class PlayFile(Strict):
@@ -368,6 +416,18 @@ class ScriptVerifier(Strict):
     timeout: int = Field(default=VERIFIER_TIMEOUT, ge=1)  # seconds
 
 
+class Gate(Strict):
+    """A moment that needs a person's approval: once per play, or every round; optionally before a part's cues (D48)."""
+
+    name: Name
+    every: Literal["play", "round"] = "play"
+    before: list[Name] = []  # parts whose cues wait for this gate's approval
+
+
+def _gate(value: object) -> object:
+    return {"name": value} if isinstance(value, str) else value  # `- release` is shorthand for `{ name: release }`
+
+
 class Script(Strict):
     """The reusable work: mission, parts, the workspace it expects, gates, verifiers and stop rules (D13, D17)."""
 
@@ -376,9 +436,16 @@ class Script(Strict):
     mission: str = Field(min_length=1)
     parts: dict[Name, Part] = Field(min_length=1)
     stage: ScriptStage = ScriptStage()
-    gates: list[Name] = []
+    gates: list[Annotated[Gate, BeforeValidator(_gate)]] = []
     verifiers: dict[Name, ScriptVerifier] = {}
     stop: StopRules = StopRules()
+
+    @property
+    def gate_names(self) -> list[str]:
+        return [g.name for g in self.gates]
+
+    def gate(self, name: str) -> Gate | None:
+        return next((g for g in self.gates if g.name == name), None)
 
 
 # Lockfile (play.lock): what each package reference resolved to

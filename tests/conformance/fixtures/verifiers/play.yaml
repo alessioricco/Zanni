@@ -1,0 +1,8 @@
+name: kata
+script: ../scripts/with-verifiers
+stage: ./stage
+cast:
+  coder: { role: ./roles/coder, seats: 1-2 }
+verifiers:
+  lint: { command: [ruff, check, app], runs_on: checker }
+  tests-pass: { runs_on: ci-box }

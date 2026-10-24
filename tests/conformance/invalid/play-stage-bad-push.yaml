@@ -1,0 +1,5 @@
+name: app
+script: github.com/someone/script@1.0.0
+stage: { backend: git, url: ../repos/app.git, push: never }
+cast:
+  coder: roles/coder

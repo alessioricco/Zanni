@@ -1,0 +1,7 @@
+name: app
+script: github.com/someone/script@1.0.0
+stage: ./stage
+cast:
+  coder: roles/coder
+house_rules:
+  requests_per_turn: 0

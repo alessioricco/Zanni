@@ -1,0 +1,8 @@
+{
+  "kind": "zanni.verdict",
+  "verify": "v3",
+  "verifier": "tests-pass",
+  "passed": true,
+  "exit_code": 0,
+  "marker": "12"
+}

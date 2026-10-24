@@ -64,8 +64,8 @@ def test_the_plays_command_overrides_the_scripts_and_says_so(tmp_path):
     play, script, _ = kata(tmp_path)
     play = play.model_copy(update={"verifiers": {"tests-pass": PlayVerifier(command=["make"], timeout=30)}})
     commands = verifier_commands(play, script)
-    assert commands["tests-pass"] == (["make"], 30, "play")
-    assert commands["tests-fail"][1:] == (300, "script")
+    assert commands["tests-pass"] == (["make"], 30, "play", None)
+    assert commands["tests-fail"][1:] == (300, "script", None)
 
 
 def events(tmp_path):
