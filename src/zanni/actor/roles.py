@@ -19,9 +19,15 @@ class Role:
 
 
 def resolve_role_folder(ref: str, relative_to: Path) -> Path:
+    """A local role folder, or a remote role fetched into the cache with git (D37)."""
     if REMOTE_REF.match(ref):
-        raise FileErrors([FileError(ref, None, (), "is a remote role, and fetching roles comes with milestone 4",
-                                    "clone it and use the local folder, e.g. role: ./roles/tester")])
+        from zanni.fetch import FetchError, fetch_latest
+
+        try:
+            return fetch_latest(ref)[0]
+        except FetchError as e:
+            raise FileErrors([FileError(ref, None, (), str(e).removeprefix(f"{ref}: "),
+                                        "check the reference and that git can reach it, or use a local folder")]) from None
     return (relative_to / ref).resolve()
 
 

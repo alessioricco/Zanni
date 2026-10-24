@@ -191,11 +191,15 @@ Skipping anthropic claude-haiku-5-5: ${ANTHROPIC_API_KEY} has no value: add ANTH
 
 The error above appears only when no model is left.
 
-### "is a remote role"
+### "has no tag"
+
+A remote role or script resolves to a git tag `vX.Y.Z` or `X.Y.Z` (for a package in a subfolder, `path/vX.Y.Z` first). The message lists the nearest tags the repository has:
 
 ```
-github.com/someone/slug-tester@0.1.0: is a remote role, and fetching roles comes with milestone 4; clone it and use the local folder, e.g. role: ./roles/tester
+example.test/someone/tester@1.2.0: https://example.test/someone/tester.git has no tag v1.2.0 or 1.2.0; the nearest tags are: 1.1.0; check the reference and that git can reach it, or use a local folder
 ```
+
+Use a version that exists, or ask the package's author to tag it. Zanni fetches with your own `git`, so a private repository needs your SSH key or credential helper to work with `git ls-remote <url>` first; git never asks for a password while zanni runs it.
 
 ### "Google models need the `google` extra"
 
