@@ -28,6 +28,11 @@ Things decided to come later. Each names where it was deferred. Remove an item w
 - [ ] **Version ranges** in package references, and **a command to clean the package cache** (D37). Deferred at milestone 4's ask point E.
 - [ ] **Telling someone a gate is waiting** (a webhook, an email), **per-person approvers**, and **a web page for gates** (D38). Deferred at milestone 4's ask point F.
 - [ ] **Token budgets**, as an alternative to prices, for actors whose models have none (D7, D39).
+- [ ] **Gates per round.** An enforced gate counts once per play: approved in round 1, it isn't asked again, and some directors skip it in later rounds. A gate a script means to be asked each round needs a way to say so (D33, D38). Found in milestone 4's recorded runs.
+- [ ] **Shorter director turns.** Directors played the whole kata in one or two turns of 80k to 180k input tokens, and were two thirds or more of the cloud spend. Trim old tool results, or end a turn after each wait for reports (D33). Found in milestone 4's recorded runs.
+- [ ] **Not restarting a seat refused at join.** A local seat refused for a reason a restart can't change, such as `unpriced`, is restarted twice anyway, and its part then waits for an actor to join with no turn to stop it (D36). Found in milestone 4's recorded runs.
+- [ ] **The cost of an interrupted turn.** A director stopped by hand mid-turn never logs that turn's cost (D39). Found in milestone 4's recorded runs.
+- [ ] **Limiting a cue's overshoot.** The actor checks its cue's budget after each model response, so one expensive response can spend several times a small cue budget. Estimating a request's cost before sending it would bound that (D39). Found in milestone 4's recorded runs.
 
 ## Later milestones
 

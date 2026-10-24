@@ -5,9 +5,9 @@ There is one command, `zanni <file>`. The kind of file comes from its keys, neve
 | Kind | Recognised by | What `zanni` would run | Full field list |
 |---|---|---|---|
 | Actor configuration | `role` and `play` | an actor: a zanni playing the role, joining the play | [spec: actor configuration](spec/actor-configuration.md) |
+| Director configuration | `role: zanni:director` and `play` | the play's director, running its play | [spec: a director's configuration](spec/actor-configuration.md#a-directors-configuration) |
 | Play file | `cast` | the play's director, running the play's script | [spec: play](spec/play.md) |
 | Role manifest (`role.yaml`) | `mission` | nothing; it is validated | [spec: role package](spec/role-package.md) |
-
 | Script (`SCRIPT.md`) | `parts`, in Markdown frontmatter | nothing; it is validated | [spec: script](spec/script.md) |
 | Lockfile (`play.lock`) | `lock_version` | nothing; it is validated | [spec: play](spec/play.md#the-lockfile) |
 
@@ -76,8 +76,39 @@ house_rules:
 - **`house_rules.budget`:** in USD, for the whole play.
 - **`house_rules.gates`:** which of the script's gates this play enforces.
 - **`house_rules.max_seats_per_host`:** the most seats the director casts onto one machine.
+- **`house_rules.gate_timeout`:** how long a gate, or a pause, may wait for a person, such as `2h`; with none, it waits.
+- **`house_rules.max_director_turns`:** the most model turns the director takes in a round (default 30).
+- **`verifiers`:** the play's own commands for its script's verifiers, such as `tests-pass: { command: [npm, test] }`.
 
-A second example, `examples/plays/newsroom/play.yaml`, uses a local script, a folder stage and a `play.lock`.
+Two more examples: `examples/plays/newsroom/play.yaml` uses a local script, a folder stage and a `play.lock`; `examples/plays/slug-kata/` is a whole play you can run, with its director's configuration and its local seats ([getting started](getting-started.md#running-a-play)).
+
+## Director configuration
+
+The director is an actor too: its configuration is an actor configuration whose `role` is `zanni:director`, Zanni's built-in director role. It sits beside the play as `director.yaml`, or is named with `--director`.
+
+```yaml
+# examples/plays/slug-kata/director.yaml
+name: director
+role: zanni:director
+play: ./play.yaml
+models:
+  - provider: anthropic
+    model: claude-haiku-5-5
+  - provider: ollama
+    model: qwen3.8:27b
+    base_url: ${OLLAMA_BASE_URL}
+    price: { input: 0, output: 0 }
+credentials:
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+  ZANNI_JOIN_TOKEN: ${ZANNI_JOIN_TOKEN}     # the play's join token: actors present it
+  ZANNI_OWNER_TOKEN: ${ZANNI_OWNER_TOKEN}   # the play's owner token: zanni gate presents it
+seats:
+  tester: [./tester-1.yaml]
+  coder: [./coder-1.yaml, ./coder-2.yaml]
+```
+
+- **`models`:** the director's own, in order. Nothing picks a model for you: the director runs on what this file lists, and under a budget each must have a price.
+- **`seats`:** the actor configurations the director starts as local seats, one file per seat. It reads only their `name` and `role`, never their credentials.
 
 ## Role manifest
 

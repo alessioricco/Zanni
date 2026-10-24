@@ -21,10 +21,10 @@ uv run zanni --version
 
 ## Check a file
 
-There is one command, `zanni <file>`. The repository has one example of each kind of file in `examples/`:
+There is one command, `zanni <file>`. With `--check`, it only validates the file and prints what it would run; without it, an actor configuration or a play runs. The repository has an example of each kind of file in `examples/`:
 
 ```bash
-uv run zanni examples/plays/habit-tracker/play.yaml
+uv run zanni --check examples/plays/habit-tracker/play.yaml
 ```
 
 ```
@@ -36,9 +36,9 @@ Play file: would start the director for the play 'habit-tracker'.
     product-owner: github.com/zanni-roles/product-owner@1.0.0, 1 seat
     tester: github.com/someone/tester@1.4.0, 1 seat
     coder: github.com/zanni-roles/coder@1.0.0, 1-4 seats, started here (local)
-  house rules: budget $20.00; human gates: plan, release
-  script: remote, so the play wasn't checked against it (fetching scripts comes later)
-Valid. Nothing was started: running files comes in a later version (see ROADMAP.md).
+  house rules: budget $20.00; human gates: plan, release; at most 30 director turns per round
+  script: remote, so it is checked when the director fetches it (D37)
+Valid.
 ```
 
 `zanni` works out what kind of file it was given from the keys in the file, never from the file's name. It validates the file and prints what it would run.
@@ -51,13 +51,14 @@ play.yaml has 2 problems; nothing was started.
   play.yaml, line 11, house_rules.budget: should be at least 0, not -1
 ```
 
-The other two examples:
+The other examples:
 
 ```bash
-uv run zanni examples/tester.yaml               # an actor configuration
-uv run zanni examples/roles/tester              # a whole role folder
-uv run zanni examples/scripts/software-team     # a script
-uv run zanni examples/plays/newsroom/play.yaml  # a play, checked against its local script
+uv run zanni --check examples/tester.yaml               # an actor configuration
+uv run zanni --check examples/roles/tester              # a whole role folder
+uv run zanni --check examples/scripts/software-team     # a script
+uv run zanni --check examples/plays/newsroom/play.yaml  # a play, checked against its local script
+uv run zanni --check examples/plays/slug-kata/play.yaml # the play you can run, below
 ```
 
 ## Run an actor: a rehearsal
@@ -139,17 +140,102 @@ The director and the actor can run on different machines. Where an actor runs is
 
 The recorded runs of this layout are in [docs/runs/milestone-3.md](runs/milestone-3.md).
 
+## Running a play
+
+`zanni play.yaml` starts a director that runs a whole play on your machine (D33). The repository's runnable example is the slug kata, `examples/plays/slug-kata/` (D40). A tester writes failing tests, you approve the plan, and one or two coders make the tests pass, over two rounds.
+
+1. **Copy the examples.** The stage is a folder inside the play, and the actors write to it, so run a copy. The play refers to its script and roles by relative paths, so copy the whole `examples/` folder:
+   ```bash
+   cp -R examples ~/slug-kata-run
+   ```
+2. **Check the models.** The play folder holds the director's configuration (`director.yaml`) and one actor configuration per local seat (`tester-1.yaml`, `coder-1.yaml`, `coder-2.yaml`). Each lists its own models, in order, and nothing picks a model for you. Edit each `models` list to what you have, such as a local model with tool calling, or a cloud model and its key. The play has a $1.00 budget, so every model needs a price: a published one, or `price: { input: 0, output: 0 }` for a local model ([Models and keys](models-and-keys.md)).
+3. **Set two tokens.** The join token lets actors join; the owner token lets you decide gates. Both come from the environment, never from a flag, and never reach a log:
+   ```bash
+   set -a; . ./.env; set +a     # your model keys, if they live in a .env
+   export ZANNI_JOIN_TOKEN=$(python3 -c "import secrets; print(secrets.token_urlsafe(24))")
+   export ZANNI_OWNER_TOKEN=$(python3 -c "import secrets; print(secrets.token_urlsafe(24))")
+   ```
+4. **Run it:**
+   ```bash
+   uv run zanni ~/slug-kata-run/plays/slug-kata/play.yaml
+   ```
+
+The director pins the script and roles in `play.lock`, lists the verifier commands it will run, starts the local seats, and follows the script. A recorded run, on `qwen3.8:27b` (trimmed paths):
+
+```
+Wrote …/plays/slug-kata/play.lock
+  verifiers, run in the stage folder with your permissions:
+    tests-fail: uv run --no-project --with pytest python -c import subprocess, sys; sys.exit(0 if subprocess.call([sys.executable, '-m', 'pytest', '-q', 'tests']) == 1 else 1) (from the script; timeout 300 s)
+    tests-pass: uv run --no-project --with pytest python -m pytest -q tests (from the script; timeout 300 s)
+Directing 'slug-kata' (slug-kata 0.1.0) at http://127.0.0.1:61086; run 20261024T202101Z
+  started the local seat tester-1 (tester)
+  started the local seat coder-1 (coder)
+Waiting for actors to join: tester, coder
+Cast coder-1 (slug-coder 0.1.0) as coder-1
+Cast tester-1 (slug-tester 0.1.0) as tester-1
+  cue r1-c1 to tester-1: Act 1, Scene 1: Specify — Round 1 (budget $0.5000)
+  report from tester-1 on r1-c1: done, cost $0
+  verifier tests-fail: passed
+Gate 'plan' is waiting for a decision: zanni gate <play> approve | reject --note …
+Gate 'plan' rejected by owner: Also cover an input that is only punctuation, such as '!!!', which slugifies to an empty string.
+  cue r1-c2 to tester-1: Act 1, Scene 1: Specify — Round 1 (revision) (budget $0.5000)
+  report from tester-1 on r1-c2: done, cost $0
+  verifier tests-fail: passed
+Gate 'plan' is waiting for a decision: zanni gate <play> approve | reject --note …
+Gate 'plan' approved by owner: ok
+  cue r1-c3 to coder-1: Act 1, Scene 2: Build — Round 1, slug (budget $0.5000)
+  started the local seat coder-2 (coder)
+Cast coder-2 (slug-coder 0.1.0) as coder-2
+  cue r1-c4 to coder-2: Act 1, Scene 2: Build — Round 1, words (budget $0.2500)
+  report from coder-1 on r1-c3: done, cost $0
+  report from coder-2 on r1-c4: done, cost $0
+  verifier tests-pass: passed
+Round 2
+  …
+Released coder-1 (done)
+Released coder-2 (done)
+Released tester-1 (done)
+The play is done. Rounds: 2; spent $0.0000; verdicts: tests-fail passed, tests-pass passed.
+The play's log: …/plays/slug-kata/log/20261024T202101Z.jsonl
+```
+
+**Deciding a gate.** When the play waits at a gate, decide it from another terminal, with the same `ZANNI_OWNER_TOKEN`. On the director's own terminal you can also type `approve`, `reject <note>` or `resume`. `zanni gate` finds the running director through `log/director.json` in the play folder. Given a director's URL instead, it works from any machine that can reach it (D38). From a scripted play in the test suite:
+
+```
+$ zanni gate play.yaml
+Play 'kata', run 20261024T204125Z, round 1, spent $0.0007: waiting at a gate.
+  gate: plan
+  The tests are written, and fail.
+  Round 1. Files changed since the last gate: tests/test_slug.py. Verdicts: tests-fail passed.
+
+$ zanni gate play.yaml approve --note go
+Approved.
+Play 'kata', run 20261024T204125Z, round 1, spent $0.0007: running.
+```
+
+`reject --note "…"` sends the play back with your note, and the director revises before asking again.
+
+- **Done is checked, not claimed:** the play ends as done only when every gate the play enforces was approved, and the script's `done_when` verifiers passed on the stage as it is at the end (D33, D42). An actor saying it's done counts for nothing.
+- **Exit codes:** 0 when the play is done; 1 when it stopped for any other reason (the budget, a rejected or unanswered gate, a cap, the director's own reason, or Ctrl-C); 2 when nothing could start ([Command reference](cli.md#exit-codes)).
+- **Logs:** the play's log is in the play folder, under `log/`, with each local seat's output beside it. Each actor also keeps its own log under its state folder (D32).
+- **The budget:** each cue gets a share of what is left, and the actor stops at it; the director's own spend counts too, after each of its model responses (D39).
+- **Actors from other machines:** a part without `host: local` also takes actors joining from elsewhere, as in [Join a director on another machine](#join-a-director-on-another-machine). Start the director with `--listen 0.0.0.0:8765`, and give those actors the join token.
+- **If it fails:** see [Troubleshooting](troubleshooting.md#running-a-play).
+
+The recorded runs, on one machine with local and cloud models and on two machines, are in [docs/runs/milestone-4.md](runs/milestone-4.md).
+
 ## What works today
 
 | Works | Not yet |
 |---|---|
-| Validating actor configurations, plays, scripts, lockfiles, rehearsals and whole role folders | Starting a play's director from its play file, and casting a whole play (milestone 4) |
-| Running one actor on a rehearsal, on local or cloud models, with fallback | Fetching remote roles (use a local folder for now) |
-| An actor joining a director over A2A, by URL or through a play file's `director` | Renewing a seat's tokens: a seat ends when they expire, after 24 hours |
-| Serving a rehearsal to an actor on another machine (`--serve`), with the stage over MCP | TLS: `--serve` speaks plain HTTP |
-| Errors with their line and how to fix them | Fetching roles and scripts from git, or plays from URLs (only their shape is checked) |
-| Rejecting secrets in shared files | Checking a play against a remote script (it needs fetching) |
-| A summary of what each file would run | |
+| Validating actor configurations, plays, scripts, lockfiles, rehearsals and whole role folders | A git stage: a play's stage is a local folder for now (milestone 5) |
+| Running one actor on a rehearsal, on local or cloud models, with fallback | Renewing a seat's tokens: a seat ends when they expire, after 24 hours |
+| An actor joining a director over A2A, by URL or through a play file's `director` | TLS: the director speaks plain HTTP |
+| Serving a rehearsal to an actor on another machine (`--serve`), with the stage over MCP | A director that survives a restart of its process |
+| Running a whole play: `zanni play.yaml` starts a director that casts local seats and joining actors, follows the script, runs its verifiers and enforces the budget | Gates per round: an enforced gate counts once per play |
+| Fetching roles and scripts from git, pinned in `play.lock` | Signed tags, and version ranges |
+| Deciding gates, and resuming a paused play, with `zanni gate` | Telling anyone a gate is waiting |
+| Errors with their line and how to fix them; rejecting secrets in shared files | |
 
 ## Next steps
 

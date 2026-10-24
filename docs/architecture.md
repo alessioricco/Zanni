@@ -1,6 +1,6 @@
 # Architecture
 
-Zanni is one Python package with one command. It validates Zanni files, runs actors that join a director over A2A, and serves rehearsals as a director. A director that runs a play's script comes in milestone 4 ([roadmap](../ROADMAP.md)).
+Zanni is one Python package with one command. It validates Zanni files, runs actors that join a director over A2A, serves rehearsals, and runs a whole play: a director that follows a script, casts actors (local seats it starts, and remote ones that join), and enforces the rules in code (D33).
 
 ## Layout
 
@@ -9,6 +9,8 @@ src/zanni/
   __init__.py       # __version__
   __main__.py       # python -m zanni
   cli.py            # the `zanni` command
+  gate.py           # `zanni gate`: the owner's client for a running director (D38)
+  fetch.py          # remote packages: a tag, fetched with git into ~/.zanni/packages (D37)
   files/            # loading and validating Zanni files
     check.py        # what `zanni <path>` checks: one file, a role folder, a play against its script and lockfile
     loader.py       # YAML (or Markdown frontmatter) -> data, plus the line of every field
@@ -27,19 +29,33 @@ src/zanni/
     seat.py         # an actor in a play: the director's card, its own card, join, cues, reports, release (D30)
     join.py         # where to join (a URL or a play file's director), and the set-up rehearsals share
     rehearsal.py    # an actor on a rehearsal, with a director started for it on loopback (D26, D29)
-  director/         # the director's casting side (no engine imports)
+  director/         # the director (engine imports only inside command.py and rehearsal.py's functions)
     contract.py     # Casting: what the engine's A2A server asks of the director; Outgoing, DirectorInfo
     casting.py      # Director: joins and refusals, seats and tokens, cues and reports, heartbeats, release
     rehearsal.py    # a rehearsal's one part, conducting its cues, verify, and --serve (D29)
+    command.py      # `zanni play.yaml`: checks before anything starts, serving, local seats, turns, the end
+    packages.py     # a play's script and roles against play.lock (D37)
+    state.py        # the play's state, kept in code: rounds, spend, reservations, verdicts, gates (D33)
+    rules.py        # the rules each tool checks first: budget, done, verifiers, casting, rounds (D33, D39)
+    play.py         # Production: the director's tools, the state summary of each turn, the turn loop
+    prompt.py       # the director's instructions: its role, the parts, the rules, the script's prose
+    role/           # the built-in zanni:director role (role.yaml, AGENTS.md) (D34)
+    verifiers.py    # running a verifier in the stage, its process group killed on a timeout (D35)
+    gates.py        # gates and pauses wait for a person's decision, or gate_timeout (D38)
+    owner.py        # who may decide (the owner token), and what a decision does
+    console.py      # the same decisions typed in the director's terminal
+    local.py        # local seats: `zanni <config> --play <url>` subprocesses on a pipe (D36)
   log.py            # the JSON Lines logs: the play's and each actor's own (D18, D32)
   protocol/         # the casting extension's messages and card params, as Pydantic models (no a2a-sdk)
     encoding.py     # numbers as decimal strings: Count, Seconds, Timestamp, Money, Range (D23)
     card.py         # what each Agent Card carries in the extension's params
     messages.py     # join, cast, refused, cue, report, release, released
-    fit.py          # does an actor's card fit a part: role, hash, needs within ceilings
+    fit.py          # does an actor's card fit a part: role (or a local role's name), hash, needs within ceilings
     schemas.py      # generates docs/spec/schemas/*.schema.json
   engine/           # the engine adapter: the only code that imports Pydantic AI, mcp or a2a-sdk (D1)
-    run.py          # run_cue: one cue on the actor's models, in order, with fallback and cost (D27)
+    run.py          # run_cue: one cue on the actor's models, in order, with fallback, cost, and the cue's budget
+    director_agent.py # one director turn on its models, with its tools and fallback (D33)
+    pricing.py      # whether a model has a price, published or declared (D39)
     models.py       # a resolved model entry -> a Pydantic AI model
     fallback.py     # a failure -> one of D20's reasons
     text_tools.py   # the opt-in text tool format (D5)
@@ -50,7 +66,7 @@ src/zanni/
     a2a_server.py   # the director's card, a task per seat, the token on every call (D21, D31)
     a2a_client.py   # the actor's side: fetch the card, join, follow the task (stream, then polling)
     stage_mcp.py    # the stage's MCP server (Streamable HTTP, a token per seat), and RemoteStage
-    serve.py        # serves a Director: A2A and the stage's MCP server on one address, plus the heartbeat watch
+    serve.py        # serves a Director: A2A, the stage's MCP server and the owner's endpoint, plus the heartbeat watch
 examples/           # one valid file of each kind
 tests/              # unit tests, CLI tests
 tests/conformance/  # data-driven tests that any implementation can run
@@ -85,7 +101,8 @@ Each step raises `FileErrors` with every problem it found. `cli.main` catches it
 - **Strict models.** Every model inherits from `Strict` (`extra="forbid"`, frozen). For unknown keys, `validation._known_fields` walks the model tree to find the allowed names, and `difflib` suggests the closest.
 - **Secrets have one home.** `find_secrets` rejects secret-looking keys anywhere, except in the sections a model lists in `SECRET_SECTIONS` (only `ActorConfiguration.credentials`). Inputs under those sections are replaced by `a value (hidden)` in every message (D15).
 - **Standards are checked, not tightened.** `SkillFrontmatter` and `McpConfig` ignore fields they don't define, because SKILL.md and `mcp.json` are shared with other tools (D19).
-- **The director decides, the engine carries.** The engine's A2A server never decides who is cast or what a seat does next: it calls the `Casting` interface (`director/contract.py`), which `director/casting.py` implements. Milestone 4 adds a script to drive it, not a new server.
+- **The director decides, the engine carries.** The engine's A2A server never decides who is cast or what a seat does next: it calls the `Casting` interface (`director/contract.py`), which `director/casting.py` implements. A play's director drives that same casting side through `Production`.
+- **The model chooses, code allows.** The director's model picks its next action, but each tool (`director/play.py`) calls the plain rules in `director/rules.py` first, and answers a refusal in plain words instead of acting. The engine (`engine/director_agent.py`) only runs the model loop with those tools (D33).
 - **One stage tool set.** The actor's `stage_*` tools are the same code for a local `FolderStage` and a `RemoteStage` over MCP, and the remote stage turns tool errors back into the same `StageError`. So a model sees the same tools and errors either way.
 - **Shorthand is normalised before validation.** A cast entry can be a plain package reference. A `BeforeValidator` turns it into `{role: …}`, so there is one model and error paths stay clean.
 
@@ -111,6 +128,30 @@ zanni actor.yaml                                   zanni smoke.yaml --serve     
 
 - **Two logs:** the director keeps the play's log (`log.jsonl`); the actor keeps its own, on its own machine (D32).
 - **Contact:** the director's heartbeat watch ends a seat that has had no contact for `misses × interval`, with an open stream counting as contact (D31), and revokes its tokens.
+
+## A play
+
+```
+zanni play.yaml   (or zanni director.yaml)
+  └─ director.command.run_play
+       ├─ the director's configuration (--director, or director.yaml beside the play)        (D34)
+       ├─ director.packages: script and roles, fetched or local, checked against play.lock   (D37)
+       ├─ the play against its script; the stage and stage.expects; the director's models,
+       │  priced under a budget; its join and owner tokens        ── any problem: exit 2, nothing started
+       ├─ engine.serve.serving: A2A + the stage's MCP server + /zanni/owner; log/director.json
+       ├─ director.local: start each part's minimum of local seats ──▶ zanni <config> --play <url>
+       ├─ wait for every part's minimum seats (local, or joining)
+       ├─ Production.direct: turns until the play stops
+       │    each turn: engine.director_agent.run_director_turn(the state summary, the tools)
+       │      cue / wait_for_reports / run_verifier / ask_gate / cast / release / end_round / stop
+       │      └─ each tool: director.rules first, then director.casting, the stage, the gates
+       │    every model failed: pause until `zanni gate … resume`                             (D33)
+       └─ Production.finish: release every seat, stop the local seats; run-stopped; exit 0 or 1
+```
+
+- **A cue's life:** `cue` reserves its budget and sends it through the casting side; a follower waits for the report, charges its cost, and takes its changes from the stage's record (D41). A seat lost mid-cue is recast, and the cue resent (D36).
+- **The director's own spend:** `run_director_turn` tells `Production.director_spending` the turn's spend after each model response, before its tool calls run; it counts in the play's spend at once, and the turn ends when the budget is reached (D39).
+- **Gates:** `ask_gate` waits on `director.gates`, which only the owner's endpoint or the console resolves; actors have no way to it (D38).
 
 ## Dependencies
 

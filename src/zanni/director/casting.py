@@ -1,7 +1,7 @@
 """The director's casting side (D29): joins, seats and their tokens, cues and reports, heartbeats and release.
 
 Plain Zanni code, no engine imports: the engine's A2A server calls the `Casting` methods below, and whatever
-drives the play (a rehearsal now, a script in milestone 4) calls `wait_for_seat`, `cue` and `release`.
+drives the play (a rehearsal, or a play's production in play.py) calls `wait_for_seat`, `cue` and `release`.
 Every limit here is enforced by the director (golden rule 5): a seat whose token is revoked can do nothing.
 """
 
@@ -209,7 +209,7 @@ class Director:
             return None
         return seat.stage
 
-    # --- Driving the play: called by the rehearsal (and, in milestone 4, the script)
+    # --- Driving the play: called by a rehearsal, or by a play's production (play.py)
 
     async def wait_for_seat(self, part: str) -> Seat:
         while True:

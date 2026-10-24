@@ -245,13 +245,13 @@ nodirector.yaml: couldn't join: couldn't fetch the director's card from http://1
 
 Nothing answered at the configuration's `play` address. Check that the director is running, and that its address and port are right. From the actor's machine, `curl http://<director's address>:<port>/.well-known/agent-card.json` should print the card. If it doesn't, the director may be listening on `127.0.0.1` only (serve with `--listen 0.0.0.0:<port>`), or a firewall on its machine may be blocking the port.
 
-### "ZANNI_JOIN_TOKEN isn't in the actor configuration's `credentials`"
+### "ZANNI_JOIN_TOKEN isn't in the actor configuration's `credentials` or the environment"
 
 ```
-notoken.yaml: ZANNI_JOIN_TOKEN isn't in the actor configuration's `credentials`; add it, e.g. ZANNI_JOIN_TOKEN: ${ZANNI_JOIN_TOKEN}, with the play's join token in the environment; nothing was started.
+notoken.yaml: ZANNI_JOIN_TOKEN isn't in the actor configuration's `credentials` or the environment; add it, e.g. ZANNI_JOIN_TOKEN: ${ZANNI_JOIN_TOKEN}, with the play's join token in the environment; nothing was started.
 ```
 
-An actor joining a director needs the play's join token. Add it to `credentials`, as a `${ZANNI_JOIN_TOKEN}` reference or a stored value. When the reference is there but the environment doesn't set it, the message is `${ZANNI_JOIN_TOKEN} has no value` instead.
+An actor joining a director needs the play's join token: in `credentials`, as a `${ZANNI_JOIN_TOKEN}` reference or a stored value, or else in its environment (D36). When the reference is there but the environment doesn't set it, the message is `${ZANNI_JOIN_TOKEN} has no value` instead.
 
 ### "ZANNI_JOIN_TOKEN isn't set", when serving
 
@@ -268,6 +268,94 @@ scheme.yaml, line 3, play: "ws://127.0.0.1:9" is not an address zanni can join; 
 ```
 
 A director's address is an `http://` or `https://` URL (D30).
+
+## Running a play
+
+### "no director configuration"
+
+```
+plays/slug-kata/play.yaml: no director configuration: there is no --director, and no plays/slug-kata/director.yaml. Write one beside the play (role: zanni:director, play: ./play.yaml, its models and credentials); see examples/plays/slug-kata/director.yaml; nothing was started.
+```
+
+A play's director needs its own models and credentials, and a play never chooses models. Write `director.yaml` beside the play, or name one with `--director` (D34). Nothing else is looked for, because its tokens belong to this play.
+
+### "ZANNI_JOIN_TOKEN isn't in the director configuration's `credentials` (or has no value)"
+
+```
+plays/slug-kata/play.yaml: ZANNI_JOIN_TOKEN isn't in the director configuration's `credentials` (or has no value); add ZANNI_JOIN_TOKEN: ${ZANNI_JOIN_TOKEN}, and set it in the environment (D34); nothing was started.
+```
+
+The director needs the play's join token (actors present it) and its owner token (`zanni gate` presents it). The example's `director.yaml` has both as `${VAR}` references: set them in the environment, for example with `export ZANNI_JOIN_TOKEN=$(python3 -c "import secrets; print(secrets.token_urlsafe(24))")`, and the same for `ZANNI_OWNER_TOKEN`.
+
+### "Skipping the director's …"
+
+```
+Skipping the director's ollama qwen3.8:27b: ${OLLAMA_BASE_URL} has no value: add OLLAMA_BASE_URL to the actor configuration's `credentials`, or set it in the environment
+```
+
+Not an error: one of the director's models can't be used on this machine, so the director runs on the others. It starts only if at least one is left.
+
+### "the director's models aren't all priced"
+
+The play has a budget, and one of the director's models has no price, so its own cost would be unknown (D39). Add `price:` to that model's entry; for a local model, `price: { input: 0, output: 0 }`.
+
+### "someone moved the tag"
+
+```
+plays/my-play/play.yaml: example.test/someone/kata@1.0.0: its tag v1.0.0 now points to 20d32853543dc5afeb369568795f1b5ee1e7dcf1, and play.lock pins edcdaaea19a9510c02e8cee40312ce619599a222; someone moved the tag. Check with the package's author, then run --update to accept the new commit; nothing was started.
+```
+
+`play.lock` pins each remote package to the commit its tag pointed to when the lock was written, so a play runs the same code every time (D37). A tag that now points elsewhere is refused. Ask the package's author why it moved. If you accept the new code, run `zanni play.yaml --update`, which rewrites `play.lock`, prints what changed (verifier commands included), and runs nothing.
+
+### "Refused: unpriced"
+
+```
+Joining the play 'slug-kata' (script ../../scripts/slug-kata) at http://127.0.0.1:…
+Refused: unpriced: this play has a budget, and the actor's models aren't all priced, so its cost would be unknown; add `price:` to each model entry in its configuration (D7)
+```
+
+Printed by an actor, which exits with code 2. Under a budget, every model an actor may use needs a price: a published one, or `price:` in its configuration; for a local model, `price: { input: 0, output: 0 }` (D39). A local seat refused this way is restarted twice, then its part waits for an actor to join, so fix the configuration and run the play again.
+
+### "stopped at its budget", and reports with `over-budget`
+
+```
+  cue r1-c1: specify
+    stopped at its budget on ollama qwen3.8:27b: 4 tool calls, 1238 in / 152 out tokens, cost $0.1390
+```
+
+Not an error: the actor reached its cue's budget and ended the cue there, reporting `over-budget` (D39). The director gives each cue a share of what is left of the play's budget. The actor checks after each model response, so one response can overshoot the cue's budget, by a lot when the budget is small. If cues keep stopping, the play's budget is too small for its models: raise `house_rules.budget`, or use cheaper models. When nothing is left to reserve, the play stops with reason `budget` (exit code 1).
+
+### "no director is running for …", from `zanni gate`
+
+```
+no director is running for plays/slug-kata/play.yaml: there is no plays/slug-kata/log/director.json, and the play names no `director`; start it with zanni play.yaml, or give the director's URL
+```
+
+`zanni gate` finds a running director through `log/director.json` beside the play, which the director writes while it runs. Run it on the director's machine with the play file, or anywhere with the director's URL.
+
+### "ZANNI_OWNER_TOKEN isn't set", from `zanni gate`
+
+```
+ZANNI_OWNER_TOKEN isn't set; set it to the play's owner token (the director's configuration has the same one). It never goes on the command line.
+```
+
+Set the owner token in the environment where you run `zanni gate`: the same value as the director's `ZANNI_OWNER_TOKEN`. A join token, or an actor's seat token, gets `not-authorised` instead (D38).
+
+### "not-authorised", from `zanni gate`
+
+```
+not-authorised: this needs the play's owner token (ZANNI_OWNER_TOKEN), not a join or seat token
+```
+
+The `ZANNI_OWNER_TOKEN` in your environment isn't the one in the director's configuration. Set the same value in both (D38). Exit code 2.
+
+### "Nothing decided", from `zanni gate`
+
+```
+Nothing decided: the play is at a gate, not paused; use approve or reject
+```
+
+`resume` is for a paused play, and `approve` or `reject` for a play waiting at a gate. `zanni gate <play>` with no decision shows which it is. Exit code 1.
 
 ## Role folders
 

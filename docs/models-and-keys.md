@@ -1,6 +1,6 @@
 # Models and keys
 
-> **Status:** an actor runs its models today, in a [rehearsal](spec/rehearsal.md) or in a seat it joined over A2A. Recorded runs are in [docs/runs/milestone-2.md](runs/milestone-2.md) and [docs/runs/milestone-3.md](runs/milestone-3.md).
+> **Status:** an actor runs its models in a [rehearsal](spec/rehearsal.md) or in a seat it joined over A2A, and a play's director runs its own. Recorded runs are in [docs/runs/](runs/): [milestone 2](runs/milestone-2.md), [milestone 3](runs/milestone-3.md) and [milestone 4](runs/milestone-4.md).
 
 ## Each actor brings its own models and keys
 
@@ -32,12 +32,34 @@ credentials:
 
 Every field is in the [actor configuration spec](spec/actor-configuration.md).
 
+## The director's models and keys
+
+The director is an actor too, and Zanni never picks its model: the director runs on the models its own configuration lists, `director.yaml` beside the play (D34). Use any model with tool calling, local or cloud, in order with fallback. When every one of them fails, the play pauses until its owner resumes it with `zanni gate <play> resume` (D33).
+
+```yaml
+models:
+  - provider: anthropic
+    model: claude-haiku-5-5            # stands for a cloud model with tool calling
+  - provider: ollama
+    model: qwen3.8:27b                 # stands for a local model with tool calling
+    base_url: ${OLLAMA_BASE_URL}
+    price: { input: 0, output: 0 }
+credentials:
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+  ZANNI_JOIN_TOKEN: ${ZANNI_JOIN_TOKEN}
+  ZANNI_OWNER_TOKEN: ${ZANNI_OWNER_TOKEN}
+```
+
+- **Its keys stay its own:** the director never holds an actor's keys. Local seats resolve their own credentials, from their own configurations (D36).
+- **The owner token:** `ZANNI_OWNER_TOKEN`, one per play, decides gates. The owner sets the same value in the environment where they run `zanni gate`; it is never a flag, and never logged (D38).
+
 ## The join token
 
 An actor joins a director with the play's join token (D24):
 
 - **On the actor's side:** it goes in the actor configuration's `credentials`, as `ZANNI_JOIN_TOKEN`, either stored or as `${ZANNI_JOIN_TOKEN}` from the environment.
-- **On the director's side:** `zanni <rehearsal> --serve` reads it from `ZANNI_JOIN_TOKEN` in its environment.
+- **On the director's side:** a play's director takes it from its configuration's `credentials` (D34); `zanni <rehearsal> --serve` reads it from `ZANNI_JOIN_TOKEN` in its environment.
+- **Local seats:** the director gives it to the seats it starts, in their environment; an actor reads `ZANNI_JOIN_TOKEN` from its `credentials`, or else from its environment (D36).
 - **Who sees it:** it travels only in the `Authorization` header of the join. After that, the actor uses the seat's own tokens, which the director gives it and revokes at release. No token is ever logged.
 - **On untrusted networks:** `--serve` speaks plain HTTP, so put it behind a TLS proxy (`TODO.md`).
 - **A rehearsal run from an actor configuration needs no join token:** its director runs in the same process, and makes one up for the run.
@@ -66,3 +88,6 @@ No role, script or play depends on a particular model or vendor:
 - **Priced models:** a seat's cost comes from published prices, for the cloud models those prices cover.
 - **Local models:** the actor's configuration can declare a price, which can be 0 for its own hardware.
 - **Unknown cost is never counted as zero.** The director treats a seat with an unknown cost as unsafe for the play's budget (D7).
+- **Under a budget, every model needs a price** (D39): an actor whose models aren't all priced is refused when it joins (`unpriced`), and a director whose models aren't all priced doesn't start. Add `price:` to a local model's entry, even `{ input: 0, output: 0 }`.
+- **A cue's budget:** each cue carries a budget, and the actor stops its work when the cue's spend reaches it, reporting `over-budget`.
+- **What a budget can't do:** costs are what actors report. The real cap on a key is its owner's, such as a provider's spending limit.

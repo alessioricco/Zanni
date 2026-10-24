@@ -42,11 +42,12 @@ Two actors on the same machine can play different roles with different models an
 
 ## How a play runs
 
-1. **Start the director.** You start the director with the play file: `zanni play.yaml`. It fetches the script. Seats marked `host: local` are started by the director itself, so one command can run a whole play on one machine.
+1. **Start the director.** You start the director with the play file: `zanni play.yaml`. The director is an actor too: its own models and credentials are in its configuration, `director.yaml` beside the play (role `zanni:director`). It fetches the script and roles, and pins them in `play.lock`. Seats marked `host: local` are started by the director itself, from actor configurations its configuration lists, so one command can run a whole play on one machine.
 2. **Actors join.** Each actor starts from its configuration: `zanni tester.yaml`. Only the director listens: the actor connects to it, presents a card built from its role, and shows the play's join token. Actors never open a port, so they can run behind a firewall.
 3. **Casting.** The director checks the role against the part it is cast for (the right role, the pinned version, needs within the part's limits) and assigns a seat. It sends the actor the seat's permissions, where the stage is, and credentials scoped to that seat.
-4. **Cues and reports.** The director follows the script and gives cues, one at a time. Each actor works on the stage and reports back. Actors never read the whole script, only their cue. The actor stays in touch with the director, and that contact is its heartbeat.
-5. **Release.** The director ends each seat and revokes the credentials it gave. If an actor stops answering, the director recasts its seat; the work survives on the stage.
+4. **Cues and reports.** The director follows the script and gives cues. It is an agent, but it acts only through tools that check the rules in code first: it can't skip a gate, spend past the budget by more than one model call, or call the play done while a verifier disagrees (D33, D39). Each actor works on the stage and reports back. Actors never read the whole script, only their cue. The actor stays in touch with the director, and that contact is its heartbeat.
+5. **Gates.** At a gate, the play waits for its owner, who decides from any machine with `zanni gate`, using the play's owner token (D38).
+6. **Release.** The director ends each seat and revokes the credentials it gave. If an actor stops answering, the director recasts its seat; the work survives on the stage.
 
 Under the hood, all of this is plain A2A: a seat is one A2A task on the director, from join to release. Zanni adds only the casting extension (see the [spec](spec/casting-extension.md)).
 
@@ -70,6 +71,7 @@ Actors may run on machines the play's owner doesn't control, so no limit depends
 - **House rules:** the house rules are set when the director starts. No role, script or actor can loosen them.
 - **Actor text:** what an actor writes is data, never instructions, because it may carry text injected from a web page or a repo.
 - **Irreversible actions:** an irreversible action, such as a payment or a public post, always needs a human's approval for that action.
+- **What the budget can and can't enforce:** the director refuses actors whose models have no price, gives each cue its own budget, and stops the play when the budget is spent; each actor stops its cue at that cue's budget (D39). But costs are what actors report: a modified actor could under-report. The real cap on a model key is its owner's, such as a provider's spending limit.
 
 ## Work is done when a verifier says so
 
