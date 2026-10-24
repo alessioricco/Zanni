@@ -24,10 +24,16 @@ from zanni.files.schemas import ActorConfiguration, PlayFile
 from zanni.files.validation import validate
 
 JOIN_TOKEN = "ZANNI_JOIN_TOKEN"
+VERIFIER_TOKEN = "ZANNI_VERIFIER_TOKEN"  # a verifier seat presents it in place of the join token (D45)
 
 
 def ready_actor(base: Path, actor: ActorConfiguration, say: Callable[[str], None]) -> tuple[Role, list[ResolvedModel]]:
-    """The actor's role and usable models, every model built and checked before anything starts (D27)."""
+    """The actor's role and usable models, every model built and checked before anything starts (D27). A verifier
+    seat has Zanni's built-in role, and no model (D45)."""
+    if actor.is_verifier:
+        from zanni.actor.verifier import ROLE_FOLDER
+
+        return load_role(ROLE_FOLDER), []
     role = load_role(resolve_role_folder(actor.role, base))
     models, skipped = resolve_usable_models(actor)
     for label, reason in skipped:
@@ -71,10 +77,12 @@ def join_play(config_path: Path, actor: ActorConfiguration, *, say: Callable[[st
     base = config_path.parent
     url = director_url(base, actor.play)
     role, models = ready_actor(base, actor, say)
-    if JOIN_TOKEN not in actor.credentials and JOIN_TOKEN not in os.environ:
-        raise Unresolved(f"{JOIN_TOKEN} isn't in the actor configuration's `credentials` or the environment; add "
-                         f"it, e.g. {JOIN_TOKEN}: ${{{JOIN_TOKEN}}}, with the play's join token in the environment")
-    token = expand(f"${{{JOIN_TOKEN}}}", actor.credentials)  # credentials first, then the environment (D36)
+    name = VERIFIER_TOKEN if actor.is_verifier else JOIN_TOKEN
+    if name not in actor.credentials and name not in os.environ:
+        raise Unresolved(f"{name} isn't in the actor configuration's `credentials` or the environment; add "
+                         f"it, e.g. {name}: ${{{name}}}, with the play's {'verifier' if actor.is_verifier else 'join'} "
+                         "token in the environment")
+    token = expand(f"${{{name}}}", actor.credentials)  # credentials first, then the environment (D36)
     run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     state = state_dir(actor, role)
 

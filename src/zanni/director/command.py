@@ -10,12 +10,13 @@ import asyncio
 import contextlib
 import json
 import os
+import secrets
 import sys
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
-from zanni.director.casting import Director, PartSlot
+from zanni.director.casting import VERIFIER_PART, Director, PartSlot
 from zanni.director.gates import Gates
 from zanni.director.local import LocalSeats
 from zanni.director.owner import Owner
@@ -33,7 +34,7 @@ from zanni.files.validation import validate
 from zanni.log import Log
 
 DIRECTOR_FILE = "director.yaml"
-JOIN_TOKEN, OWNER_TOKEN = "ZANNI_JOIN_TOKEN", "ZANNI_OWNER_TOKEN"
+JOIN_TOKEN, OWNER_TOKEN, VERIFIER_TOKEN = "ZANNI_JOIN_TOKEN", "ZANNI_OWNER_TOKEN", "ZANNI_VERIFIER_TOKEN"
 
 
 class CannotStart(Exception):
@@ -97,14 +98,22 @@ def part_slots(play: PlayFile, play_folder: Path, script: Script, packages) -> l
 
 
 def local_seats(director: ActorConfiguration, base: Path) -> dict[str, list[tuple[Path, str]]]:
-    """Each listed file and its `name`: the only fields the director reads from them (D36)."""
+    """Each listed file and its `name`: the only fields the director reads from them (D36). Local verifier seats
+    are under the part `zanni:verifier` (D45)."""
     out = {}
-    for part, files in director.seats.items():
+    lists = {**director.seats, **({VERIFIER_PART: director.verifier_seats.local} if director.verifier_seats.local else {})}
+    for part, files in lists.items():
         out[part] = []
         for file in files:
             path = (base / file).resolve()
             out[part].append((path, str(load_file(path).data.get("name") or path.stem)))
     return out
+
+
+def trusted_verifiers(director: ActorConfiguration, base: Path) -> list[str]:
+    """The names of the verifier seats the director's configuration lists: local ones by their files' names (D45)."""
+    local = [name for _, name in local_seats(director, base).get(VERIFIER_PART, [])]
+    return [*local, *director.verifier_seats.remote]
 
 
 def run_play(play_path: Path, *, director_path: Path | None = None, update: bool = False, listen: str | None = None,
@@ -153,6 +162,13 @@ def run_play(play_path: Path, *, director_path: Path | None = None, update: bool
             if not value:
                 raise CannotStart(f"{name} isn't in the director configuration's `credentials` (or has no value); add "
                                   f"{name}: ${{{name}}}, and set it in the environment (D34)")
+        verifier_token = credential(director, VERIFIER_TOKEN)
+        if director.verifier_seats.remote and not verifier_token:
+            raise CannotStart(f"the director's configuration lists remote verifier seats, and {VERIFIER_TOKEN} isn't "
+                              f"in its `credentials` (or has no value); add {VERIFIER_TOKEN}: ${{{VERIFIER_TOKEN}}}, "
+                              "and give those seats the same value (D45)")
+        if director.verifier_seats.local and not verifier_token:
+            verifier_token = secrets.token_urlsafe(32)  # for local verifier seats only: made for this run
         host, port = parse_listen(listen)
     except FileErrors as e:
         print(f"{play_path} can't start; nothing was started.", file=sys.stderr)
@@ -175,7 +191,7 @@ def run_play(play_path: Path, *, director_path: Path | None = None, update: bool
         say(line)
     try:
         return asyncio.run(_run(play_path, play, script, prose, director, director_file, packages, stage_root, models,
-                                join_token, owner_token, host, port, say, build or build_model,
+                                join_token, owner_token, verifier_token, host, port, say, build or build_model,
                                 sys.stdin.isatty() if interactive is None else interactive))
     except KeyboardInterrupt:
         print("Stopped before the play finished; every seat was released and every local seat stopped.",
@@ -184,7 +200,7 @@ def run_play(play_path: Path, *, director_path: Path | None = None, update: bool
 
 
 async def _run(play_path, play, script, prose, director, director_file, packages, stage_root, models, join_token,
-               owner_token, host, port, say, build, interactive) -> int:
+               owner_token, verifier_token, host, port, say, build, interactive) -> int:
     from zanni import __version__
     from zanni.director.console import console, stdin_lines
     from zanni.director.contract import DirectorInfo
@@ -198,14 +214,15 @@ async def _run(play_path, play, script, prose, director, director_file, packages
     casting = Director(join_token=join_token, parts=part_slots(play, folder, script, packages),
                        stage=folder_stage(stage_root), log=log, say=say,
                        max_per_host=play.house_rules.max_seats_per_host,
-                       require_pricing=play.house_rules.budget is not None)
+                       require_pricing=play.house_rules.budget is not None, verifier_token=verifier_token,
+                       verifier_seats=frozenset(trusted_verifiers(director, director_file.parent)))
     gates = Gates(state, log, play.house_rules.gate_timeout, say=say)
     production = Production(state=state, casting=casting, stage=casting.stage, log=log,
                             verifiers=verifier_commands(play, script), gates=gates, say=say)
-    if director.seats:
+    if director.seats or director.verifier_seats.local:
         production.local = LocalSeats(local_seats(director, director_file.parent), join_token=join_token, log=log,
                                       out_dir=folder / "log" / f"{run_id}-seats", say=say,
-                                      on_exit=production.local_seat_exited)
+                                      on_exit=production.local_seat_exited, verifier_token=verifier_token)
     info = DirectorInfo(name=f"zanni director {play.name}", description=script.mission, version=__version__,
                         play=play.name, script=play.script)
     text = instructions(script, prose, play)
@@ -234,6 +251,7 @@ async def _run(play_path, play, script, prose, director, director_file, packages
                 production.local.url = server.url
                 for part in play.cast:
                     await production.local.start(part, min(production.local.listed(part), state.seats_for(part).min))
+                await production.local.start(VERIFIER_PART, production.local.listed(VERIFIER_PART))
             await _wait_for_minimums(production, say)
             reason, completed = await production.direct(turn)
             await production.finish()

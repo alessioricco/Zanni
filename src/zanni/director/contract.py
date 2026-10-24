@@ -8,17 +8,17 @@ from dataclasses import dataclass
 from typing import Literal, Protocol
 
 from zanni.actor.contract import Stage
-from zanni.protocol.messages import Cast, Cue, Join, Refused, Release, Released, Report
+from zanni.protocol.messages import Cast, Cue, Join, Refused, Release, Released, Report, Verdict, Verify
 
 TaskState = Literal["working", "input-required", "completed", "canceled", "rejected"]
 
 
 @dataclass(frozen=True)
 class Outgoing:
-    """The seat's next task status: a cue or a release (input-required), or the end of the task."""
+    """The seat's next task status: a cue, a verify or a release (input-required), or the end of the task."""
 
     state: TaskState
-    message: Cue | Release | None = None
+    message: Cue | Verify | Release | None = None
 
 
 @dataclass(frozen=True)
@@ -51,6 +51,9 @@ class Casting(Protocol):
     async def report(self, task_id: str, report: Report) -> None: ...
 
     async def released(self, task_id: str, released: Released) -> None: ...
+
+    async def verdict(self, task_id: str, verdict: Verdict) -> None:
+        """A verifier seat's answer to a zanni.verify (D45)."""
 
     def ending(self, task_id: str) -> Outgoing:
         """The final status of a task the director is ending itself, such as a seat with no heartbeat."""

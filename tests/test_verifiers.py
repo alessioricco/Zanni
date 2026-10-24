@@ -11,7 +11,7 @@ import pytest
 
 from tests.director_harness import kata, production
 from zanni.director.play import Pending
-from zanni.director.verifiers import run_command
+from zanni.commands import run_command
 from zanni.files.check import verifier_commands
 from zanni.files.schemas import PlayVerifier
 from zanni.protocol.messages import Cue

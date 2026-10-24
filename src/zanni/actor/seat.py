@@ -24,7 +24,7 @@ from zanni.files.schemas import ActorConfiguration
 from zanni.log import Log
 from zanni.protocol.card import EXTENSION_URI, ActorCardParams, DirectorCardParams
 from zanni.protocol.encoding import money
-from zanni.protocol.messages import Cast, Cue, Refused, Release, Released, Report
+from zanni.protocol.messages import Cast, Cue, Refused, Release, Released, Report, Verify
 
 
 class CannotJoin(Exception):
@@ -162,6 +162,11 @@ async def _play(client, task_id, cast, stage, role, models, servers, log, say, r
                 report = await _answer(message, stage, role, models, servers, cast.seat, log, say, runner)
                 reports.append(report)
                 await client.send(task_id, cast.seat_token, report)
+            elif isinstance(message, Verify) and status.state == "input-required" and message.verify not in answered:
+                from zanni.actor.verifier import run_verify
+
+                answered.add(message.verify)
+                await client.send(task_id, cast.seat_token, await run_verify(message, stage, cast.seat, log, say))
             elif isinstance(message, Release):
                 reason = message.reason
                 if status.state == "input-required":  # asked to stop: discard, then confirm

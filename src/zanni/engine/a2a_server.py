@@ -25,7 +25,7 @@ from starlette.routing import BaseRoute
 from zanni.director.contract import Casting, DirectorInfo, Outgoing
 from zanni.engine.a2a_wire import STATES, BadMessage, from_a2a, join_problem, to_a2a
 from zanni.protocol.card import EXTENSION_URI, DirectorCardParams
-from zanni.protocol.messages import Join, Refused, Released, Report
+from zanni.protocol.messages import Join, Refused, Released, Report, Verdict
 
 logging.getLogger("a2a").setLevel(logging.WARNING)
 
@@ -98,13 +98,16 @@ class SeatExecutor(AgentExecutor):
             if state == "rejected":
                 return
         else:
-            message = from_a2a(context.message, "zanni.report", "zanni.released")
+            message = from_a2a(context.message, "zanni.report", "zanni.released", "zanni.verdict")
             if isinstance(message, Released):
                 await self.casting.released(task_id, message)
                 await publish(event_queue, task_id, context_id, Outgoing("completed"))
                 return
-            assert isinstance(message, Report)
-            await self.casting.report(task_id, message)
+            if isinstance(message, Verdict):
+                await self.casting.verdict(task_id, message)
+            else:
+                assert isinstance(message, Report)
+                await self.casting.report(task_id, message)
             await publish(event_queue, task_id, context_id, Outgoing("working"))
         out = await self.casting.next_for(task_id)
         await publish(event_queue, task_id, context_id, out)
@@ -134,7 +137,7 @@ class SeatHandler(DefaultRequestHandler):
 
     def _message(self, params) -> None:
         if params.message.task_id:
-            kinds = ("zanni.report", "zanni.released")
+            kinds = ("zanni.report", "zanni.released", "zanni.verdict")
         else:
             kinds = ("zanni.join",)
             if params.message.context_id:

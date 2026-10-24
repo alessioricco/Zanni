@@ -17,10 +17,13 @@ from zanni.director.contract import Outgoing
 from zanni.log import Log
 from zanni.protocol.card import EXTENSION_URI, ActorCardParams
 from zanni.protocol.encoding import Timestamp
-from zanni.protocol.messages import Cast, Cue, Join, Refused, Release, Released, Report
+from zanni.protocol.messages import Cast, Cue, Join, Refused, Release, Released, Report, Verdict, Verify
 
 # What decides whether an actor's card fits a part: None, or a (reason, message) refusal (protocol/fit.py).
 Fit = Callable[[ActorCardParams], tuple[str, str] | None]
+
+
+VERIFIER_PART = "zanni:verifier"  # the part every verifier seat holds; no script part can be named so (D45)
 
 
 @dataclass
@@ -54,7 +57,7 @@ class Seat:
     cue_marker: int = 0  # the stage's record length when the pending cue was sent (D41)
     streams: int = 0
     outbox: asyncio.Queue = field(default_factory=asyncio.Queue)
-    pending: tuple[Cue, asyncio.Future] | None = None
+    pending: tuple[Cue | Verify, asyncio.Future] | None = None
     deadline: datetime | None = None
     released: asyncio.Event = field(default_factory=asyncio.Event)
     ended: Outgoing | None = None  # set once the director ends the task itself
@@ -64,6 +67,10 @@ class Seat:
     @property
     def active(self) -> bool:
         return not self.revoked
+
+    @property
+    def verifier(self) -> bool:
+        return self.part == VERIFIER_PART
 
 
 def stamp(when: datetime) -> Timestamp:
@@ -82,8 +89,11 @@ class Director:
                  heartbeat_interval: int = 30, heartbeat_misses: int = 3, token_ttl: timedelta = timedelta(hours=24),
                  clock: Callable[[], float] = time.monotonic, utcnow: Callable[[], datetime] = lambda: datetime.now(UTC),
                  say: Callable[[str], None] = lambda _: None, max_per_host: int | None = None,
-                 require_pricing: bool = False):
+                 require_pricing: bool = False, verifier_token: str | None = None,
+                 verifier_seats: frozenset[str] = frozenset()):
         self.join_token = join_token
+        self.verifier_token = verifier_token  # verifier seats present it instead of the join token (D45)
+        self.verifier_seats = verifier_seats  # the names the director's configuration trusts as verifier seats
         self.parts = {p.name: p for p in parts}
         self.stage, self.log = stage, log
         self.interval, self.misses = heartbeat_interval, heartbeat_misses
@@ -102,13 +112,16 @@ class Director:
         return Refused(kind="zanni.refused", reason=reason, message=message)
 
     async def join(self, token, task_id, join, problem, reached_at, peer=None):
-        if not token or not secrets.compare_digest(token, self.join_token):
+        as_verifier = bool(token and self.verifier_token and secrets.compare_digest(token, self.verifier_token))
+        if not as_verifier and (not token or not secrets.compare_digest(token, self.join_token)):
             return self._refuse("not-authorised", "the join token is missing, or isn't this play's")
         if problem:
             reason, _, message = problem.partition(": ")
             return self._refuse(reason, message)
         params = card_params(join)
         who = dict(actor=params.actor or join.card.get("name"), role=params.role.ref)
+        if as_verifier or params.role.ref == VERIFIER_PART:
+            return self._join_verifier(as_verifier, task_id, params, join, reached_at, peer, who)
         if self.require_pricing and join.pricing != "known":
             return self._refuse("unpriced", "this play has a budget, and the actor's models aren't all priced, so "
                                             "its cost would be unknown; add `price:` to each model entry in its "
@@ -133,22 +146,45 @@ class Director:
                 return self._cast(slot, task_id, params, join, reached_at, peer)
         return self._refuse(*refusal, **who)
 
+    def _join_verifier(self, as_verifier: bool, task_id: str, params: ActorCardParams, join: Join, reached_at: str,
+                       peer: str | None, who: dict) -> Cast | Refused:
+        """A verifier seat: its own token, Zanni's verifier role, and a name the configuration lists (D45)."""
+        if not as_verifier:
+            return self._refuse("not-authorised", "a verifier seat joins with the play's verifier token "
+                                                  "(ZANNI_VERIFIER_TOKEN), never with the join token", **who)
+        if params.role.ref != VERIFIER_PART:
+            return self._refuse("not-authorised", f"the verifier token is for verifier seats, whose role is "
+                                                  f"{VERIFIER_PART}", **who)
+        if who["actor"] not in self.verifier_seats:
+            return self._refuse("not-authorised", f"{who['actor']!r} isn't one of the verifier seats the director's "
+                                                  "configuration lists (verifier_seats)", **who)
+        if any(s.active and s.verifier and s.actor == who["actor"] for s in self.seats.values()):
+            return self._refuse("part-full", f"the verifier seat {who['actor']} is already cast", **who)
+        slot = PartSlot(VERIFIER_PART, lambda _: None, 1)
+        return self._cast(slot, task_id, params, join, reached_at, peer, seat_id=f"verifier-{who['actor']}",
+                          permissions=(["/"], []))
+
     def _cast(self, slot: PartSlot, task_id: str, params: ActorCardParams, join: Join, reached_at: str,
-              peer: str | None = None) -> Cast:
+              peer: str | None = None, seat_id: str | None = None,
+              permissions: tuple[list[str], list[str]] | None = None) -> Cast:
         number = sum(1 for s in self.seats.values() if s.part == slot.name) + 1
-        seat_id = f"{slot.name}-{number}"
+        seat_id = seat_id or f"{slot.name}-{number}"
         needs = params.role.needs
+        read, write = permissions or (needs.stage_read, needs.stage_write)
         seat = Seat(id=seat_id, part=slot.name, task_id=task_id, actor=params.actor or join.card.get("name"),
                     role=params.role.ref, seat_token=secrets.token_urlsafe(32), stage_token=secrets.token_urlsafe(32),
                     expires_at=self.utcnow() + self.token_ttl, last_contact=self.clock(), host=peer,
-                    stage=self.stage.seat(needs.stage_read, needs.stage_write, seat_id))
+                    stage=self.stage.seat(read, write, seat_id))
         self.seats[task_id] = seat
-        self.log.event("actor-joined", seat=seat_id, part=slot.name, role=seat.role, actor=seat.actor,
-                       models=[m.model_dump() for m in params.models])  # self-reported (D11)
+        if seat.verifier:
+            self.log.event("verifier-joined", seat=seat_id, actor=seat.actor)
+        else:
+            self.log.event("actor-joined", seat=seat_id, part=slot.name, role=seat.role, actor=seat.actor,
+                           models=[m.model_dump() for m in params.models])  # self-reported (D11)
         self.say(f"Cast {seat.actor or 'an actor'} ({params.role.name} {params.role.version}) as {seat_id}")
         self.cast_event.set()
         return Cast(kind="zanni.cast", seat=seat_id, part=slot.name,
-                    permissions={"read": needs.stage_read, "write": needs.stage_write},
+                    permissions={"read": read, "write": write},
                     stage={"mcp_url": f"{reached_at}/stage/mcp", "token": seat.stage_token},
                     seat_token=seat.seat_token, expires_at=stamp(seat.expires_at),
                     heartbeat={"interval": str(self.interval), "misses": str(self.misses)})
@@ -158,7 +194,7 @@ class Director:
 
     async def report(self, task_id: str, report: Report) -> None:
         seat = self.seats[task_id]
-        if seat.pending is None or seat.pending[0].cue != report.cue:
+        if seat.pending is None or not isinstance(seat.pending[0], Cue) or seat.pending[0].cue != report.cue:
             self.log.event("report-ignored", seat=seat.id, cue=report.cue, detail="no such cue is waiting")
             return
         cue, answer = seat.pending
@@ -174,6 +210,16 @@ class Director:
 
     async def released(self, task_id: str, released: Released) -> None:
         self.seats[task_id].released.set()
+
+    async def verdict(self, task_id: str, verdict: Verdict) -> None:
+        seat = self.seats[task_id]
+        pending = seat.pending
+        if pending is None or not isinstance(pending[0], Verify) or pending[0].verify != verdict.verify:
+            self.log.event("verdict-ignored", seat=seat.id, verify=verdict.verify, detail="no such verify is waiting")
+            return
+        seat.pending = None
+        if not pending[1].done():
+            pending[1].set_result(verdict)
 
     def ending(self, task_id: str) -> Outgoing:
         seat = self.seats.get(task_id)
@@ -231,6 +277,15 @@ class Director:
         self.log.event("cue", seat=seat.id, scene=cue.scene, cue=cue.cue,
                        budget=cue.limits.budget.amount if cue.limits.budget else None)
         await seat.outbox.put(Outgoing("input-required", cue))
+        return await answer
+
+    async def verify(self, seat: Seat, verify: Verify) -> Verdict:
+        """Ask a verifier seat to run one verifier's command; raises SeatLost if the seat ends first (D45)."""
+        if seat.revoked:
+            raise SeatLost(seat.id, seat.reason or "released")
+        answer = asyncio.get_running_loop().create_future()
+        seat.pending = (verify, answer)
+        await seat.outbox.put(Outgoing("input-required", verify))
         return await answer
 
     async def release(self, seat: Seat, reason: str = "done", message: str = "") -> bool:

@@ -6,10 +6,12 @@ logged as `tool-refused`; the model reads it and decides again.
 """
 
 import asyncio
+import tempfile
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import timedelta
 from decimal import Decimal, InvalidOperation
+from pathlib import Path
 
 from zanni.actor.contract import AllModelsFailed, StageError
 from zanni.stage import Stage
@@ -17,10 +19,10 @@ from zanni.director import rules
 from zanni.director.casting import Director, Seat, SeatLost, stamp
 from zanni.director.gates import Gates
 from zanni.director.state import PlayState, Report, Verdict
-from zanni.director.verifiers import run_command
+from zanni.commands import run_command
 from zanni.log import Log
 from zanni.protocol.encoding import money
-from zanni.protocol.messages import Cue
+from zanni.protocol.messages import Cue, Verify
 
 DEFAULT_DEADLINE = 60  # minutes: a cue nobody answers can't hold an unattended play forever
 RESENT = "\n\n(The seat that had this cue was lost. Continue from what is on the stage now.)"
@@ -63,6 +65,7 @@ class Production:
         self.local = local  # the local seats (src/zanni/director/local.py), when the configuration lists any
         self.pending: dict[str, Pending] = {}
         self.cues = 0
+        self.verifies = 0
         self.last_gate_marker = 0
         self.recast_wait = recast_wait  # seconds a lost seat's part waits for its next seat before giving up
         self._turn_charged = Decimal(0)  # the current turn's spend already charged, response by response (D39)
@@ -77,7 +80,12 @@ class Production:
         return "the play has stopped; end your turn" if self.state.stopped else None
 
     def active_seats(self, part: str | None = None) -> list[Seat]:
-        return [s for s in self.casting.seats.values() if s.active and (part is None or s.part == part)]
+        """The seats playing the script's parts; verifier seats aren't among them (D45)."""
+        return [s for s in self.casting.seats.values()
+                if s.active and not s.verifier and (part is None or s.part == part)]
+
+    def verifier_seat(self, name: str) -> Seat | None:
+        return next((s for s in self.casting.seats.values() if s.active and s.verifier and s.actor == name), None)
 
     def busy(self, seat: Seat) -> bool:
         return any(p.seat is seat for p in self.pending.values())
@@ -201,9 +209,13 @@ class Production:
 
     async def local_seat_exited(self, name: str) -> None:
         """A local seat's process exited on its own: end its seat at once rather than waiting for its heartbeat."""
-        seat = next((s for s in self.active_seats() if s.actor == name), None)
+        seat = next((s for s in self.casting.seats.values() if s.active and s.actor == name), None)
         if seat is None:  # it never joined: restart it, within its limit
             await self.local.restart(name, "it exited before joining")
+            return
+        if seat.verifier:  # a verifier seat has no part to recast: it is restarted, within its limit (D45)
+            await self.casting.lose(seat, "its process exited")
+            await self.local.restart(name, "its process exited")
             return
         if self.busy(seat):
             await self.casting.lose(seat, "its process exited")  # the pending cue's follower recasts and resends
@@ -217,7 +229,7 @@ class Production:
         for p in list(self.pending.values()):
             if p.task:
                 p.task.cancel()
-        seats = self.active_seats()
+        seats = [s for s in self.casting.seats.values() if s.active]  # verifier seats too
         if self.local is not None:
             for seat in seats:
                 self.local.released(seat.actor)
@@ -242,14 +254,43 @@ class Production:
             return stopped
         if refusal := rules.may_run_verifier(self.state, name, self.writing_cues()):
             return self._refuse("run_verifier", refusal)
-        command, timeout, source, _ = self.verifiers[name]
-        marker = self.marker()
-        passed, detail = await run_command(command, self.stage.backend.root, timeout)
-        self.state.verdicts[name] = Verdict(name, passed, detail, source, marker, self.state.round)
+        run = self.verifiers[name]
+        if run.runs_on:
+            passed, detail, marker = await self._verify_on_seat(name, run)
+            by = run.runs_on
+        else:  # on a snapshot, never the stage itself, so a verifier can't change it (D45)
+            with tempfile.TemporaryDirectory(prefix="zanni-verify-") as tmp:
+                marker = await self.stage.snapshot(Path(tmp))
+                passed, detail = await run_command(run.command, tmp, run.timeout)
+            by = "director"
+        self.state.verdicts[name] = Verdict(name, passed, detail, run.source, marker, self.state.round)
         self.log.event("verdict", scene=f"round {self.state.round}", verifier=name, kind="hard", passed=passed,
-                       detail=detail[-500:], source=source)
-        self.say(f"  verifier {name}: {'passed' if passed else 'FAILED'}")
+                       detail=detail[-500:], source=run.source, marker=marker, by=by)
+        self.say(f"  verifier {name}: {'passed' if passed else 'FAILED'}" + (f" (on {by})" if by != "director" else ""))
         return f"{name}: {'passed' if passed else 'failed'}\n{detail}"
+
+    async def _verify_on_seat(self, name: str, run) -> tuple[bool, str, int]:
+        """Send the command to the verifier seat the play names, and take its exit code as the verdict (D45)."""
+        seat = self.verifier_seat(run.runs_on)
+        loop = asyncio.get_running_loop()
+        until = loop.time() + self.state.play.house_rules.cast_timeout
+        while seat is None and loop.time() < until and not self.state.stopped:
+            await asyncio.sleep(0.2)
+            seat = self.verifier_seat(run.runs_on)
+        if seat is None:
+            return False, f"the verifier seat {run.runs_on} isn't connected, so {name} couldn't run", self.marker()
+        self.verifies += 1
+        verify = Verify(kind="zanni.verify", verify=f"v{self.verifies}", verifier=name, command=run.command,
+                        timeout=str(run.timeout), marker=str(self.marker()))
+        try:
+            verdict = await asyncio.wait_for(self.casting.verify(seat, verify), run.timeout + self.casting.interval + 30)
+        except TimeoutError:
+            seat.pending = None
+            return False, f"the verifier seat {run.runs_on} sent no verdict in time", self.marker()
+        except SeatLost as e:
+            return False, f"the verifier seat {run.runs_on} was lost ({e.reason}) before its verdict", self.marker()
+        marker = int(verdict.marker) if verdict.marker.isdigit() else self.marker()
+        return verdict.passed, verdict.output or f"exit code {verdict.exit_code}", marker
 
     async def ask_gate(self, name: str, summary: str) -> str:
         if stopped := self._stopped():

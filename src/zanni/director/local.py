@@ -13,6 +13,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from zanni.director.casting import VERIFIER_PART
 from zanni.log import Log
 
 RESTARTS = 2
@@ -32,9 +33,11 @@ class LocalSeat:
 
 class LocalSeats:
     def __init__(self, seats: dict[str, list[tuple[Path, str]]], *, join_token: str, log: Log, out_dir: Path,
-                 say: Callable[[str], None] = print, on_exit: Callable[[str], Awaitable[None]] | None = None):
+                 say: Callable[[str], None] = print, on_exit: Callable[[str], Awaitable[None]] | None = None,
+                 verifier_token: str | None = None):
         self.seats = {part: [LocalSeat(part, path, name) for path, name in files] for part, files in seats.items()}
         self.join_token, self.log, self.out_dir, self.say = join_token, log, out_dir, say
+        self.verifier_token = verifier_token  # for local verifier seats only, in place of the join token (D45)
         self.on_exit = on_exit
         self.url: str | None = None  # the director's own address, once it listens
         self.stopping = False
@@ -69,7 +72,9 @@ class LocalSeats:
         self.out_dir.mkdir(parents=True, exist_ok=True)
         out = (self.out_dir / f"{seat.name}.out").open("a")
         # Unbuffered, so its output reaches the file as it happens, even if it is stopped through its pipe.
-        env = {**os.environ, "ZANNI_JOIN_TOKEN": self.join_token, "ZANNI_WATCH_STDIN": "1", "PYTHONUNBUFFERED": "1"}
+        token = (("ZANNI_VERIFIER_TOKEN", self.verifier_token) if seat.part == VERIFIER_PART
+                 else ("ZANNI_JOIN_TOKEN", self.join_token))
+        env = {**os.environ, token[0]: token[1] or "", "ZANNI_WATCH_STDIN": "1", "PYTHONUNBUFFERED": "1"}
         seat.expected_exit = False
         seat.proc = await asyncio.create_subprocess_exec(
             sys.executable, "-m", "zanni", str(seat.config), "--play", self.url, stdin=asyncio.subprocess.PIPE,

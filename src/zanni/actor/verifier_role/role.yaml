@@ -1,0 +1,10 @@
+# Zanni's built-in verifier seat (D45): it runs the commands of a play's verifiers on a snapshot of the stage, and
+# reports their exit codes. It runs no model and decides nothing; it reads the whole stage, and writes nothing.
+name: zanni-verifier
+version: 1.0.0
+mission: Run a play's verifiers on a snapshot of the stage, and report each command's exit code.
+needs:
+  stage_read: ["/"]
+never:
+  - write to the stage
+  - judge the work, since only a command's exit code decides

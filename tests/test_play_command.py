@@ -258,3 +258,33 @@ def test_a_local_seat_that_cant_join_exits_cleanly_while_watching_its_pipe(tmp_p
             seat.kill()
     assert seat.returncode == 2, out + err
     assert "Fatal Python error" not in err
+
+
+def test_a_local_verifier_seat_runs_the_plays_verifier_in_its_own_process(tmp_path):
+    """D45: the director starts the verifier seat it lists, which joins with its own token and runs the command."""
+    with fake_openai() as (url, _, scripts):
+        scripts["director"] = list(DIRECTOR_DONE)
+        folder = play_folder(tmp_path, url)
+        play = yaml.safe_load((folder / "play.yaml").read_text())
+        play["verifiers"] = {"tests-pass": {"runs_on": "checker"}}
+        (folder / "play.yaml").write_text(yaml.safe_dump(play))
+        director = yaml.safe_load((folder / "director.yaml").read_text())
+        director["verifier_seats"] = {"local": ["./checker.yaml"]}
+        (folder / "director.yaml").write_text(yaml.safe_dump(director))
+        (folder / "checker.yaml").write_text(yaml.safe_dump({
+            "name": "checker", "role": "zanni:verifier", "play": "./play.yaml",
+            "state_dir": str(tmp_path / "state" / "checker")}))
+        proc = subprocess.Popen([PY, "-m", "zanni", str(folder / "play.yaml")], stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE, text=True, env=env(tmp_path), stdin=subprocess.DEVNULL)
+        try:
+            wait_until(lambda: "waiting at a gate" in zanni("gate", folder / "play.yaml", tmp_path=tmp_path).stdout, 90)
+            zanni("gate", folder / "play.yaml", "approve", tmp_path=tmp_path)
+            out, err = proc.communicate(timeout=120)
+        finally:
+            proc.kill()
+    assert proc.returncode == 0, out + err
+    assert "runs on the verifier seat checker" in out and "verifier tests-pass: passed (on checker)" in out
+    log = [json.loads(line) for line in next((folder / "log").glob("*.jsonl")).read_text().splitlines()]
+    verdicts = {e["verifier"]: e["by"] for e in log if e["event"] == "verdict"}
+    assert verdicts == {"tests-fail": "director", "tests-pass": "checker"}
+    assert any(e["event"] == "verifier-joined" and e["actor"] == "checker" for e in log)
