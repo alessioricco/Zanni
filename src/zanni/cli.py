@@ -96,6 +96,11 @@ def serve(path: Path, rehearsal: Rehearsal, listen: str | None) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    argv = sys.argv[1:] if argv is None else argv
+    if argv[:1] == ["gate"]:  # zanni gate <play or director URL> [approve | reject | resume] (D38)
+        from zanni.gate import main as gate
+
+        return gate(argv[1:])
     parser = argparse.ArgumentParser(prog="zanni", description="Run what a Zanni file describes.")
     parser.add_argument("--version", action="version", version=f"zanni {__version__}")
     parser.add_argument("--check", action="store_true", help="only validate the file; never run anything")

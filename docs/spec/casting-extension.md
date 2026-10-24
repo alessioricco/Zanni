@@ -235,7 +235,7 @@ A person decides a gate, or resumes a paused play, through a small HTTP endpoint
   | `paused` | `{ reason }` while paused; otherwise `null`. |
   | `round`, `spend` | The current round, and the spend so far as a decimal string in USD (`"at least …"` once a cost was unknown). |
 
-- **`POST /zanni/owner`:** a decision, as JSON `{ "action": "approve" | "reject" | "resume", "note": "…" }`. `approve` and `reject` need a pending gate, and `reject` needs a note; `resume` needs a pause. The answer is the new state; a decision with nothing to decide gets HTTP 409.
+- **`POST /zanni/owner`:** a decision, as JSON `{ "action": "approve" | "reject" | "resume", "note": "…" }`. `approve` and `reject` need a pending gate, and `reject` needs a note; `resume` needs a pause. The answer is the play's state, as `GET` gives it, with `decided` set to the action; a decision with nothing to decide gets HTTP 409, with a plain-words `error`.
 
 Zanni's `zanni gate` command is a client of this endpoint ([Play: gates and pauses](play.md#gates-and-pauses)).
 

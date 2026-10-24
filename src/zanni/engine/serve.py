@@ -2,22 +2,51 @@
 
 import asyncio
 import contextlib
+import json
 from collections.abc import AsyncIterator
+
+from starlette.requests import Request
+from starlette.responses import JSONResponse
+from starlette.routing import Route
 
 from zanni.director.casting import Director
 from zanni.director.contract import DirectorInfo
 from zanni.engine.a2a_server import Listening, director_app, listening
 from zanni.engine.stage_mcp import stage_server
 
+OWNER_PATH = "/zanni/owner"
+
+
+def owner_route(owner) -> Route:
+    """The owner's endpoint beside A2A (D38): GET the play's state, POST a decision, with the owner token."""
+
+    async def endpoint(request: Request) -> JSONResponse:
+        scheme, _, token = request.headers.get("authorization", "").partition(" ")
+        problem = owner.authorise(token.strip() if scheme.lower() == "bearer" else None)
+        if problem:
+            return JSONResponse({"error": problem}, status_code=401)
+        if request.method == "GET":
+            return JSONResponse(owner.status())
+        try:
+            body = json.loads(await request.body() or b"{}")
+            action, note = str(body.get("action", "")), str(body.get("note") or "")
+        except (ValueError, AttributeError):
+            return JSONResponse({"error": 'send JSON such as {"action": "approve", "note": "…"}'}, status_code=400)
+        status, answer = owner.decide(action, note)
+        return JSONResponse(answer, status_code=status)
+
+    return Route(OWNER_PATH, endpoint, methods=["GET", "POST"])
+
 
 @contextlib.asynccontextmanager
 async def serving(director: Director, info: DirectorInfo, host: str = "127.0.0.1",
-                  port: int = 0) -> AsyncIterator[Listening]:
+                  port: int = 0, owner=None) -> AsyncIterator[Listening]:
     handlers = []
 
     def app_for(url: str):
         mount, lifespan = stage_server(director, host)
-        app, handler = director_app(director, info, url, mounts=[mount], lifespans=[lifespan])
+        routes = [owner_route(owner), mount] if owner is not None else [mount]
+        app, handler = director_app(director, info, url, mounts=routes, lifespans=[lifespan])
         handlers.append(handler)
         return app
 
