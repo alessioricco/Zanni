@@ -1,0 +1,12 @@
+name: p
+script: ../fixtures/scripts/with-verifiers
+stage: ./s
+cast:
+  coder: { role: roles/c, seats: 1-2 }
+verifiers:
+  lint: { command: [ruff, check, app], timeout: 60 }
+  tests-pass: { command: [uv, run, pytest, -q] }
+house_rules:
+  budget: 2.00
+  gate_timeout: 30m
+  max_director_turns: 10

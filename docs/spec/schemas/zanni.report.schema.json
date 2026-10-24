@@ -62,9 +62,11 @@
       "type": "string"
     },
     "outcome": {
+      "description": "The actor's own view; `over-budget` when it stopped at the cue's budget (D39).",
       "enum": [
         "done",
-        "failed"
+        "failed",
+        "over-budget"
       ],
       "title": "Outcome",
       "type": "string"

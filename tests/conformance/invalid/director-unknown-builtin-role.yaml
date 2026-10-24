@@ -1,0 +1,5 @@
+name: director
+role: zanni:producer
+play: ../fixtures/director/play.yaml
+models:
+  - { provider: anthropic, model: claude-haiku-5-5 }

@@ -33,6 +33,7 @@ It is recognised by having both `role` and `play`, and it is the file passed to 
 | `models` | list of model entries, at least one | yes | — | the actor | The models this actor runs, in order (D11). |
 | `credentials` | map of name → value | no | none | the actor, and `zanni` | This instance's credentials ([below](#credentials)). |
 | `state_dir` | path | no | `~/.zanni/actors/<name>` | the actor | Where the actor keeps its working memory and state. It is discarded or kept by the actor; the play's shared state lives on the stage. |
+| `seats` | map of part → list of actor configuration files | no | none | the director | Only in a [director's configuration](#a-directors-configuration): the local seats it starts. |
 
 ## Where the actor joins
 
@@ -45,7 +46,9 @@ It is recognised by having both `role` and `play`, and it is the file passed to 
 | A rehearsal | a local path to a [rehearsal](rehearsal.md) | Runs it, with a director started for it on this machine (D29). |
 
 - **Before joining:** the actor prints the play and script named on the director's card. It refuses a director whose card doesn't carry the [casting extension](casting-extension.md) at a version it speaks, and sends it nothing.
-- **Joining:** the actor presents `ZANNI_JOIN_TOKEN` from its `credentials` (D24).
+- **Joining:** the actor presents `ZANNI_JOIN_TOKEN` from its `credentials`, or else from its environment (D24, D36). It also says whether every one of its models has a price (`pricing`): a play with a budget refuses an actor whose models aren't all priced (D39).
+- **Overriding `play`:** `zanni <configuration> --play <URL or file>` joins another play or director than the file says. A director uses it to start its local seats (D36).
+- **A cue's budget:** when a cue carries a budget, the actor checks its spend after each model response, and stops at it, reporting `over-budget` (D39).
 - **The run:** the actor follows its seat's cues until it is released.
 - **Exit codes:** `zanni` exits with:
   - 0 when the seat is released with `done`;
@@ -53,7 +56,33 @@ It is recognised by having both `role` and `play`, and it is the file passed to 
   - 2 when the join is refused or nothing could start.
 
   For a rehearsal, the codes are the rehearsal's own (D28).
-- **Not yet:** a play file with no `director` means "this machine": the director starts those seats itself, which comes with milestone 4.
+- **A play file with no `director`** means the play runs on this machine: start it with `zanni play.yaml`, and its director starts the local seats it lists (D36).
+
+## A director's configuration
+
+The director is an actor too: its configuration is an actor configuration whose `role` is `zanni:director`, Zanni's built-in director role (D34). It holds the director's own models and credentials; a play never chooses models.
+
+```yaml
+# plays/slug-kata/director.yaml
+name: director
+role: zanni:director
+play: ./play.yaml
+models:
+  - { provider: anthropic, model: claude-haiku-5-5 }
+credentials:
+  ZANNI_JOIN_TOKEN: ${ZANNI_JOIN_TOKEN}     # the play's join token, which actors present
+  ZANNI_OWNER_TOKEN: ${ZANNI_OWNER_TOKEN}   # the play's owner token, for `zanni gate` (D38)
+seats:                                      # local seats, one actor configuration each (D36)
+  tester: [./tester-1.yaml]
+  coder: [./coder-1.yaml, ./coder-2.yaml]
+```
+
+- **`role`:** `zanni:director` is the only built-in role. Any other `zanni:` name is refused.
+- **`play`:** a local play file. `zanni director.yaml` runs it, like `zanni play.yaml`.
+- **Where `zanni play.yaml` finds it:** `--director <file>`, or else `director.yaml` beside the play file. Nowhere else, because its tokens belong to one play. A configuration whose `play` names another play is refused.
+- **`models`:** the director's own, in order with fallback (D27). Under a budget, each must have a price.
+- **`credentials`:** `ZANNI_JOIN_TOKEN` and `ZANNI_OWNER_TOKEN`, one of each per play, plus the models' keys, under the same [safeguards](#safeguards).
+- **`seats`:** for each part, the actor configurations the director starts as local seats, one file per seat. A part the play casts with `host: local` must have at least one. The director reads only each file's `name` and `role`: the role must be the one the play casts for that part (the same remote reference, or the same local folder), and the names must be unique. Each local seat resolves its own credentials; the director never holds them.
 
 ## The actor's log
 

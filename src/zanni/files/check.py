@@ -38,6 +38,30 @@ def check_body(loaded: Loaded) -> None:
                                     "describe the acts and scenes for the director below the --- line")])
 
 
+def check_script(loaded: Loaded, script: Script) -> None:
+    """The prose is present, and `stop.done_when` names only the script's verifiers (D35)."""
+    check_body(loaded)
+    errors = []
+    for i, name in enumerate(script.stop.done_when):
+        if name not in script.verifiers:
+            where = ("stop", "done_when", i)
+            errors.append(FileError(loaded.file, loaded.line(where), where, f'"{name}" is not one of the script\'s verifiers',
+                                    f"use one of: {', '.join(script.verifiers) or 'none (add it under `verifiers`)'}"))
+    if errors:
+        raise FileErrors(errors)
+
+
+def verifier_commands(play: PlayFile, script: Script) -> dict[str, tuple[list[str] | None, int, str]]:
+    """Each script verifier's command, timeout and where the command came from (`play` or `script`) (D35)."""
+    out = {}
+    for name, v in script.verifiers.items():
+        own = play.verifiers.get(name)
+        command, source = (own.command, "play") if own else (v.command, "script")
+        timeout = own.timeout if own and own.timeout else v.timeout
+        out[name] = (command, timeout, source)
+    return out
+
+
 def load_script(loaded: Loaded, play: PlayFile, folder: Path) -> Script:
     """Load a play's local script; a missing one is reported on the play's `script:` line."""
     target = folder / play.script
@@ -46,7 +70,7 @@ def load_script(loaded: Loaded, play: PlayFile, folder: Path) -> Script:
                                     f'"{play.script}" does not exist', "check the path, relative to the play file")])
     script_loaded = load_file(resolve(target))
     script = validate(script_loaded, Script)
-    check_body(script_loaded)
+    check_script(script_loaded, script)
     return script
 
 
@@ -74,7 +98,30 @@ def against_script(loaded: Loaded, play: PlayFile, script: Script) -> list[FileE
             where = ("house_rules", "gates", i)
             errors.append(FileError(loaded.file, loaded.line(where), where, f'"{gate}" is not one of the script\'s gates',
                                     f"use one of: {', '.join(script.gates) or 'none (the script has no gates)'}"))
+    for name in play.verifiers:
+        if name not in script.verifiers:
+            where = ("verifiers", name)
+            errors.append(FileError(loaded.file, loaded.line(where), where, "is not one of the script's verifiers",
+                                    f"a play only gives commands for the script's verifiers: "
+                                    f"{', '.join(script.verifiers) or 'none'}"))
+    for name, (command, _, _) in verifier_commands(play, script).items():
+        if command is None:
+            where = ("verifiers",) if play.verifiers else ("script",)
+            errors.append(FileError(loaded.file, loaded.line(where), where,
+                                    f"the script's verifier `{name}` has no command, and this play gives none",
+                                    f"add it under the play's `verifiers`, e.g. {name}: {{ command: [pytest, -q] }}"))
     return errors
+
+
+def describe_verifiers(play: PlayFile, script: Script) -> list[str]:
+    """Every command the director may run, and where it came from: they run with the user's permissions (D35)."""
+    lines = []
+    for name, (command, timeout, source) in verifier_commands(play, script).items():
+        if command is not None:
+            lines.append(f"    {name}: {' '.join(command)} (from the {source}; timeout {timeout} s)")
+    if not lines:
+        return ["  verifiers: none"]
+    return ["  verifiers, run in the stage folder with your permissions:", *lines]
 
 
 def against_lockfile(loaded: Loaded, play: PlayFile, lock: Lockfile) -> list[FileError]:
@@ -93,10 +140,12 @@ def check_play(loaded: Loaded, play: PlayFile) -> list[str]:
     errors: list[FileError] = []
     notes: list[str] = []
     if REMOTE_REF.match(play.script):
-        notes.append("  script: remote, so the play wasn't checked against it (fetching scripts comes later)")
+        notes.append("  script: remote, so it is checked when the director fetches it (D37)")
     else:
-        errors += against_script(loaded, play, load_script(loaded, play, folder))
+        script = load_script(loaded, play, folder)
+        errors += against_script(loaded, play, script)
         notes.append("  script: checked; the play casts its parts within their seats, and uses its gates")
+        notes += describe_verifiers(play, script)
     if (folder / LOCKFILE).is_file():
         errors += against_lockfile(loaded, play, validate(load_file(folder / LOCKFILE), Lockfile))
         notes.append(f"  {LOCKFILE}: every remote package is pinned")
@@ -163,8 +212,74 @@ def play_target(base: Path, play: str) -> tuple[str, str]:
     return ("rehearsal" if "cues" in load_file(target).data else "play"), str(target)
 
 
+def same_role(ref: str, base: Path, cast_ref: str, play_folder: Path) -> bool:
+    """Whether a configuration's role is the one a play casts: the same remote reference, or the same local folder."""
+    if REMOTE_REF.match(ref) or REMOTE_REF.match(cast_ref):
+        return ref == cast_ref
+    return (base / ref).resolve() == (play_folder / cast_ref).resolve()
+
+
+def check_director_seats(loaded: Loaded, director: ActorConfiguration, play_path: Path, play: PlayFile) -> list[str]:
+    """A director configuration's local seats: one actor configuration per seat, for a part the play casts, playing
+    that part's role. Only `name` and `role` are read from them, never their credentials (D36)."""
+    base = Path(loaded.file).parent
+    errors: list[FileError] = []
+    names: dict[str, str] = {}
+    for part, files in director.seats.items():
+        if part not in play.cast:
+            where = ("seats", part)
+            errors.append(FileError(loaded.file, loaded.line(where), where, "is not a part the play casts",
+                                    f"use one of: {', '.join(play.cast)}"))
+            continue
+        for i, file in enumerate(files):
+            where = ("seats", part, i)
+            target = base / file
+            data = load_file(target).data if target.is_file() else None
+            if not isinstance(data, dict) or "role" not in data or "play" not in data:
+                errors.append(FileError(loaded.file, loaded.line(where), where,
+                                        f'"{file}" is not an actor configuration',
+                                        "point at an actor configuration file, relative to this one"))
+                continue
+            role, name = str(data["role"]), str(data.get("name") or Path(file).stem)
+            if not same_role(role, target.parent, play.cast[part].role, play_path.parent):
+                errors.append(FileError(loaded.file, loaded.line(where), where,
+                                        f"{file} plays {role}, and the play casts {play.cast[part].role} as {part}",
+                                        "list a configuration whose `role` is the part's role"))
+            if name in names:
+                errors.append(FileError(loaded.file, loaded.line(where), where,
+                                        f"{file} has the name {name!r}, like {names[name]}",
+                                        "give every local seat's configuration its own `name`"))
+            names[name] = file
+    for part, entry in play.cast.items():
+        if entry.host == "local" and not director.seats.get(part):
+            where = ("seats",) if director.seats else ("play",)
+            errors.append(FileError(loaded.file, loaded.line(where), where,
+                                    f"the play casts `{part}` with host: local, and no local seat is listed for it",
+                                    f"add the actor configurations to start, e.g. seats: {{ {part}: [./{part}-1.yaml] }}"))
+    if errors:
+        raise FileErrors(errors)
+    seats = [f"{part}: {', '.join(files)}" for part, files in director.seats.items()]
+    return [f"  directs: the play '{play.name}' ({director.play})",
+            f"  local seats: {'; '.join(seats) or 'none; every part waits for actors to join'}"]
+
+
+def check_director(loaded: Loaded, director: ActorConfiguration) -> list[str]:
+    """A director configuration's `play` must be a local play file, which is checked too (D34)."""
+    kind, where = play_target(Path(loaded.file).parent, director.play)
+    if kind != "play":
+        raise FileErrors([FileError(loaded.file, loaded.line(("play",)), ("play",),
+                                    f'"{director.play}" is not a local play file',
+                                    "a director runs a play on this machine; point `play` at its play.yaml")])
+    play_loaded = load_file(Path(where))
+    play = validate(play_loaded, PlayFile)
+    notes = check_play(play_loaded, play)
+    return check_director_seats(loaded, director, Path(where).resolve(), play) + notes
+
+
 def check_actor_play(loaded: Loaded, actor: ActorConfiguration) -> list[str]:
     """An actor configuration's `play`: a director, a play file, or a local rehearsal (D26, D30)."""
+    if actor.is_director:
+        return check_director(loaded, actor)
     kind, where = play_target(Path(loaded.file).parent, actor.play)
     if kind == "bad-url":
         raise FileErrors([FileError(loaded.file, loaded.line(("play",)), ("play",),
@@ -275,7 +390,7 @@ def check(path: str | Path) -> tuple[BaseModel, list[str]]:
         else:
             notes = ["  (pass the role's folder to also check AGENTS.md, skills and mcp.json)"]
     if isinstance(doc, Script):
-        check_body(loaded)
+        check_script(loaded, doc)
     if isinstance(doc, PlayFile):
         notes = check_play(loaded, doc)
     if isinstance(doc, ActorConfiguration):

@@ -1,0 +1,7 @@
+name: p
+script: roles/s
+stage: ./s
+cast:
+  writer: roles/w
+house_rules:
+  max_director_turns: 0

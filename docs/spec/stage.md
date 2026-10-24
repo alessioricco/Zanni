@@ -109,7 +109,7 @@ The stage is a folder on the director's machine, managed by the director. This s
 | `path` | text | yes | — | The folder, relative to the play file or absolute. |
 
 - **Access:** only through MCP. There is no direct access.
-- **Changes:** the director keeps an append-only record of every write and delete; change markers are positions in it.
+- **Changes:** the director keeps an append-only record of every write and delete, and which seat made it; change markers are positions in it. A report's changes are taken from this record, so with several seats writing at once each report holds only its own seat's changes (D41).
 - **Ordering:** writes are applied in the order the director receives them. There are no branches.
 
 ## In the play file

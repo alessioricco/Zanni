@@ -18,7 +18,8 @@
         "host-cap",
         "role-mismatch",
         "hash-mismatch",
-        "needs-beyond-part"
+        "needs-beyond-part",
+        "unpriced"
       ],
       "title": "Reason",
       "type": "string"

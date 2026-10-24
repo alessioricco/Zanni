@@ -1,0 +1,7 @@
+name: kata
+script: ../scripts/with-verifiers
+stage: ./stage
+cast:
+  coder: { role: ./roles/coder, seats: 1-2, host: local }
+verifiers:
+  lint: { command: [ruff, check, app] }

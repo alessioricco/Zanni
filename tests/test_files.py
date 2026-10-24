@@ -54,7 +54,7 @@ def test_play_is_checked_against_its_local_script():
 
 
 def test_play_with_remote_script_says_it_was_not_checked():
-    assert "script: remote, so the play wasn't checked against it" in zanni(PLAY).stdout
+    assert "script: remote, so it is checked when the director fetches it" in zanni(PLAY).stdout
 
 
 def test_play_summary_shows_cast_and_house_rules():

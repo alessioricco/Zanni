@@ -11,7 +11,7 @@ from a2a.types import AgentCard, Message
 from google.protobuf.json_format import MessageToDict, MessageToJson, Parse, ParseDict
 
 VALID = Path(__file__).parents[1] / "conformance" / "protocol" / "valid"
-URI = "https://github.com/alessioricco/Zanni/blob/master/docs/spec/casting-extension.md#v1"
+URI = "https://github.com/alessioricco/Zanni/blob/master/docs/spec/casting-extension.md#v2"
 
 
 def same(a, b) -> bool:

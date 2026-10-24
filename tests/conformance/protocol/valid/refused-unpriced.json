@@ -1,0 +1,5 @@
+{
+  "kind": "zanni.refused",
+  "reason": "unpriced",
+  "message": "this play has a budget, and the actor's models aren't all priced; add `price:` to each model entry"
+}

@@ -1,0 +1,19 @@
+{
+  "kind": "zanni.report",
+  "cue": "round-1-specify-tester",
+  "outcome": "over-budget",
+  "summary": "Stopped at the cue's budget of $0.25, after writing 2 of 4 tests.",
+  "changes": [
+    "3f1d2c4b5a6978e0d1c2b3a4f5e6d7c8b9a0f1e2"
+  ],
+  "cost": {
+    "amount": "0.0048",
+    "currency": "USD"
+  },
+  "models": [
+    {
+      "provider": "anthropic",
+      "model": "claude-sonnet-5-5"
+    }
+  ]
+}

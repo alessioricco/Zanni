@@ -1,0 +1,6 @@
+# A local seat's actor configuration: the director reads only its name and role.
+name: coder-1
+role: ./roles/coder
+play: ./play.yaml
+models:
+  - { provider: ollama, model: a-local-model, price: { input: 0, output: 0 } }

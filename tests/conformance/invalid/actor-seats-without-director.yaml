@@ -1,0 +1,7 @@
+name: coder-1
+role: ./roles/coder
+play: ./play.yaml
+models:
+  - { provider: ollama, model: a-local-model }
+seats:
+  coder: [./coder-2.yaml]

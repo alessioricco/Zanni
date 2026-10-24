@@ -10,13 +10,14 @@ The spec covers only what existing standards don't:
 | A role's skills | SKILL.md | — |
 | A role's tools | MCP, standard `mcp.json` | — |
 | A role's Zanni fields | — | [Role package](role-package.md) |
-| One actor instance: role, play, models, credentials | — | [Actor configuration](actor-configuration.md) |
-| The reusable work: mission, parts, gates, stop rules, acts and scenes | Markdown with frontmatter, like SKILL.md | [Script](script.md) |
-| A production of a script: script, director, cast, stage, house rules | — | [Play](play.md) |
+| One actor instance: role, play, models, credentials; and the director's own (`zanni:director`) | — | [Actor configuration](actor-configuration.md) |
+| The reusable work: mission, parts, gates, verifiers, stop rules, acts and scenes | Markdown with frontmatter, like SKILL.md | [Script](script.md) |
+| A production of a script: script, director, cast, stage, house rules, verifier commands; running it, gates and the budget | — | [Play](play.md) |
 | One actor on cues from a file, with a director started for it: a role's own tests, and served with `--serve` | — | [Rehearsal](rehearsal.md) |
 | The play's workspace: operations, permissions, backends, its MCP server | MCP (transport) | [Stage](stage.md) |
 | Director to actor | A2A | — |
 | Joining, seats, cues, reports, release | A2A 1.0, plus an extension | [Casting extension](casting-extension.md), [schemas](schemas/) |
+| Deciding a gate, resuming a paused play | HTTP and JSON | [Casting extension: the owner's endpoint](casting-extension.md#the-owners-endpoint) |
 
 ## Status
 

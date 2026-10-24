@@ -19,7 +19,7 @@
               "contains": {
                 "properties": {
                   "uri": {
-                    "const": "https://github.com/alessioricco/Zanni/blob/master/docs/spec/casting-extension.md#v1"
+                    "const": "https://github.com/alessioricco/Zanni/blob/master/docs/spec/casting-extension.md#v2"
                   }
                 },
                 "required": [
@@ -56,6 +56,16 @@
       "default": null,
       "description": "The part to join, when the role is cast for more than one.",
       "title": "Part"
+    },
+    "pricing": {
+      "default": "unknown",
+      "description": "`known` when every model the actor may use has a price; under a budget, `unknown` is refused with `unpriced` (D7, D39).",
+      "enum": [
+        "known",
+        "unknown"
+      ],
+      "title": "Pricing",
+      "type": "string"
     }
   },
   "required": [

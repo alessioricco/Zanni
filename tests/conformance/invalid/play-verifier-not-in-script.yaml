@@ -1,0 +1,8 @@
+name: p
+script: ../fixtures/scripts/with-verifiers
+stage: ./s
+cast:
+  coder: roles/c
+verifiers:
+  lint: { command: [ruff, check] }
+  typecheck: { command: [mypy, app] }

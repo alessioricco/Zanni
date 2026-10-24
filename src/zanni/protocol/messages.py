@@ -21,7 +21,7 @@ from zanni.protocol.encoding import Count, Money, Seconds, Timestamp, Wire
 Text = Annotated[str, Field(min_length=1)]
 Url = Annotated[str, Field(pattern=r"^(https?|wss?)://\S+$")]
 REFUSAL_REASONS = ("not-authorised", "bad-card", "unsupported-version", "no-such-part", "part-full", "host-cap",
-                   "role-mismatch", "hash-mismatch", "needs-beyond-part")
+                   "role-mismatch", "hash-mismatch", "needs-beyond-part", "unpriced")
 RELEASE_REASONS = ("done", "recast", "play-stopped", "budget", "no-heartbeat")
 
 
@@ -38,6 +38,9 @@ class Join(Wire):
                                               "properties": {"uri": {"const": EXTENSION_URI}}}}}}}})
     part: str | None = Field(default=None, min_length=1,
                              description="The part to join, when the role is cast for more than one.")
+    pricing: Literal["known", "unknown"] = Field(
+        default="unknown", description="`known` when every model the actor may use has a price; under a budget, "
+                                       "`unknown` is refused with `unpriced` (D7, D39).")
 
     @field_validator("card")
     @classmethod
@@ -100,6 +103,10 @@ class Refused(Wire):
     message: Text = Field(description="What was refused and why, in plain words.")
 
 
+class CueLimits(Wire):
+    budget: Money | None = Field(default=None, description="The most this cue may spend; the actor stops at it (D39).")
+
+
 class Cue(Wire):
     """What one seat must do now. Actors never receive the whole script."""
 
@@ -111,6 +118,7 @@ class Cue(Wire):
     writes: list[str] = []
     verifiers: list[str] = Field(default=[], description="What will judge the work, in plain words.")
     deadline: Timestamp | None = None
+    limits: CueLimits = CueLimits()
 
 
 class Report(Wire):
@@ -118,7 +126,8 @@ class Report(Wire):
 
     kind: Literal["zanni.report"]
     cue: Text
-    outcome: Literal["done", "failed"]
+    outcome: Literal["done", "failed", "over-budget"] = Field(
+        description="The actor's own view; `over-budget` when it stopped at the cue's budget (D39).")
     summary: str
     changes: list[str] = Field(default=[], description="The stage change markers this work produced.")
     cost: Money | None = Field(description="Self-reported; null when unknown, never zero (D7).")

@@ -109,17 +109,34 @@ class ModelEntry(Strict):
         return self
 
 
+DIRECTOR_ROLE = "zanni:director"  # Zanni's built-in director role, shipped in the package (D34)
+
+
+def _role_ref(value: object) -> object:
+    """A package reference, or one of Zanni's built-in roles: only `zanni:director` exists."""
+    if isinstance(value, str) and value.startswith("zanni:"):
+        if value != DIRECTOR_ROLE:
+            raise ValueError(f'"{value}" is not one of Zanni\'s built-in roles; the only one is {DIRECTOR_ROLE}')
+        return value
+    return _package_ref(value)
+
+
 class ActorConfiguration(Strict):
-    """One actor instance: its role, its play, its models and its credentials. Never the role's capabilities (D14)."""
+    """One actor instance: its role, its play, its models and its credentials. Never the role's capabilities (D14).
+
+    With `role: zanni:director` it is a director configuration: the director's own models and credentials, and the
+    actor configurations it starts for local seats (D34, D36).
+    """
 
     SECRET_SECTIONS: ClassVar[tuple[str, ...]] = ("credentials",)
 
     name: str | None = Field(default=None, min_length=1)
-    role: PackageRef
+    role: Annotated[str, BeforeValidator(_role_ref)]
     play: str = Field(min_length=1)
     models: list[ModelEntry] = Field(min_length=1)
     credentials: dict[EnvName, str] = {}  # this instance's own; protected by D15's safeguards
     state_dir: str | None = None  # default: ~/.zanni/actors/<name>
+    seats: dict[str, list[Annotated[str, Field(min_length=1)]]] = {}  # director only: part -> actor configurations
 
     @model_validator(mode="after")
     def _credentials_exist(self) -> "ActorConfiguration":
@@ -128,6 +145,18 @@ class ActorConfiguration(Strict):
                 raise ValueError(f"models[{i}] uses the credential {entry.credential}, which isn't in `credentials`; "
                                  f"add {entry.credential} to `credentials`, or remove `credential` to use the environment")
         return self
+
+    @field_validator("seats")
+    @classmethod
+    def _seats_for_a_director(cls, seats: dict, info) -> dict:
+        if seats and info.data.get("role") != DIRECTOR_ROLE:
+            raise ValueError(f"`seats` lists local seats for a director; only a configuration with "
+                             f"role: {DIRECTOR_ROLE} may have it. Remove it, or make this the director's configuration")
+        return seats
+
+    @property
+    def is_director(self) -> bool:
+        return self.role == DIRECTOR_ROLE
 
     def stored_credentials(self) -> list[str]:
         """Credentials whose values are in this file, not references to the environment."""
@@ -149,10 +178,27 @@ def _cast_entry(value: object) -> object:
 CastSeat = Annotated[CastEntry, BeforeValidator(_cast_entry)]
 
 
+def _duration(value: object) -> object:
+    """Whole seconds (`90`), or a number with s, m or h (`90s`, `30m`, `2h`)."""
+    if isinstance(value, bool):
+        raise ValueError("should be a duration such as 3600, 30m or 2h")
+    if isinstance(value, str):
+        m = re.fullmatch(r"\s*(\d+)\s*([smh]?)\s*", value)
+        if not m:
+            raise ValueError(f'"{value}" is not a duration; write whole seconds, or a number with s, m or h, e.g. 30m')
+        return int(m[1]) * {"": 1, "s": 1, "m": 60, "h": 3600}[m[2]]
+    return value
+
+
+Duration = Annotated[int, BeforeValidator(_duration), Field(ge=1)]
+
+
 class HouseRules(Strict):
     budget: Decimal | None = Field(default=None, ge=0)  # in USD, for the whole play
     gates: list[str] = []  # moments that need human approval; must be among the script's gates
     max_seats_per_host: int | None = Field(default=None, ge=1)  # actors on one machine share its GPU
+    gate_timeout: Duration | None = None  # seconds a gate or a pause may wait; none: it waits (D38)
+    max_director_turns: int = Field(default=30, ge=1)  # the director's model turns in one round (D33)
 
 
 GIT_URL = re.compile(r"^(git@[^:\s]+:\S+|(ssh|git|https?)://\S+\.git/?|\S+\.git/?)$")
@@ -201,6 +247,13 @@ def _director(value: object) -> object:
     return value
 
 
+class PlayVerifier(Strict):
+    """A play's own command for one of its script's verifiers: the project-specific part (D35)."""
+
+    command: list[str] = Field(min_length=1)
+    timeout: int | None = Field(default=None, ge=1)  # seconds; default: the script's
+
+
 class PlayFile(Strict):
     """One production of a script: the director, the cast for the script's parts, the stage and the house rules."""
 
@@ -210,6 +263,7 @@ class PlayFile(Strict):
     stage: StageSpec
     cast: dict[str, CastSeat] = Field(min_length=1)  # part name -> role
     house_rules: HouseRules = HouseRules()
+    verifiers: dict[str, PlayVerifier] = {}  # name -> command, overriding the script's (D35)
 
 
 # Role manifest (role.yaml)
@@ -300,10 +354,22 @@ class ScriptStage(Strict):
 class StopRules(Strict):
     max_rounds: int | None = Field(default=None, ge=1)
     budget_per_round: Decimal | None = Field(default=None, ge=0)  # USD
+    done_when: list[Name] = []  # verifiers that must pass, after the stage's last change, for "done" (D35)
+
+
+VERIFIER_TIMEOUT = 300  # seconds
+
+
+class ScriptVerifier(Strict):
+    """A check the director runs in the stage, by name: it passes when its command exits 0 (D35)."""
+
+    description: str = Field(min_length=1)  # what it checks, in plain words; the prose refers to it by name
+    command: list[str] | None = Field(default=None, min_length=1)  # a default; a play may give its own
+    timeout: int = Field(default=VERIFIER_TIMEOUT, ge=1)  # seconds
 
 
 class Script(Strict):
-    """The reusable work: mission, parts, the workspace it expects, gates and stop rules (D13, D17)."""
+    """The reusable work: mission, parts, the workspace it expects, gates, verifiers and stop rules (D13, D17)."""
 
     name: Name
     version: Annotated[str, BeforeValidator(_version)]
@@ -311,6 +377,7 @@ class Script(Strict):
     parts: dict[Name, Part] = Field(min_length=1)
     stage: ScriptStage = ScriptStage()
     gates: list[Name] = []
+    verifiers: dict[Name, ScriptVerifier] = {}
     stop: StopRules = StopRules()
 
 

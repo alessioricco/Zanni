@@ -531,3 +531,155 @@ The loop is about 25 lines.
   - the maintainer's own machines are kept out of the repository.
 
 **Why:** Alessio's answer at ask point D of milestone 3: each actor must be able to log its own work locally, and one contributor's setup is a detail that shouldn't shape the project for everyone else.
+
+## D33. The director is an agent acting through tools that code checks (2026-10-24)
+
+**Decision:** `zanni play.yaml` runs the director as an agent loop on its own models (D34). Its instructions are Zanni's built-in director role, the script's prose and frontmatter, the cast and the house rules. It can read the stage, and it acts only through tools, each of which checks the rules in code before acting and refuses in plain words when they forbid it:
+
+- `cue(seat or part, scene, instructions, reads, writes, deadline, budget)` and `wait_for_reports()`;
+- `run_verifier(name)` and `ask_gate(name, summary)`;
+- `cast(part, seats)` and `release(seat, reason)`;
+- `end_round()` and `stop(reason)`.
+
+- **State in code:** rounds, spend, seats, pending cues, reports, verdicts and gate decisions are kept by the director's code, not in the model's context. Each turn is a fresh model run, given a summary of that state and the reports that arrived since the last turn, marked as actors' reports (data, never instructions).
+- **Three rules in code,** because a director often runs unattended:
+  1. **"Done" is checked.** `stop("done")` is refused unless every gate in the script's frontmatter that the play enforces was approved, and every verifier in the script's `stop.done_when` passed after the stage's last change (D35). A script without `done_when` falls back to every verifier run in the last round passing, at least one of them, and the log warns that "done" was weakly checked. Any other reason (`budget`, `stuck`, …) ends the run as not completed.
+  2. **The director falls back, then pauses.** Its models are an ordered list with fallback, like an actor's (D27). When every model fails, the play pauses: the director logs `paused`, sends no new cues and keeps every seat's heartbeat. The owner resumes it with `zanni gate … resume` (D38). `gate_timeout` applies to a pause too, stopping the run with reason `paused`. The play's state lives in the director's process: surviving a restart of that process is deferred (`TODO.md`).
+  3. **A turn cap per round.** The house rule `max_director_turns` (default 30) limits the director's model turns in one round. When it is reached, the round ends; if the round's work isn't verified, the run stops with reason `director-turns`.
+- **Stop reasons:** `done`, `budget`, `gate`, `paused`, `director-turns`, `max-rounds`, or the director's own reason.
+
+**Why:** Alessio's call at ask point A of milestone 4. A script is prose for an agent (D17), so an agent must read it; but every hard rule stays in code (golden rule 5).
+
+**Considered and set aside:**
+
+- **Code-driven:** parse acts and scenes from the headings and run them with no model. Every script would need one shape, which D17 rejected; the two example scripts already read differently.
+- **Hybrid:** code walks the headings, the model writes the cues. It still needs a model, still breaks on prose that isn't neatly headed, and rules 1 and 3 give most of its predictability.
+
+## D34. The director's configuration is an actor configuration with role `zanni:director` (2026-10-24)
+
+**Decision:**
+
+- **The file:** a director configuration is an actor configuration whose `role` is `zanni:director`, Zanni's built-in director role, shipped in the package, and whose `play` is a local play file. It has the director's models, in order with fallback, and its credentials, under D15's safeguards.
+- **Where it is found:** `zanni play.yaml` uses `--director <file>`, then `director.yaml` beside the play file. Nowhere else: when there is none, the error names both places.
+- **Either file starts the play:** `zanni director.yaml` runs its `play`, as `zanni play.yaml` does. A director configuration whose `play` names another play is refused.
+- **Tokens:** `ZANNI_JOIN_TOKEN` and `ZANNI_OWNER_TOKEN` (D38) come from its `credentials`, one of each per play. They may be `${VAR}` references, so a director configuration with only references may be committed.
+- **Only `zanni:director` can direct.** A configuration is a director's exactly when its role is `zanni:director`. Any other `zanni:` name is refused, and `--director` given a configuration with another role is refused too.
+
+**Why:** Alessio's call at ask point B. The director is an actor too, so it reuses the format, the safeguards and the fallback. This answers "The director's own configuration" in `TODO.md`.
+
+**Considered and set aside:**
+
+- **`~/.zanni/director.yaml` as a fallback:** join and owner tokens belong to one play; a global file would share them across plays, and pick models silently. A global defaults file is deferred (`TODO.md`).
+- **Models from the environment only** (`ZANNI_DIRECTOR_MODEL`): one model, no fallback.
+- **`zanni play.yaml` only validating:** against "one command, one file".
+
+**Deferred** (`TODO.md`): custom director roles with their own instructions.
+
+## D35. Verifiers are named in the script's frontmatter; the play gives project-specific commands (2026-10-24)
+
+**Decision:**
+
+- **In the script:** `verifiers:` maps a name to `{ description, command, timeout }`. `description` says what it checks; `command` is an optional default; `timeout` defaults to 300 seconds. The prose refers to verifiers by name, and the director's `run_verifier` accepts only these names.
+- **In the play:** `verifiers:` maps a script verifier's name to its own `{ command, timeout }`. A play can't add or remove names. A verifier with no command, after the play's, is refused by `zanni --check` before anything runs.
+- **Running one:** the director runs the command in the stage folder, with the user's permissions (as rehearsals do, D26), and logs a `verdict`. Only verdicts mark work done.
+- **"Done" names its verifiers:** `stop.done_when` lists the verifiers that must pass, each after the stage's last change, for `stop("done")` (D33). A later write makes an earlier pass stale. Not every verifier must pass at the end: "every new test fails" is meant to fail by then.
+- **No verdict while work is in flight:** `run_verifier` is refused while a cue that writes to the stage is pending.
+- **Commands from someone else's script:** `zanni --check` and the director's start-up output list every command that will run, and whether it came from the script or the play. The commands come from the script version pinned in `play.lock` (D37), so they can't change between runs unless the lock does.
+
+**Why:** Alessio's call at ask point C. The script knows what must be checked; only the play knows the project's commands (`pytest`, `npm test`).
+
+**Considered and set aside:** verifiers as MCP servers the script names (heavier, and a command covers it); verifiers as parts played by actors (a verdict must not be an actor's opinion).
+
+**Deferred** (`TODO.md`): soft verifiers (a model judging), verifiers run on one workstream instead of the whole stage, and sandboxing verifier commands.
+
+## D36. Local seats are actor subprocesses the director starts (2026-10-24)
+
+**Decision:**
+
+- **The list:** a director configuration's `seats:` maps a part to actor configuration files, one file per seat. The director starts each as `zanni <configuration> --play <director URL>`, gives it the join token in its environment, and stops it at the end. Each actor uses its own configuration's models and credentials, and keeps its own log (D32).
+- **`--play`:** a new flag that overrides an actor configuration's `play`. A flag overrides only what a file can say (D9).
+- **`host: local` is a requirement:** a part with `host: local` and no local seats listed is refused. A part without it may have local seats, and actors may also join it. The director can't start more local seats than files listed.
+- **What the director reads:** only `name` and `role` from each file. The role must be the one the play casts for that part (the same remote reference, or the same local folder), and names must be unique. The director never resolves those files' credentials.
+- **No orphans:** each subprocess watches a pipe from the director (its standard input) and exits as soon as it closes, even mid-cue. The heartbeat timeout stays as the backstop.
+- **Crashes:** a local seat that dies is restarted up to twice per play, and its pending cue is resent. After that, its seat is left to an actor joining, or the stop rules end the run.
+- **Local roles at casting:** a local cast reference differs from machine to machine (D29), so for a local cast entry an actor fits if its role has the name and content hash of the folder the play names. A remote cast entry still needs the same reference, and the hash pinned in `play.lock`.
+- **The join token:** an actor reads `ZANNI_JOIN_TOKEN` from its configuration's `credentials`, or else from its environment.
+
+**Why:** Alessio's call at ask point D. The director never holds an actor's keys, and one command runs a whole play on one machine.
+
+**Considered and set aside:** running local seats in the director's own process (it would hold their keys); no local seats in this milestone.
+
+**Deferred** (`TODO.md`): several seats from one file.
+
+## D37. Fetching packages with git; `play.lock` written once, updated only on request (2026-10-24)
+
+**Decision:**
+
+- **Resolving:** `host/owner/repo[/path]@version` is the git tag `v<version>` or `<version>` on `https://<host>/<owner>/<repo>.git`, fetched with the `git` command. `version` must be `major.minor.patch`; a missing tag is refused, listing the nearest tags.
+- **The cache:** `~/.zanni/packages/<host>/<owner>/<repo>/<commit>/`. A package in a subfolder uses that folder, and its hash covers that folder only.
+- **The lockfile:** the director writes `play.lock` the first time it resolves the play's packages. After that:
+  - a pinned commit already in the cache is used without touching the network, after its hash is checked;
+  - a tag that now points to another commit is refused, naming both commits;
+  - only `zanni play.yaml --update` re-resolves the tags and rewrites `play.lock`, printing the changed commits and the verifier commands that changed.
+- **Local packages:** pinned by hash only. A local package that changed since `play.lock` is reported, not refused, and the director uses its current hash; `--update` re-pins it.
+- **Authentication is git's:** Zanni passes no credentials. Private repositories use the person's own SSH keys or credential helper, and `url.<base>.insteadOf` in their git config. Git runs with `GIT_TERMINAL_PROMPT=0`, so an unattended fetch fails instead of waiting for a password.
+- **Fetching runs nothing:** one tag, shallow, no submodules; git never copies a repository's hooks.
+- **Actors** fetch remote roles the same way.
+
+**Why:** Alessio's call at ask point E. A director running unattended must not depend on the network once its packages are fetched, nor change what it runs without being asked.
+
+**Considered and set aside:** local folders only until milestone 5; each host's archive API (code per host, and it bypasses git's authentication).
+
+**Deferred** (`TODO.md`): version ranges, cleaning the cache, and checking signed tags.
+
+## D38. Gates pause the play; the owner decides from anywhere (2026-10-24)
+
+**Decision:**
+
+- **A gate is a state of the play.** At a gate the play enforces (`house_rules.gates`), the director logs `gate-pending` with a summary (the scene, the files changed since the last gate, the verdicts), sends no new cues, and keeps every seat's heartbeat. A gate the play doesn't list is skipped, and logged as skipped.
+- **Deciding:** `zanni gate <play file or director URL> [approve | reject | resume] [--note …]` shows or decides a pending gate, or resumes a paused play (D33). With a play file, it finds the running director through `log/director.json`, which the director writes beside its log while it runs (its URL and run id, never a token), or else the play's `director`.
+- **The owner token:** `ZANNI_OWNER_TOKEN`, one per play, separate from the join token, so no actor can decide a gate. The director's comes from its configuration (D34); `zanni gate` reads it from its own environment, never a flag. It is never printed or logged.
+- **How `zanni gate` reaches the director:** a small HTTP endpoint beside A2A, at `/zanni/owner` under the director's address: `GET` returns the play's state and any pending gate or pause, `POST` decides. A missing or wrong token gets HTTP 401.
+- **A deadline:** `house_rules.gate_timeout` (whole seconds, or a number with `s`, `m` or `h`) stops the run with reason `gate` when it passes. With none, the play waits.
+- **A convenience:** when the director runs in an interactive terminal, it also offers the same choice there.
+
+**Why:** Alessio's call at ask point F. A director often runs in the background, on a machine nobody is sitting at.
+
+**Why an HTTP endpoint and not A2A:** in A2A, the director's tasks are seats, and every call on them is an actor's. An owner isn't an agent, and a gate decision isn't a conversation: two plain JSON calls say it, and keep owner calls out of the seats' tasks entirely.
+
+**Considered and set aside:** approval on the director's terminal only (a background director would stop at its first gate forever); approval by a file in the play folder (it only works on the director's machine).
+
+**Deferred** (`TODO.md`): telling someone a gate is waiting, per-person approvers, and a web page for gates.
+
+## D39. Budgets are reserved per cue and enforced by actors; unpriced actors are refused at join (2026-10-24)
+
+**Decision:**
+
+- **What counts:** the play's spend is every report's `cost` plus the director's own.
+- **Priced at join:** `zanni.join` carries `pricing: known` when every model the actor may use has a price (published, or `price:` in its configuration). Under a budget, an actor with `unknown` pricing is refused with a new reason, `unpriced`. The director's own models must be priced too, or the play doesn't start.
+- **A budget per cue:** `zanni.cue` carries `limits.budget`. By default it is the budget not yet reserved, divided among the seats with no pending cue; the director's model may give less, never more. A pending cue reserves its budget; its report replaces the reservation with the actual cost. When nothing is left to reserve, the run stops with reason `budget`.
+- **The actor stops at it:** after each model response, the actor's engine checks the cue's spend; at the limit, it ends the cue and reports `outcome: over-budget`, with the cost so far. Overshoot is bounded by one model call.
+- **Unknown cost that gets through:** under a budget, the seat is released with reason `budget` and its part recast, and the spend is shown as "at least" from then on. With no budget, unknown cost is logged and the play goes on.
+- **The director's own turns:** before each turn, the director stops with reason `budget` if the spend has reached it.
+- **A written limit:** the budget counts what actors report. A modified actor could under-report; the real cap on a key is its owner's.
+- **A new extension version:** these change `zanni.join`, `zanni.refused`, `zanni.cue` and `zanni.report`, and the casting extension says any change to a message makes a new version, so its URI moves from `#v1` to `#v2`.
+
+**Why:** Alessio's call at ask point G. D7 says unknown cost is never zero, and must be caught before a seat is cast, not after it has spent.
+
+**Considered and set aside:** stopping the whole play at the first unknown cost (the check at join prevents that case); allowing unknown cost when the house rules opt in (contradicts D7).
+
+**Deferred** (`TODO.md`): an actor's own spending cap in its configuration; token budgets.
+
+## D40. The slug kata: the example play for milestone 4's recorded runs (2026-10-24)
+
+**Decision:** `examples/scripts/slug-kata/` and `examples/plays/slug-kata/`. A tester (`slug-tester`) writes failing tests; up to two coders (a new `slug-coder` role) make them pass. Round 1 has two independent items in separate files, so two coders work in parallel; round 2 extends one of them. Two verifiers: `tests-fail` before the `plan` gate, and `tests-pass`, the script's `done_when`. The play folder ships `director.yaml` and the local seats' configurations, with `${VAR}` credentials only and priced models. It is run from a copy, because the stage is the play's own folder.
+
+**Why:** Alessio's call at ask point H. It is small enough for a local model, needs no network, and exercises two parts, a range of seats, a gate, two verifiers, rounds and the budget.
+
+**Considered and set aside:** the newsroom script (web fetching, three new roles); a reduced software script now (milestone 6's work, done twice).
+
+## D41. A report's changes come from the stage's record, not the actor (2026-10-24)
+
+**Decision:** the folder stage records which seat made each change. When a report arrives, the director logs the changes that seat made while its cue was pending, from that record, and ignores the actor's own list.
+
+**Why:** with several seats writing at once, an actor can't tell its own changes from another seat's (`TODO.md`, "A report's change markers with several seats"). The stage knows, and it can't be bypassed (golden rule 5).

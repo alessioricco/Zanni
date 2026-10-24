@@ -1,0 +1,7 @@
+name: director
+role: zanni:director
+play: ../fixtures/director/play.yaml
+models:
+  - { provider: anthropic, model: claude-haiku-5-5 }
+seats:
+  coder: [../fixtures/director/tester-1.yaml]

@@ -1,0 +1,5 @@
+name: tester-1
+role: ./roles/tester
+play: ./play.yaml
+models:
+  - { provider: ollama, model: a-local-model }

@@ -1,0 +1,11 @@
+# A director configuration: an actor configuration whose role is Zanni's built-in director (D34).
+name: director
+role: zanni:director
+play: ../fixtures/director/play.yaml
+models:
+  - { provider: anthropic, model: claude-haiku-5-5 }
+credentials:
+  ZANNI_JOIN_TOKEN: ${ZANNI_JOIN_TOKEN}
+  ZANNI_OWNER_TOKEN: ${ZANNI_OWNER_TOKEN}
+seats:
+  coder: [../fixtures/director/coder-1.yaml]

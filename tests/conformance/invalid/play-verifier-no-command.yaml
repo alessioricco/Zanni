@@ -1,0 +1,5 @@
+name: p
+script: ../fixtures/scripts/with-verifiers
+stage: ./s
+cast:
+  coder: roles/c

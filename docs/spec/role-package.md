@@ -77,6 +77,19 @@ The first tag that exists wins. If two of them exist and point to different comm
 
 Scripts are referenced and resolved the same way.
 
+### Fetching
+
+The director fetches a play's script and roles, and an actor fetches its role, with the `git` command (D37):
+
+- **Where from:** `https://<host>/<owner>/<repo>.git`.
+- **What:** only the tag's commit, shallow, without submodules. Fetching runs nothing: git never copies a repository's hooks.
+- **The cache:** `~/.zanni/packages/<host>/<owner>/<repo>/<commit>/`. A package in a subfolder is that folder of the commit, and its content hash covers that folder only.
+- **Offline once fetched:** a commit already in the cache is used without touching the network, once its hash is checked.
+- **Authentication is git's:** Zanni passes no credentials. A private repository is reached with the person's own SSH keys or credential helper; `url.<base>.insteadOf` in their git config sends `https://` addresses through SSH. Git runs with `GIT_TERMINAL_PROMPT=0`, so a fetch that would ask for a password fails with a message instead of waiting.
+- **Updating:** a play's packages stay at the commits in its `play.lock`. A tag that moved is refused; `zanni play.yaml --update` re-resolves them ([Play: the lockfile](play.md#the-lockfile)).
+
+**Not in the first version:** version ranges, cleaning the cache, and checking signed tags (`TODO.md`).
+
 ## Checking a role
 
 `zanni roles/tester/role.yaml` checks the manifest on its own. `zanni roles/tester`, passing the folder, also checks the rest of the package:

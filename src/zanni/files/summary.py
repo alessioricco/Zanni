@@ -6,8 +6,12 @@ from zanni.files.schemas import ActorConfiguration, Lockfile, PlayFile, Rehearsa
 def summarise(doc: ActorConfiguration | PlayFile | RoleManifest | Script | Lockfile | Rehearsal) -> list[str]:
     if isinstance(doc, ActorConfiguration):
         who = f"'{doc.name}'" if doc.name else "an actor"
-        lines = [f"Actor configuration: would start {who}, playing a role in a play.",
-                 f"  role: {doc.role}", f"  play: {doc.play}", "  models, in order:"]
+        if doc.is_director:
+            lines = [f"Director configuration: would start the director for the play {doc.play}.",
+                     f"  role: {doc.role} (built in)", "  models, in order:"]
+        else:
+            lines = [f"Actor configuration: would start {who}, playing a role in a play.",
+                     f"  role: {doc.role}", f"  play: {doc.play}", "  models, in order:"]
         for i, m in enumerate(doc.models, start=1):
             bits = [f"{m.provider} {m.model}"]
             if m.base_url:
@@ -35,7 +39,11 @@ def summarise(doc: ActorConfiguration | PlayFile | RoleManifest | Script | Lockf
         rules = doc.house_rules
         budget = f"${rules.budget:.2f}" if rules.budget is not None else "none set"
         cap = f"; at most {rules.max_seats_per_host} seats per host" if rules.max_seats_per_host else ""
-        lines.append(f"  house rules: budget {budget}; human gates: {', '.join(rules.gates) or 'none'}{cap}")
+        wait = f"; gates wait at most {rules.gate_timeout} s" if rules.gate_timeout else ""
+        lines.append(f"  house rules: budget {budget}; human gates: {', '.join(rules.gates) or 'none'}{wait}{cap}; "
+                     f"at most {rules.max_director_turns} director turns per round")
+        if doc.verifiers:
+            lines.append(f"  verifier commands: {', '.join(doc.verifiers)}")
         return lines
     if isinstance(doc, Rehearsal):
         lines = [f"Rehearsal: '{doc.rehearsal}', run when an actor configuration's `play` points here, or served with --serve.",
@@ -60,9 +68,16 @@ def summarise(doc: ActorConfiguration | PlayFile | RoleManifest | Script | Lockf
                 bits.append(f"suggested role {part.suggested}")
             lines.append(f"    {name}: {'; '.join(bits)}")
         lines.append(f"  gates: {', '.join(doc.gates) or 'none'}")
+        if doc.verifiers:
+            lines.append("  verifiers:")
+            for name, v in doc.verifiers.items():
+                command = " ".join(v.command) if v.command else "no default command: the play gives it"
+                lines.append(f"    {name}: {v.description} ({command})")
         rules = [f"at most {doc.stop.max_rounds} rounds"] if doc.stop.max_rounds else []
         if doc.stop.budget_per_round is not None:
             rules.append(f"${doc.stop.budget_per_round:.2f} per round")
+        if doc.stop.done_when:
+            rules.append(f"done when {', '.join(doc.stop.done_when)} pass")
         lines.append(f"  stop rules: {'; '.join(rules) or 'none in the frontmatter'}")
         return lines
     return [f"Role manifest: the role '{doc.name}' {doc.version}.", f"  mission: {doc.mission}",
