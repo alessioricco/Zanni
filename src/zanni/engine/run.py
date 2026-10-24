@@ -7,9 +7,10 @@ from pydantic_ai import Agent
 from pydantic_ai.models import Model
 
 from zanni.actor.contract import AllModelsFailed, CueResult, CueTask, Fallback, ResolvedModel
-from zanni.engine.fallback import classify
+from zanni.engine.fallback import UnusableReply, classify
 from zanni.engine.mcp import mcp_toolsets
 from zanni.engine.models import build_model
+from zanni.engine.text_tools import BLOCK
 from zanni.engine.tools import skill_toolset, stage_toolset
 
 MILLION = Decimal(1_000_000)
@@ -32,6 +33,9 @@ async def run_cue(task: CueTask, *, build: Callable[[ResolvedModel], Model] = bu
                       toolsets=[skill_toolset(task.skills), stage_toolset(task.stage), *mcp_toolsets(task.mcp_servers)])
         try:
             result = await agent.run(task.prompt)
+            if rm.entry.tool_format == "text" and BLOCK.search(str(result.output)):
+                # The model's last reply still holds a tool block it never got right: that is a failed answer.
+                raise UnusableReply("the model's last reply still held a tool block it couldn't write correctly")
         except Exception as exc:
             reason = classify(exc)
             if reason is None:

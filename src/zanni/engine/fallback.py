@@ -5,13 +5,17 @@ from pydantic_ai.exceptions import (
     ModelRateLimitError, ModelRequestTimeout, ModelTimeoutError,
 )
 
+class UnusableReply(Exception):
+    """A reply that can't be used as an answer, such as a broken tool block left in a text-format reply."""
+
+
 # Order matters: a ModelTimeoutError is also a ModelConnectionError, so the specific types come first.
 _REASONS: list[tuple[tuple[type[BaseException], ...], str]] = [
     ((ModelRateLimitError, ModelQuotaExceededError), "rate-limit"),
     ((ModelContextWindowExceededError,), "context"),
     ((ModelTimeoutError, ModelRequestTimeout, TimeoutError), "timeout"),
     ((ContentFilterError,), "refusal"),
-    ((ModelAPIError, ConnectionError, OSError), "error"),
+    ((ModelAPIError, ConnectionError, OSError, UnusableReply), "error"),
 ]
 
 

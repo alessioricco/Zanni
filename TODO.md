@@ -11,6 +11,10 @@ Things decided to come later. Each names where it was deferred. Remove an item w
 - [ ] **Secrets management for actors on cloud services** (D15).
 - [ ] **Sandboxing a rehearsal's `verify` commands**, and a role's MCP servers, for roles from other people. Today they run with the user's permissions (D26).
 
+## Engine
+
+- [ ] **Cap output tokens per request** in a model entry, so a small model stuck repeating itself stops early. A recorded `gemma3:4b` run looped for 280 s and 15,503 output tokens (docs/runs/milestone-2.md).
+
 ## Later milestones
 
 - [ ] **Actors behind NAT that can't reach the director**, such as a director on a laptop with actors elsewhere: a tunnel or a relay. Actors already connect outwards (D21), so only the director must be reachable.

@@ -56,13 +56,38 @@ def as_text(messages: list[ModelMessage], tool_help: str) -> list[ModelMessage]:
     return out
 
 
+def loads_lenient(block: str):
+    """json.loads, but close braces and brackets a small model left open (seen with gemma3:4b in milestone 2)."""
+    try:
+        return json.loads(block)
+    except json.JSONDecodeError:
+        stack, in_string, escaped = [], False, False
+        for ch in block:
+            if in_string:
+                if escaped:
+                    escaped = False
+                elif ch == "\\":
+                    escaped = True
+                elif ch == '"':
+                    in_string = False
+            elif ch == '"':
+                in_string = True
+            elif ch in "{[":
+                stack.append("}" if ch == "{" else "]")
+            elif ch in "}]" and stack:
+                stack.pop()
+        if in_string or not stack:
+            raise
+        return json.loads(block.rstrip() + "".join(reversed(stack)))
+
+
 def parse(response: ModelResponse) -> tuple[list[ToolCallPart], list[str]]:
     """The tool calls in a reply, and a problem for each block that couldn't be read."""
     text = "".join(p.content for p in response.parts if isinstance(p, TextPart))
     calls, problems = [], []
     for n, block in enumerate(BLOCK.findall(text), start=1):
         try:
-            call = json.loads(block)
+            call = loads_lenient(block)
             if not isinstance(call, dict) or not isinstance(call.get("tool"), str):
                 raise ValueError('it needs a "tool" name')
             args = call.get("args", {})
