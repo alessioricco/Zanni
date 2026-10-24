@@ -6,7 +6,6 @@ logged as `tool-refused`; the model reads it and decides again.
 """
 
 import asyncio
-import os
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import timedelta
@@ -18,12 +17,12 @@ from zanni.director import rules
 from zanni.director.casting import Director, Seat, SeatLost, stamp
 from zanni.director.gates import Gates
 from zanni.director.state import PlayState, Report, Verdict
+from zanni.director.verifiers import run_command
 from zanni.log import Log
 from zanni.protocol.encoding import money
 from zanni.protocol.messages import Cue
 
 DEFAULT_DEADLINE = 60  # minutes: a cue nobody answers can't hold an unattended play forever
-VERIFIER_OUTPUT = 2000  # characters of a verifier's output kept for the model and the log
 
 
 @dataclass
@@ -433,20 +432,3 @@ def _report_text(r: Report) -> str:
     summary = r.summary.replace("</actor-report", "</actor-report-text")
     return (f'<actor-report seat="{r.seat}" part="{r.part}" cue="{r.cue}" scene="{r.scene}" outcome="{r.outcome}" '
             f'cost="{cost}" changes="{changes}">\n{summary}\n</actor-report>')
-
-
-async def run_command(command: list[str], cwd, timeout: int) -> tuple[bool, str]:
-    """Run a verifier's command in the stage folder: it passes when it exits 0 (D35)."""
-    try:
-        proc = await asyncio.create_subprocess_exec(*command, cwd=cwd, stdout=asyncio.subprocess.PIPE,
-                                                    stderr=asyncio.subprocess.STDOUT, env=os.environ.copy())
-    except OSError as e:
-        return False, f"couldn't start {command[0]}: {e}"
-    try:
-        out, _ = await asyncio.wait_for(proc.communicate(), timeout)
-    except TimeoutError:
-        proc.kill()
-        await proc.wait()
-        return False, f"timed out after {timeout} s"
-    text = out.decode(errors="replace").strip()
-    return proc.returncode == 0, (text[-VERIFIER_OUTPUT:] or f"exit code {proc.returncode}")
