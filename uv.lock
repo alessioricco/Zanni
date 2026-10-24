@@ -26,6 +26,12 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/7b/df/138f64f3138db7b44b9798426909357d27429c868715af8751ace6083238/a2a_sdk-1.2.3-py3-none-any.whl", hash = "sha256:a89529ab7d026900170aefc1515f35c68d9a14b6a9133f8cc775c8fe598f8ae7", size = 278339, upload-time = "2026-10-19T10:11:29.102Z" },
 ]
 
+[package.optional-dependencies]
+http-server = [
+    { name = "sse-starlette" },
+    { name = "starlette" },
+]
+
 [[package]]
 name = "aiofile"
 version = "3.12.3"
@@ -2128,11 +2134,12 @@ name = "zanni"
 version = "0.0.1"
 source = { editable = "." }
 dependencies = [
-    { name = "a2a-sdk" },
+    { name = "a2a-sdk", extra = ["http-server"] },
     { name = "mcp" },
     { name = "pydantic" },
     { name = "pydantic-ai-slim", extra = ["anthropic", "mcp", "openai"] },
     { name = "pyyaml" },
+    { name = "uvicorn" },
 ]
 
 [package.optional-dependencies]
@@ -2148,12 +2155,13 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "a2a-sdk", specifier = "==1.2.3" },
+    { name = "a2a-sdk", extras = ["http-server"], specifier = "==1.2.3" },
     { name = "mcp", specifier = "==2.3.0" },
     { name = "pydantic", specifier = ">=2.10" },
     { name = "pydantic-ai-slim", extras = ["anthropic", "mcp", "openai"], specifier = "==2.60.0" },
     { name = "pydantic-ai-slim", extras = ["google"], marker = "extra == 'google'", specifier = "==2.60.0" },
     { name = "pyyaml", specifier = ">=6.0" },
+    { name = "uvicorn", specifier = ">=0.31.1" },
 ]
 provides-extras = ["google"]
 

@@ -14,11 +14,12 @@ classifiers = [
   "Operating System :: OS Independent",
 ]
 dependencies = [
-    "a2a-sdk==1.2.3",
+    "a2a-sdk[http-server]==1.2.3",
     "mcp==2.3.0",
     "pydantic>=2.10",
     "pydantic-ai-slim[anthropic,mcp,openai]==2.60.0",
     "pyyaml>=6.0",
+    "uvicorn>=0.31.1",  # serves the director (D29); already required by mcp
 ]
 
 [project.optional-dependencies]
