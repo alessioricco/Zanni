@@ -227,6 +227,7 @@ def test_a_lost_seat_nobody_replaces_is_reported_as_lost(tmp_path):
 
     report = asyncio.run(body(p))
     assert 'outcome="lost"' in report and "no seat of coder took its place in time" in report
+    assert p.state.stopped == ("uncastable", False)  # the coder part is below its minimum, with nobody to come (D50)
 
 
 # The budget: pricing at join, a cue's budget, reservations, unknown cost (D39)
@@ -328,3 +329,23 @@ def test_finish_releases_every_seat_with_done_or_play_stopped(tmp_path):
 
     assert asyncio.run(staged(p, [("tester", actor_runner({})), ("coder", actor_runner({}))], tmp_path, body)) == []
     assert {e["reason"] for e in events(tmp_path) if e["event"] == "seat-released"} == {"done"}
+
+
+def test_a_local_seat_refused_at_join_isnt_restarted(home):
+    """D50: a refusal such as `unpriced` won't change on a restart, so the seat is started once."""
+    with fake_openai() as (url, _, _):
+        async def body(p):
+            p.casting.require_pricing = True
+            config = p.local.seats["coder"][0].config
+            doc = yaml.safe_load(config.read_text())
+            doc["models"][0].pop("price")
+            config.write_text(yaml.safe_dump(doc))
+            await p.cast("coder", 1)
+            await until(lambda: any(e["event"] == "seat-not-restarted" for e in events(home)), timeout=60)
+            await asyncio.sleep(1)
+            return events(home)
+
+        log = asyncio.run(local_play(home, ["done"], url, body))
+    assert [e["event"] for e in log].count("seat-started") == 1
+    assert [e["exit_code"] for e in log if e["event"] == "seat-exited"] == [2]
+    assert "refused at join" in next(e["reason"] for e in log if e["event"] == "seat-not-restarted")

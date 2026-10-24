@@ -2,7 +2,8 @@
 
 Each actor keeps its own models, credentials and log; the director reads only each file's `name` and `role`, and
 never its credentials. Each subprocess watches a pipe from the director (its stdin) and exits when it closes, so a
-director that dies leaves nothing spending. A seat that dies is restarted at most twice per play.
+director that dies leaves nothing spending. A seat that dies is restarted at most twice per play; one that exits with
+code 2 (refused at join, or couldn't start) isn't restarted, since a restart wouldn't change that (D50).
 """
 
 import asyncio
@@ -17,6 +18,7 @@ from zanni.director.casting import VERIFIER_PART
 from zanni.log import Log
 
 RESTARTS = 2
+REFUSED = 2  # a zanni's exit code when it was refused at join, or couldn't start
 RELEASED_GRACE = 5  # seconds a released seat has to exit on its own before its pipe is closed
 
 
@@ -97,6 +99,12 @@ class LocalSeats:
         """Restart a local seat that was lost, at most RESTARTS times per play. False if it isn't local, or is spent."""
         seat = self.by_name(name)
         if seat is None or self.stopping:
+            return False
+        if seat.proc is not None and seat.proc.returncode == REFUSED:
+            self.log.event("seat-not-restarted", seat=seat.name, reason="it was refused at join, or couldn't start "
+                                                                      "(exit code 2); a restart wouldn't change that")
+            self.say(f"  {seat.name} was refused at join, or couldn't start (see {self.out_dir / (seat.name + '.out')}); "
+                     "it isn't restarted, so its part waits for an actor to join")
             return False
         if seat.restarts >= RESTARTS:
             self.log.event("seat-not-restarted", seat=seat.name, reason=f"restarted {RESTARTS} times already")

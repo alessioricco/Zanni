@@ -57,7 +57,7 @@ class Production:
 
     def __init__(self, *, state: PlayState, casting: Director, stage: Stage, log: Log,
                  verifiers: dict[str, tuple[list[str] | None, int, str]], gates: Gates,
-                 say: Callable[[str], None] = print, local=None, recast_wait: float = 180):
+                 say: Callable[[str], None] = print, local=None, recast_wait: float | None = None):
         self.state, self.casting, self.log, self.gates, self.say = state, casting, log, gates, say
         self.stage = stage
         self.view = stage.seat(["/"], [])  # the director reads the whole stage, and writes nothing
@@ -67,7 +67,8 @@ class Production:
         self.cues = 0
         self.verifies = 0
         self.last_gate_marker = 0
-        self.recast_wait = recast_wait  # seconds a lost seat's part waits for its next seat before giving up
+        # seconds a lost seat's part waits for its next seat before giving up: the house rule cast_timeout (D50)
+        self.recast_wait = state.play.house_rules.cast_timeout if recast_wait is None else recast_wait
         self._turn_charged = Decimal(0)  # the current turn's spend already charged, response by response (D39)
         self._end_turn = False  # a long wait just ended: the turn ends before the model's next request (D49)
         self.carry: list[str] = []  # what that wait returned, for the next turn's summary
@@ -213,6 +214,9 @@ class Production:
             if idle:
                 return idle[0]
             await asyncio.sleep(0.2)
+        if not self.state.stopped and len(self.active_seats(seat.part)) < self.state.seats_for(seat.part).min:
+            self.say(f"  no seat of {seat.part} took {seat.id}'s place within the cast_timeout; the play stops")
+            self.stop_run("uncastable")
         return None
 
     async def local_seat_exited(self, name: str) -> None:

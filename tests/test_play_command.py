@@ -288,3 +288,21 @@ def test_a_local_verifier_seat_runs_the_plays_verifier_in_its_own_process(tmp_pa
     verdicts = {e["verifier"]: e["by"] for e in log if e["event"] == "verdict"}
     assert verdicts == {"tests-fail": "director", "tests-pass": "checker"}
     assert any(e["event"] == "verifier-joined" and e["actor"] == "checker" for e in log)
+
+
+def test_a_part_nobody_can_take_stops_the_play_at_the_cast_timeout(tmp_path):
+    """D50: the coder's only local seat is refused at join (unpriced under a budget), so the part never fills."""
+    with fake_openai() as (url, calls, _):
+        folder = play_folder(tmp_path, url, budget=1.0)
+        play = yaml.safe_load((folder / "play.yaml").read_text())
+        play["house_rules"]["cast_timeout"] = 3
+        (folder / "play.yaml").write_text(yaml.safe_dump(play))
+        coder = yaml.safe_load((folder / "coder-1.yaml").read_text())
+        coder["models"][0].pop("price")
+        (folder / "coder-1.yaml").write_text(yaml.safe_dump(coder))
+        result = zanni(folder / "play.yaml", tmp_path=tmp_path)
+        assert "director" not in calls  # the director never took a turn
+    assert result.returncode == 1 and "within the cast_timeout (3 s)" in result.stdout
+    log = [json.loads(line) for line in next((folder / "log").glob("*.jsonl")).read_text().splitlines()]
+    assert log[-1]["reason"] == "uncastable"
+    assert [e["seat"] for e in log if e["event"] == "seat-started"].count("coder-1") == 1

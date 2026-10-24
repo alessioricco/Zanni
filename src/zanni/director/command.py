@@ -294,8 +294,10 @@ async def _run(play_path, play, script, prose, director, director_file, packages
                 for part in play.cast:
                     await production.local.start(part, min(production.local.listed(part), state.seats_for(part).min))
                 await production.local.start(VERIFIER_PART, production.local.listed(VERIFIER_PART))
-            await _wait_for_minimums(production, say)
-            reason, completed = await production.direct(turn)
+            if await _wait_for_minimums(production, say):
+                reason, completed = await production.direct(turn)
+            else:
+                reason, completed = "uncastable", False
             await production.finish()
             await _publish(production, play, completed, say)
     finally:
@@ -327,13 +329,21 @@ async def _publish(production: Production, play: PlayFile, completed: bool, say)
             f"the play didn't finish). To publish it: {backend.push_command()}")
 
 
-async def _wait_for_minimums(production: Production, say) -> None:
-    """Before the first turn, every part has at least its minimum seats: local ones started, others joining."""
+async def _wait_for_minimums(production: Production, say) -> bool:
+    """Before the first turn, every part has at least its minimum seats: local ones started, others joining. False
+    when one is still short after the house rule cast_timeout (D50)."""
     state = production.state
     told = False
+    loop = asyncio.get_running_loop()
+    until = loop.time() + state.play.house_rules.cast_timeout
     while short := [p for p in state.play.cast if len(production.active_seats(p)) < state.seats_for(p).min]:
         if not told:
             say(f"Waiting for actors to join: {', '.join(short)}")
             told = True
+        if loop.time() >= until:
+            say(f"No actor took the part(s) {', '.join(short)} within the cast_timeout "
+                f"({state.play.house_rules.cast_timeout} s); the play stops")
+            return False
         await asyncio.sleep(0.2)
+    return True
 
