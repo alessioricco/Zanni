@@ -43,6 +43,7 @@ class PlayState:
     inbox: list[Report] = field(default_factory=list)  # reports the model hasn't seen yet
     verdicts: dict[str, Verdict] = field(default_factory=dict)  # the latest per verifier
     gates: dict[str, str] = field(default_factory=dict)  # gate -> approved, rejected or skipped
+    gate_rounds: dict[str, int] = field(default_factory=dict)  # gate -> the round of its latest decision (D48)
     pending_gate: tuple[str, str] | None = None  # (name, summary) while waiting at a gate
     paused: str | None = None  # why, while every director model has failed
     stopped: tuple[str, bool] | None = None  # (reason, completed) once the run ends
@@ -62,6 +63,13 @@ class PlayState:
 
     def enforced_gates(self) -> list[str]:
         return [g for g in self.script.gate_names if g in self.play.house_rules.gates]
+
+    def gate_open(self, name: str) -> bool:
+        """Approved as the gate's rhythm requires: once in the play, or in this round for `every: round` (D48)."""
+        if self.gates.get(name) != "approved":
+            return False
+        gate = self.script.gate(name)
+        return gate is None or gate.every == "play" or self.gate_rounds.get(name) == self.round
 
     def charge(self, amount: Decimal | None) -> None:
         if amount is None:

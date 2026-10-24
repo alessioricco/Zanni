@@ -31,8 +31,13 @@ def instructions(script: Script, prose: str, play: PlayFile) -> str:
         stop.append(f"at most ${script.stop.budget_per_round:.2f} per round")
     if script.stop.done_when:
         stop.append(f"done when {', '.join(script.stop.done_when)} pass")
+    enforced = []
+    for gate in script.gates:
+        if gate.name in rules.gates:
+            when = "every round" if gate.every == "round" else "once"
+            enforced.append(f"{gate.name} ({when}{', before any cue to ' + ', '.join(gate.before) if gate.before else ''})")
     house = [f"budget: {'$' + format(rules.budget, '.2f') if rules.budget is not None else 'none'}",
-             f"gates this play enforces: {', '.join(rules.gates) or 'none'} (the others are skipped)",
+             f"gates this play enforces: {', '.join(enforced) or 'none'} (the others are skipped)",
              f"at most {rules.max_director_turns} of your turns per round"]
     return "\n".join([
         (ROLE / "AGENTS.md").read_text().strip(), "",

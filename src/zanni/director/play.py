@@ -116,6 +116,8 @@ class Production:
         seat = self._seat_for(target)
         if isinstance(seat, str):
             return self._refuse("cue", seat)
+        if refusal := rules.gates_before(self.state, seat.part):
+            return self._refuse("cue", refusal)
         if refusal := rules.paths_within(seat.stage.read_rules, seat.stage.write_rules, reads, writes):
             return self._refuse("cue", refusal)
         try:
@@ -374,6 +376,8 @@ class Production:
             return stopped
         if self.pending:
             return self._refuse("end_round", "cues are still pending; wait_for_reports first")
+        if refusal := rules.round_gates(self.state):
+            return self._refuse("end_round", refusal)
         return self._end_round(reason)
 
     def _end_round(self, reason: str) -> str:
@@ -438,7 +442,7 @@ class Production:
             listed = f"; {self.local.listed(part)} local seat(s) listed" if self.local else ""
             lines.append(f"  part {part}: {len(self.active_seats(part))} cast, may have {seats}{listed}")
         if s.enforced_gates():
-            lines.append("Gates: " + ", ".join(f"{g} ({s.gates.get(g, 'not asked yet')})" for g in s.enforced_gates()))
+            lines.append("Gates: " + ", ".join(f"{g} ({self._gate_state(g)})" for g in s.enforced_gates()))
         if s.script.verifiers:
             lines.append("Verifiers:")
             for name, v in s.script.verifiers.items():
@@ -454,6 +458,19 @@ class Production:
         if reports:
             lines.append(reports)
         return "\n".join(lines)
+
+    def _gate_state(self, name: str) -> str:
+        s, gate = self.state, self.state.script.gate(name)
+        rhythm = (f"every round, before {', '.join(gate.before)}" if gate.before else "every round") \
+            if gate.every == "round" else (f"once, before {', '.join(gate.before)}" if gate.before else "once")
+        decision = s.gates.get(name)
+        if decision is None:
+            now = "not asked yet"
+        elif gate.every == "round" and s.gate_rounds.get(name) != s.round:
+            now = f"{decision} in round {s.gate_rounds.get(name)}; needed again in this round"
+        else:
+            now = decision
+        return f"{rhythm}: {now}"
 
     async def direct(self, run_turn: RunTurn) -> tuple[str, bool]:
         """Take turns until the play stops; returns (reason, completed)."""

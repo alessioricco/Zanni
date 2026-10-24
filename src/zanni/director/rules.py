@@ -76,9 +76,9 @@ def may_run_verifier(state: PlayState, name: str, writing_cues: int) -> str | No
 
 def may_stop_done(state: PlayState, marker: int) -> str | None:
     """"Done" only with every enforced gate approved and done_when verified after the last change (D33, D35)."""
-    missing = [g for g in state.enforced_gates() if state.gates.get(g) != "approved"]
+    missing = [g for g in state.enforced_gates() if not state.gate_open(g)]
     if missing:
-        return f"the gate(s) {', '.join(missing)} haven't been approved; ask for them with ask_gate first"
+        return f"the gate(s) {', '.join(missing)} haven't been approved{_this_round(state, missing)}; ask for them with ask_gate first"
     done_when = state.script.stop.done_when
     if done_when:
         not_yet = []
@@ -113,6 +113,29 @@ def may_cast(state: PlayState, part: str, total: int, active: int, local_files: 
     if total > active and local_started >= local_files and not has_remote:
         return (f"every local seat listed for {part} is already started ({local_files}); more can only come from "
                 "actors joining, and this part takes none")
+    return None
+
+
+def _this_round(state: PlayState, gates: list[str]) -> str:
+    return " in this round" if any(state.script.gate(g) and state.script.gate(g).every == "round" for g in gates) else ""
+
+
+def gates_before(state: PlayState, part: str) -> str | None:
+    """A cue to `part` waits for every enforced gate that names it in `before` (D48)."""
+    waiting = [g.name for g in state.script.gates
+               if part in g.before and g.name in state.enforced_gates() and not state.gate_open(g.name)]
+    if waiting:
+        return (f"the gate(s) {', '.join(waiting)} must be approved{_this_round(state, waiting)} before {part} gets a "
+                "cue; ask for them with ask_gate first")
+    return None
+
+
+def round_gates(state: PlayState) -> str | None:
+    """`end_round` waits for every enforced `every: round` gate to be approved in this round (D48)."""
+    waiting = [g.name for g in state.script.gates
+               if g.every == "round" and g.name in state.enforced_gates() and not state.gate_open(g.name)]
+    if waiting:
+        return f"the gate(s) {', '.join(waiting)} haven't been approved in this round; ask for them with ask_gate first"
     return None
 
 

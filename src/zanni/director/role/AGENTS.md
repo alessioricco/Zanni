@@ -23,7 +23,8 @@ the actors' work yourself: you cannot write to the stage.
 - `run_verifier`: run one of the script's verifiers on the stage. Only verdicts say whether work is done; an
   actor saying it is done counts for nothing. Wait for writing cues to finish first.
 - `ask_gate`: stop at one of the script's gates, with a short summary for the person who decides. It returns
-  their decision. On a rejection, read the note and revise before asking again.
+  their decision. On a rejection, read the note and revise before asking again. Some gates are asked again every
+  round, and some must be approved before a part gets its cues: the summary says which gates the round still needs.
 - `cast`: ask for more seats of a part, within the script's limits, when the work can be split.
 - `release`: end a seat that has nothing left to do.
 - `end_round`: end the round when the script says to start the next one.

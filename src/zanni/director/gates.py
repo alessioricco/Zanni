@@ -57,6 +57,7 @@ class Gates:
         else:
             outcome = "approved" if decision.action == "approve" else "rejected"
             self.state.gates[name] = outcome
+            self.state.gate_rounds[name] = self.state.round  # an `every: round` gate counts in this round only (D48)
             self.log.event("gate", gate=name, decision=outcome, by=decision.by, note=decision.note)
             self.say(f"Gate '{name}' {outcome}{' by ' + decision.by if decision.by else ''}"
                      f"{': ' + decision.note if decision.note else ''}")
