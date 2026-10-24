@@ -3,6 +3,8 @@
 The engine (src/zanni/engine/) is the only part that knows Pydantic AI, MCP or A2A (golden rule 4, D1).
 """
 
+from __future__ import annotations  # Stage.list shadows `list` in the class body; Python < 3.14 evaluates eagerly
+
 from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Protocol

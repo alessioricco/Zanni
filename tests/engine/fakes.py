@@ -1,5 +1,7 @@
 """Fakes for engine tests: a stage in memory, and scripted models. No network, no keys."""
 
+from __future__ import annotations  # a `list` method shadows `list` in the class body; Python < 3.14 evaluates eagerly
+
 from pydantic_ai.messages import ModelResponse, TextPart, ToolCallPart
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 

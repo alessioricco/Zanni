@@ -4,6 +4,8 @@ Enforcement lives here, in the stage, never in the prompt (golden rule 5). The d
 rehearsal runner, keeps the append-only record of changes; change markers are positions in it.
 """
 
+from __future__ import annotations  # a `list` method shadows `list` in the class body; Python < 3.14 evaluates eagerly
+
 from pathlib import Path
 
 from zanni.actor.contract import StageError

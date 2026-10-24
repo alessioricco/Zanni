@@ -5,6 +5,8 @@ tool errors with the text `<code>: <message>`. Client: turns those back into the
 stage raises, so a model sees the same tools and the same errors on a local or a remote stage.
 """
 
+from __future__ import annotations  # a `list` method shadows `list` in the class body; Python < 3.14 evaluates eagerly
+
 import contextlib
 import json
 import logging
