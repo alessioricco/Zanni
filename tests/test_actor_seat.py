@@ -104,7 +104,9 @@ def test_an_actor_joins_answers_two_cues_and_is_released(setup):
     director_log = (run_dir / "log.jsonl").read_text()
     actor_log = (run_dir / "actor-log.jsonl").read_text()
     for text in (director_log, actor_log):
-        assert "token" not in text and "join-token-fake" not in text  # tokens are never logged (D24)
+        keys = {k for line in text.splitlines() for k in json.loads(line)}
+        assert not {k for k in keys if "token" in k} - {"input_tokens", "output_tokens"}  # never a token (D24)
+        assert "join-token-fake" not in text
     own = log(run_dir / "actor-log.jsonl")
     assert own[0]["event"] == "joined" and own[0]["permissions"]["write"] == ["tests/"]
     assert [e["event"] for e in own][1:] == ["cue", "report", "cost", "cue", "report", "cost", "released"]

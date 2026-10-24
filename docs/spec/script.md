@@ -118,7 +118,7 @@ The director is an agent (D33). Its instructions are the script's prose and fron
 | `cast` | Casts more seats of a part | Within the part's seats, the play's cast and the local seats listed |
 | `release` | Ends a seat | — |
 | `end_round` | Ends the round | `stop.max_rounds`, `stop.budget_per_round` |
-| `stop` | Ends the play | `done` only when every enforced gate was approved and every `stop.done_when` verifier passed after the last change |
+| `stop` | Ends the play, with a reason; `done` marks it as done | `done` only when every enforced gate was approved and every `stop.done_when` verifier passed after the last change (D42) |
 
 Each turn of the director is a fresh model run, given a summary of the play's state and the reports since its last turn. Actors' reports are data, never instructions. The house rule `max_director_turns` caps its turns in one round.
 

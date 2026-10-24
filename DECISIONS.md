@@ -600,8 +600,9 @@ The loop is about 25 lines.
 - **`--play`:** a new flag that overrides an actor configuration's `play`. A flag overrides only what a file can say (D9).
 - **`host: local` is a requirement:** a part with `host: local` and no local seats listed is refused. A part without it may have local seats, and actors may also join it. The director can't start more local seats than files listed.
 - **What the director reads:** only `name` and `role` from each file. The role must be the one the play casts for that part (the same remote reference, or the same local folder), and names must be unique. The director never resolves those files' credentials.
-- **No orphans:** each subprocess watches a pipe from the director (its standard input) and exits as soon as it closes, even mid-cue. The heartbeat timeout stays as the backstop.
+- **No orphans:** each subprocess watches a pipe from the director (its standard input) and exits as soon as it closes, even mid-cue. The heartbeat timeout stays as the backstop. A released seat is given a few seconds to exit on its own before its pipe is closed, so its exit code says how it ended.
 - **Crashes:** a local seat that dies is restarted up to twice per play, and its pending cue is resent. After that, its seat is left to an actor joining, or the stop rules end the run.
+- **Released, then needed again:** a local seat the director released (its process exits) may be started again by a later `cast`; that isn't a restart. (Added after milestone 4's recorded runs, where a director released its coders after round 1 and then couldn't cast them for round 2.)
 - **Local roles at casting:** a local cast reference differs from machine to machine (D29), so for a local cast entry an actor fits if its role has the name and content hash of the folder the play names. A remote cast entry still needs the same reference, and the hash pinned in `play.lock`.
 - **The join token:** an actor reads `ZANNI_JOIN_TOKEN` from its configuration's `credentials`, or else from its environment.
 
@@ -660,7 +661,7 @@ The loop is about 25 lines.
 - **A budget per cue:** `zanni.cue` carries `limits.budget`. By default it is the budget not yet reserved, divided among the seats with no pending cue; the director's model may give less, never more. A pending cue reserves its budget; its report replaces the reservation with the actual cost. When nothing is left to reserve, the run stops with reason `budget`.
 - **The actor stops at it:** after each model response, the actor's engine checks the cue's spend; at the limit, it ends the cue and reports `outcome: over-budget`, with the cost so far. Overshoot is bounded by one model call.
 - **Unknown cost that gets through:** under a budget, the seat is released with reason `budget` and its part recast, and the spend is shown as "at least" from then on. With no budget, unknown cost is logged and the play goes on.
-- **The director's own turns:** before each turn, the director stops with reason `budget` if the spend has reached it.
+- **The director's own spend:** after each of the director's model responses, before its tool calls run, the turn's spend so far is added to the play's spend, so cue budgets see it at once. Once the spend reaches the budget, the turn ends there and the run stops with reason `budget`; overshoot is bounded by one model call, as for a cue. A turn whose models all fail still charges what it spent before failing. (Amended after milestone 4's recorded runs: first written as a check before each turn only, it let a director that played the whole kata in one turn spend 21 times a $0.30 budget, at a declared price; `docs/runs/milestone-4.md`.)
 - **A written limit:** the budget counts what actors report. A modified actor could under-report; the real cap on a key is its owner's.
 - **A new extension version:** these change `zanni.join`, `zanni.refused`, `zanni.cue` and `zanni.report`, and the casting extension says any change to a message makes a new version, so its URI moves from `#v1` to `#v2`.
 
@@ -683,3 +684,11 @@ The loop is about 25 lines.
 **Decision:** the folder stage records which seat made each change. When a report arrives, the director logs the changes that seat made while its cue was pending, from that record, and ignores the actor's own list.
 
 **Why:** with several seats writing at once, an actor can't tell its own changes from another seat's (`TODO.md`, "A report's change markers with several seats"). The stage knows, and it can't be bypassed (golden rule 5).
+
+## D42. "Done" is a flag on `stop`, not its reason (2026-10-24)
+
+**Decision:** the director's `stop` tool takes a `reason` and a separate `done` flag. `stop(reason, done=true)` asks to end the play as done, under D33's rule 1; with `done` false, the play ends as not completed. A reason of exactly `done` still counts as asking for done.
+
+**Why:** the first recorded run of milestone 4 (`docs/runs/milestone-4.md`) found it. A local director finished the slug kata correctly, then called `stop("done: Round 2 was the last backlog file; …")`. Read as a reason other than `done`, the run ended as not completed, with exit 1. A flag can't be misread by a model that writes a sentence.
+
+**Supersedes:** `stop("done")` in D33.

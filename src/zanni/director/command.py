@@ -212,8 +212,10 @@ async def _run(play_path, play, script, prose, director, director_file, packages
     tools = production.tools()
 
     async def turn(prompt) -> TurnOutcome:
-        result = await run_director_turn(models, text, prompt, tools, build=build)
-        return TurnOutcome(result.model, result.cost, result.requests, result.fallbacks)
+        result = await run_director_turn(models, text, prompt, tools, build=build,
+                                         spending=production.director_spending)
+        return TurnOutcome(result.model, result.cost, result.requests, result.fallbacks, result.input_tokens,
+                           result.output_tokens)
 
     log.event("run-started", play=play.name, script={"ref": play.script, "commit": packages.script.pin.commit,
                                                      "hash": packages.script.pin.hash})

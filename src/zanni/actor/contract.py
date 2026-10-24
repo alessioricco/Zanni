@@ -96,6 +96,9 @@ class CueResult:
 class AllModelsFailed(Exception):
     """Every model in the list failed, or one failed for a reason its entry doesn't fall back on."""
 
-    def __init__(self, fallbacks: list[Fallback]):
+    def __init__(self, fallbacks: list[Fallback], cost: Decimal | None = Decimal(0), input_tokens: int = 0,
+                 output_tokens: int = 0):
         self.fallbacks = fallbacks
+        self.cost = cost  # what the failed attempts spent before failing; None when unknown (D7)
+        self.input_tokens, self.output_tokens = input_tokens, output_tokens
         super().__init__("; ".join(f"{f.model}: {f.reason} ({f.detail})" for f in fallbacks))

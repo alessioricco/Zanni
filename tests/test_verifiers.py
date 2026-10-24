@@ -105,3 +105,13 @@ def test_done_without_done_when_is_weakly_checked_and_logged(tmp_path):
     assert run(p.stop("done")) == "the play is done"
     assert p.state.weak_done and p.state.stopped == ("done", True)
     assert any(e["event"] == "warning" and "weakly checked" in e["detail"] for e in events(tmp_path))
+
+
+def test_done_is_a_flag_so_a_sentence_for_the_reason_still_ends_the_play_as_done(tmp_path):
+    play, script, stage = kata(tmp_path, gates=())
+    p = production(tmp_path, play, script, stage)
+    (stage / "app/slug.py").write_text("x = 1\n")
+    run(p.run_verifier("tests-pass"))
+    reason = "done: round 2 was the last backlog file, and tests-pass passed"  # what a local director wrote (D42)
+    assert run(p.stop(reason, done=True)) == "the play is done" and p.state.stopped == ("done", True)
+    assert [e["note"] for e in events(tmp_path) if e["event"] == "stop-note"] == [reason]

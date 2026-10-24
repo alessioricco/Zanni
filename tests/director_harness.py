@@ -42,9 +42,9 @@ The **tester** writes a failing test for each item in `backlog/round-1.md`. *Ver
 """
 
 
-def priced(name="scripted") -> ResolvedModel:
+def priced(name="scripted", per_million=1) -> ResolvedModel:
     return ResolvedModel(ModelEntry(provider="openai-compatible", model=name, base_url="http://127.0.0.1:9/v1",
-                                    price={"input": 1, "output": 1}))
+                                    price={"input": per_million, "output": per_million}))
 
 
 def kata(tmp_path: Path, *, gates=("plan",), budget=None, turns=30, max_rounds=2, done_when=("tests-pass",),
@@ -114,7 +114,8 @@ def run_turn(p: Production, steps: Callable, models=None, build=None) -> Callabl
     model = FunctionModel(steps, model_name="scripted-director")
 
     async def turn(prompt):
-        result = await run_director_turn(models or [priced()], text, prompt, p.tools(), build=build or (lambda rm: model))
+        result = await run_director_turn(models or [priced()], text, prompt, p.tools(), build=build or (lambda rm: model),
+                                         spending=p.director_spending)
         return TurnOutcome(result.model, result.cost, result.requests, result.fallbacks)
 
     return turn

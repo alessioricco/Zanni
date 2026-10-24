@@ -198,3 +198,75 @@ def test_the_instructions_hold_the_role_the_script_and_the_rules(tmp_path):
     assert "- **coder**: 1-2 seat(s); writes app/" in text and "- `tests-pass`: every test passes" in text
     assert "done when tests-pass pass" in text and "budget: $2.00" in text and "gates this play enforces: plan" in text
     assert text.endswith("The **tester** writes tests.")
+
+
+def test_the_directors_own_spend_counts_response_by_response_and_ends_its_turn_at_the_budget(tmp_path):
+    """Milestone 4's recorded runs: a director that played the whole kata in one turn spent 21 times the budget,
+    because the budget was checked only between turns. Now its first response here costs more than the budget, so
+    the turn ends before that response's tool call runs."""
+    play, script, stage = kata(tmp_path, budget=Decimal("1.00"))
+    p = production(tmp_path, play, script, stage)
+    steps = Steps([[("cue", {"target": "tester", "scene": "Specify", "instructions": "Write the tests."})],
+                   [("wait_for_reports", {})], "never reached"])
+    expensive = priced(per_million=1_000_000)  # $1 a token
+
+    result = asyncio.run(staged(p, [("tester", actor_runner({}))], tmp_path,
+                                lambda p: p.direct(run_turn(p, steps, models=[expensive]))))
+    assert result == ("budget", False)
+    log = events(tmp_path)
+    assert not [e for e in log if e["event"] == "cue"]
+    cost = [e for e in log if e["event"] == "cost" and e["seat"] == "director"]
+    assert len(cost) == 1 and p.state.spend == Decimal(cost[0]["amount"]) >= Decimal("1.00")
+
+
+def test_a_turns_spend_is_charged_once_whether_reported_during_it_or_at_its_end(tmp_path):
+    from zanni.director.play import TurnOutcome
+
+    play, script, stage = kata(tmp_path, budget=Decimal("10.00"))
+    p = production(tmp_path, play, script, stage)
+    seen = []
+
+    async def turn(prompt):
+        assert p.director_spending(Decimal("0.40")) is False
+        assert p.director_spending(Decimal("0.70")) is False
+        seen.append(p.state.spend)
+        p.stop_run("checked")
+        return TurnOutcome("m", Decimal("0.90"))
+
+    asyncio.run(p.direct(turn))
+    assert seen == [Decimal("0.70")] and p.state.spend == Decimal("0.90")
+
+
+def test_a_turn_whose_models_all_fail_still_charges_what_it_spent(tmp_path):
+    """Milestone 4's recorded runs: the model server died mid-turn, and that turn's spend was never logged. What it
+    spent before failing counts (D7), and is logged as the director's cost."""
+    play, script, stage = kata(tmp_path, gates=())
+    p = production(tmp_path, play, script, stage)
+    calls = {"n": 0}
+
+    def dies_mid_turn(messages, info):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return Steps([[("list_files", {"path": "/"})]])(messages, info)
+        if calls["n"] == 2:
+            raise ModelAPIError("scripted", "the model server went away")
+        return Steps([[("stop", {"reason": "resumed and stopped"})]])(messages, info) if calls["n"] == 3 else \
+            Steps(["ok"])(messages, info)
+
+    model = FunctionModel(dies_mid_turn, model_name="dies")
+
+    async def body(p):
+        async def resume():
+            await until(lambda: p.state.paused is not None)
+            p.gates.decide("resume", "back")
+
+        resumed = asyncio.create_task(resume())
+        result = await p.direct(run_turn(p, dies_mid_turn, models=[priced("a", per_million=1000)],
+                                         build=lambda rm: model))
+        await resumed
+        return result
+
+    assert asyncio.run(staged(p, [("tester", actor_runner({}))], tmp_path, body)) == ("resumed and stopped", False)
+    costs = [e for e in events(tmp_path) if e["event"] == "cost" and e["seat"] == "director"]
+    assert len(costs) == 2 and Decimal(costs[0]["amount"]) > 0 and costs[0]["input_tokens"] > 0
+    assert p.state.spend == sum(Decimal(c["amount"]) for c in costs)

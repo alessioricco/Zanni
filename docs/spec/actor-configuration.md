@@ -95,7 +95,7 @@ Every actor keeps its own log, on its own machine, whether its director is local
 | `cue` | `seat`, `scene`, `cue` | A cue arrives. |
 | `fallback` | `seat`, `model`, `reason`, `detail` | A model failed, and the actor moved on (D20). |
 | `report` | `seat`, `cue`, `outcome`, `summary`, `changes` | The actor sends its report. |
-| `cost` | `seat`, `model`, `amount` | The cue's spend, `null` when unknown (D7). |
+| `cost` | `seat`, `model`, `amount`, `input_tokens`, `output_tokens` | The cue's spend, `null` when unknown (D7), and its tokens. |
 | `released` | `seat`, `reason` | The seat ends. |
 
 The director keeps the play's log; neither log depends on the other.

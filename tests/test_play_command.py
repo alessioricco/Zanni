@@ -140,6 +140,8 @@ def test_a_play_runs_to_done_with_a_gate_decided_from_another_process(tmp_path):
     events = [e["event"] for e in log]
     assert events[0] == "run-started" and events[-1] == "run-stopped" and log[-1]["completed"]
     assert {"seat-started", "actor-joined", "cue", "report", "verdict", "gate-pending", "gate", "seat-released"} <= set(events)
+    # each seat saw its release and exited on its own, with 0, before its pipe was closed
+    assert [e["exit_code"] for e in log if e["event"] == "seat-exited"] == [0, 0]
     text = "\n".join(json.dumps(e) for e in log)
     assert JOIN not in text and OWNER not in text
     assert {"director", "write:tests/test_slug.py", "write:app/slug.py"} <= set(calls)
@@ -239,3 +241,20 @@ def test_update_rewrites_play_lock_and_runs_nothing(tmp_path):
     assert first.returncode == 0 and f"Wrote {folder / 'play.lock'}" in first.stdout
     assert second.returncode == 0 and "./roles/coder: its content changed" in second.stdout
     assert "run the play again to use it" in second.stdout
+
+
+def test_a_local_seat_that_cant_join_exits_cleanly_while_watching_its_pipe(tmp_path):
+    """A seat whose join fails exits 2 through the normal path, while its pipe is still open: the watch on its stdin
+    mustn't make the interpreter abort at exit (it did, with SIGABRT, in milestone 4's recorded runs)."""
+    with fake_openai() as (url, _, _):
+        folder = play_folder(tmp_path, url)
+        seat = subprocess.Popen([PY, "-m", "zanni", str(folder / "tester-1.yaml"), "--play", "http://127.0.0.1:9"],
+                                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                                env=env(tmp_path, ZANNI_WATCH_STDIN="1"))
+        try:
+            seat.wait(60)  # its stdin stays open: the director is still there
+            out, err = seat.stdout.read(), seat.stderr.read()
+        finally:
+            seat.kill()
+    assert seat.returncode == 2, out + err
+    assert "Fatal Python error" not in err

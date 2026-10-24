@@ -43,9 +43,12 @@ def exit_with_stdin() -> None:
     import threading
 
     def watch():
-        while sys.stdin.buffer.read(1024):
+        # os.read, not sys.stdin: a thread blocked in the buffered reader holds its lock, and the interpreter aborts
+        # when it exits normally (a refused join) while that lock is held.
+        while os.read(0, 1024):
             pass
         print("The director's pipe closed; stopping this seat.", file=sys.stderr, flush=True)
+        sys.stdout.flush()
         os._exit(1)
 
     threading.Thread(target=watch, daemon=True, name="zanni-director-pipe").start()

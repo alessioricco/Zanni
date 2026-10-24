@@ -16,6 +16,7 @@ from pathlib import Path
 from zanni.log import Log
 
 RESTARTS = 2
+RELEASED_GRACE = 5  # seconds a released seat has to exit on its own before its pipe is closed
 
 
 @dataclass
@@ -45,22 +46,30 @@ class LocalSeats:
         return len(self.seats.get(part, []))
 
     def started(self, part: str) -> int:
-        return sum(1 for s in self.seats.get(part, []) if s.proc is not None)
+        return sum(1 for s in self.seats.get(part, []) if not self._free(s))
+
+    @staticmethod
+    def _free(seat: LocalSeat) -> bool:
+        """Never started, or released: the director may start it again for a later scene."""
+        return seat.proc is None or seat.expected_exit
 
     def by_name(self, name: str | None) -> LocalSeat | None:
         return next((s for s in self.all() if s.name == name), None)
 
     async def start(self, part: str, n: int) -> int:
-        """Start up to `n` of the part's listed seats that haven't started; returns how many started."""
-        new = [s for s in self.seats.get(part, []) if s.proc is None][:n]
+        """Start up to `n` of the part's listed seats that aren't running (never started, or released); returns how
+        many started. A released seat is waited for, or stopped, before it starts again."""
+        new = [s for s in self.seats.get(part, []) if self._free(s)][:n]
         for seat in new:
+            await self._end(seat)
             await self._spawn(seat)
         return len(new)
 
     async def _spawn(self, seat: LocalSeat) -> None:
         self.out_dir.mkdir(parents=True, exist_ok=True)
         out = (self.out_dir / f"{seat.name}.out").open("a")
-        env = {**os.environ, "ZANNI_JOIN_TOKEN": self.join_token, "ZANNI_WATCH_STDIN": "1"}
+        # Unbuffered, so its output reaches the file as it happens, even if it is stopped through its pipe.
+        env = {**os.environ, "ZANNI_JOIN_TOKEN": self.join_token, "ZANNI_WATCH_STDIN": "1", "PYTHONUNBUFFERED": "1"}
         seat.expected_exit = False
         seat.proc = await asyncio.create_subprocess_exec(
             sys.executable, "-m", "zanni", str(seat.config), "--play", self.url, stdin=asyncio.subprocess.PIPE,
@@ -100,10 +109,16 @@ class LocalSeats:
             seat.expected_exit = True
 
     async def _end(self, seat: LocalSeat, grace: float = 10) -> None:
-        """Close its pipe (it exits at once), then kill it if it hasn't after `grace` seconds."""
+        """Close its pipe (it exits at once), then kill it if it hasn't after `grace` seconds. A released seat is first
+        given a few seconds to see its release and exit on its own, so its exit code says how it ended."""
         proc = seat.proc
         if proc is None or proc.returncode is not None:
             return
+        if seat.expected_exit:
+            with contextlib.suppress(TimeoutError):
+                await asyncio.wait_for(proc.wait(), RELEASED_GRACE)
+            if proc.returncode is not None:
+                return
         seat.expected_exit = True
         with contextlib.suppress(Exception):
             proc.stdin.close()

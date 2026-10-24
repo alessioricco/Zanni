@@ -27,9 +27,9 @@ the actors' work yourself: you cannot write to the stage.
 - `cast`: ask for more seats of a part, within the script's limits, when the work can be split.
 - `release`: end a seat that has nothing left to do.
 - `end_round`: end the round when the script says to start the next one.
-- `stop`: end the play. `stop("done")` is accepted only when every gate the play enforces was approved, and the
-  script's "done" verifiers passed on the stage as it is now. Stop with another reason (such as "stuck") when the
-  play can't go on.
+- `stop`: end the play, with a short reason. Set `done` to true to end it as done: that is accepted only when
+  every gate the play enforces was approved, and the script's "done" verifiers passed on the stage as it is now.
+  With `done` false (such as when the play is stuck), it ends as not completed.
 - `read` and `list_files`: look at the stage.
 
 ## Rules

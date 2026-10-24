@@ -26,43 +26,59 @@ class TurnResult:
     output_tokens: int
     cost: Decimal | None  # every attempt's spend, failed ones included; None when any of it is unknown (D7)
     fallbacks: list[Fallback] = field(default_factory=list)
+    over_budget: bool = False  # `spending` said the play's budget was reached, and the turn was ended
 
 
 async def run_director_turn(models: list[ResolvedModel], instructions: str, prompt: Callable[[], str],
                             tools: list[Callable], *, build: Callable[[ResolvedModel], Model] = build_model,
-                            requests_per_turn: int = REQUESTS_PER_TURN) -> TurnResult:
+                            requests_per_turn: int = REQUESTS_PER_TURN,
+                            spending: Callable[[Decimal | None], bool] | None = None) -> TurnResult:
     """Run one turn. `prompt` is called for each attempt, so a fallback model sees the state as it is now.
+
+    `spending` is told the turn's spend so far after every model response, before its tool calls run (D39); when
+    it returns True, the turn ends there: overshoot is bounded by one model call, as for an actor's cue.
 
     Raises AllModelsFailed when every model failed (the director then pauses the play, D33).
     """
     fallbacks: list[Fallback] = []
     spent: Decimal | None = Decimal(0)
+    tokens = [0, 0]  # the failed attempts' input and output tokens
     for i, rm in enumerate(models):
         agent = Agent(build(rm), instructions=instructions, toolsets=[FunctionToolset(tools, sequential=True)])
         usage = None
         output = ""
+        over = False
         try:
             async with agent.iter(prompt()) as run:
                 async for node in run:
                     usage = run.usage
-                    if usage.requests >= requests_per_turn and Agent.is_call_tools_node(node):
+                    if not Agent.is_call_tools_node(node):
+                        continue
+                    if spending is not None and spending(_add(spent, cost_of(usage, rm)[0])):
+                        over = True
+                        output = "(the play's budget was reached, and the turn was ended)"
+                        break
+                    if usage.requests >= requests_per_turn:
                         output = f"(the turn reached {requests_per_turn} model requests and was ended)"
                         break
-                if run.result is not None:
+                if run.result is not None and not over:
                     output = str(run.result.output)
                 usage = run.usage
         except Exception as exc:
             reason = classify(exc)
             if reason is None:
                 raise
-            spent = _add(spent, cost_of(usage, rm)[0] if usage and usage.requests else Decimal(0))
+            if usage and usage.requests:
+                spent = _add(spent, cost_of(usage, rm)[0])
+                tokens = [tokens[0] + usage.input_tokens, tokens[1] + usage.output_tokens]
             fallbacks.append(Fallback(rm.label(), reason, f"{type(exc).__name__}: {exc}"[:300]))
             if i == len(models) - 1 or reason not in rm.entry.fall_back_on:
-                raise AllModelsFailed(fallbacks) from exc
+                raise AllModelsFailed(fallbacks, spent, *tokens) from exc
             continue
         spent = _add(spent, cost_of(usage, rm)[0])
-        return TurnResult(rm.label(), output, usage.requests, usage.input_tokens, usage.output_tokens, spent, fallbacks)
-    raise AllModelsFailed(fallbacks)
+        return TurnResult(rm.label(), output, usage.requests, usage.input_tokens, usage.output_tokens, spent, fallbacks,
+                          over)
+    raise AllModelsFailed(fallbacks, spent, *tokens)
 
 
 def _add(total: Decimal | None, amount: Decimal | None) -> Decimal | None:

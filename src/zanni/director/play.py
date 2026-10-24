@@ -42,6 +42,8 @@ class TurnOutcome:
     cost: Decimal | None
     requests: int = 0
     fallbacks: list = None
+    input_tokens: int = 0
+    output_tokens: int = 0
 
 
 # A director turn, run by the engine: given a function returning the prompt, it runs the model loop with the tools.
@@ -63,6 +65,7 @@ class Production:
         self.cues = 0
         self.last_gate_marker = 0
         self.recast_wait = recast_wait  # seconds a lost seat's part waits for its next seat before giving up
+        self._turn_charged = Decimal(0)  # the current turn's spend already charged, response by response (D39)
 
     # --- helpers
 
@@ -321,10 +324,10 @@ class Production:
         self.say(f"Round {self.state.round}")
         return f"round {self.state.round} begins"
 
-    async def stop(self, reason: str) -> str:
+    async def stop(self, reason: str, done: bool = False) -> str:
         if stopped := self._stopped():
             return stopped
-        if reason.strip().lower() == "done":
+        if done or reason.strip().lower() == "done":
             if self.pending:
                 return self._refuse("stop", "cues are still pending; wait_for_reports first")
             if refusal := rules.may_stop_done(self.state, self.marker()):
@@ -333,6 +336,8 @@ class Production:
                 self.state.weak_done = True
                 self.log.event("warning", detail="the script has no stop.done_when, so done was weakly checked")
             self.stop_run("done", completed=True)
+            if reason.strip().lower() != "done":
+                self.log.event("stop-note", note=reason)
             return "the play is done"
         self.stop_run(reason.strip() or "stopped by the director")
         return f"the play stopped: {reason}"
@@ -404,11 +409,17 @@ class Production:
                 self._end_round("director-turns")
                 continue
             self.state.turns += 1
+            self._turn_charged = Decimal(0)
             try:
                 outcome = await run_turn(self.summary)
             except AllModelsFailed as e:
                 for f in e.fallbacks:
                     self.log.event("fallback", seat="director", model=f.model, reason=f.reason, detail=f.detail)
+                # what the failed turn spent still counts: never as zero (D7)
+                self.state.charge(None if e.cost is None else e.cost - self._turn_charged)
+                self.log.event("cost", seat="director", model=e.fallbacks[-1].model if e.fallbacks else None,
+                               amount=str(e.cost) if e.cost is not None else None, input_tokens=e.input_tokens,
+                               output_tokens=e.output_tokens)
                 decision = await self.gates.pause("every one of the director's models failed: "
                                                   + "; ".join(f"{f.model}: {f.reason}" for f in e.fallbacks))
                 if decision.action != "resume":
@@ -416,14 +427,25 @@ class Production:
                 continue
             for f in outcome.fallbacks or []:
                 self.log.event("fallback", seat="director", model=f.model, reason=f.reason, detail=f.detail)
-            self.state.charge(outcome.cost)
+            self.state.charge(None if outcome.cost is None else outcome.cost - self._turn_charged)
             self.log.event("cost", seat="director", model=outcome.model,
-                           amount=str(outcome.cost) if outcome.cost is not None else None)
+                           amount=str(outcome.cost) if outcome.cost is not None else None,
+                           input_tokens=outcome.input_tokens, output_tokens=outcome.output_tokens)
         for p in list(self.pending.values()):
             if p.task:
                 p.task.cancel()
         reason, completed = self.state.stopped
         return reason, completed
+
+    def director_spending(self, so_far: Decimal | None) -> bool:
+        """Told the current turn's spend after each of the director's model responses (D39): it counts in the play's
+        spend at once, so cue budgets see it. True when the play's budget is reached, to end the turn."""
+        if so_far is None:
+            self.state.charge(None)
+            return False
+        self.state.charge(so_far - self._turn_charged)
+        self._turn_charged = so_far
+        return self.state.budget is not None and self.state.spend >= self.state.budget
 
     def tools(self) -> list[Callable]:
         """The director's tools, as plain functions with docstrings, for the engine (golden rule 4)."""
@@ -461,10 +483,10 @@ class Production:
             """End the current round, when the script says to start the next one."""
             return await production.end_round(reason)
 
-        async def stop(reason: str) -> str:
-            """End the play. "done" is accepted only when the script's done rules hold; any other reason ends it as
-            not completed."""
-            return await production.stop(reason)
+        async def stop(reason: str, done: bool = False) -> str:
+            """End the play, with a short reason. Set done=true to end it as done: accepted only when the script's
+            done rules hold (refused otherwise, and the play goes on). With done=false it ends as not completed."""
+            return await production.stop(reason, done)
 
         def read(path: str) -> str:
             """Read a file on the stage."""

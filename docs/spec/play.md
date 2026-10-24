@@ -135,7 +135,7 @@ It is recognised by having `lock_version`.
 2. **The packages:** the script and every role are resolved, fetched when remote, and checked against `play.lock`, which is written when missing ([The lockfile](#the-lockfile)).
 3. **The checks:** the play is checked against its script, as `--check` does, and the stage must hold the script's `stage.expects`.
 4. **Serving:** the director serves its A2A card and its stage's MCP server on one address (`--listen host:port`, default `127.0.0.1` on a free port), and writes `log/director.json` with that address and the run's id, never a token, so `zanni gate` can find it. It removes the file when the run ends.
-5. **Casting:** it starts the local seats its configuration lists, and accepts actors joining with the join token. Before its first turn, every part has at least its minimum seats.
+5. **Casting:** it starts the local seats its configuration lists, and accepts actors joining with the join token. Before its first turn, every part has at least its minimum seats. A local seat the director released can be started again by a later `cast`.
 6. **The script:** the director's turns follow the script, through its tools ([Script: how the director follows a script](script.md#how-the-director-follows-a-script)).
 7. **The end:** every seat is released, local seats are stopped, and the command exits with:
    - 0 when the director stopped the play as `done`, and the rules accepted it;
@@ -156,7 +156,8 @@ The play's spend is every report's cost plus the director's own (D39):
 - **Before casting:** under a budget, an actor whose models aren't all priced is refused (`unpriced`).
 - **Per cue:** each cue carries a budget, by default the budget not yet reserved divided among the seats with no pending cue. A pending cue reserves it; its report replaces the reservation with the actual cost. The actor stops at its cue's budget and reports `over-budget`.
 - **Unknown cost:** a report with an unknown cost under a budget releases that seat (reason `budget`) and recasts its part; the spend is then shown as "at least" that much.
-- **Stopping:** the run stops with reason `budget` when nothing is left to reserve, or before a director turn once the spend has reached the budget.
+- **The director's own spend:** counted after each of its model responses, before that response's tool calls run, so cue budgets see it at once. A turn whose models all fail still counts what it spent before failing.
+- **Stopping:** the run stops with reason `budget` when nothing is left to reserve, or once the spend reaches the budget, even in the middle of a director turn. One model call can overshoot it.
 - **What it can't enforce:** costs are what actors report. The real cap on a key is its owner's, such as a provider's spending limit.
 
 ## The log
@@ -180,7 +181,7 @@ The play's spend is every report's cost plus the director's own (D39):
 | `gate-pending` | `gate`, `summary` | The play waits at a gate. |
 | `gate` | `gate`, `decision` (`approved`, `rejected` or `skipped`), `by`, `note` | A human decides a gate, or the play doesn't enforce it. |
 | `paused`, `resumed` | `reason`; `by` and `note` when resumed | Every one of the director's models failed; the owner resumed it (D33). |
-| `cost` | `seat` (or `director`), `model`, `amount` (decimal string in USD, or `null` if unknown) | A seat, or the director, reports its spend. |
+| `cost` | `seat` (or `director`), `model`, `amount` (decimal string in USD, or `null` if unknown); for the director, `input_tokens` and `output_tokens` | A seat reports its spend, or the director counts one of its turns. |
 | `fallback` | `seat`, `model`, `reason`, `detail` | A model failed and the actor moved to its next one, or stopped (D27, D28). |
 | `tool-refused` | `tool`, `reason` | The rules refused one of the director's tool calls (D33). |
 | `round-ended` | `round`, `reason` | A round ends. |

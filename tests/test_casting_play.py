@@ -96,6 +96,25 @@ def test_cast_beyond_the_listed_local_seats_is_refused(home):
         assert "every local seat listed for coder is already started" in asyncio.run(local_play(home, ["done"], url, body))
 
 
+def test_a_released_local_seat_can_be_cast_again_for_a_later_scene(home):
+    """Milestone 4's recorded runs: a director released its coders after round 1, then couldn't cast them in round 2."""
+    with fake_openai() as (url, _, _):
+        async def body(p):
+            await p.cast("coder", 1)
+            await until(lambda: len(p.active_seats("coder")) == 1, timeout=60)
+            assert await p.release("coder-1", "round 1 is done") == "coder-1 released"
+            again = await p.cast("coder", 1)
+            await until(lambda: len(p.active_seats("coder")) == 1, timeout=60)
+            sent = await p.cue("coder", "Build", "Write app/slug.py.", writes=["app/"])
+            return again, sent, await p.wait_for_reports()
+
+        again, sent, report = asyncio.run(local_play(home, ["write:app/slug.py"], url, body))
+    assert again == "coder: 0 seat(s) cast, 1 local seat(s) starting"
+    assert sent.startswith("cue r1-c1 sent") and 'outcome="done"' in report
+    started = [e for e in events(home) if e["event"] == "seat-started"]
+    assert len(started) == 2 and not [e for e in events(home) if e["event"] == "seat-not-restarted"]
+
+
 def test_a_local_seat_exits_mid_cue_when_its_directors_pipe_closes(home):
     with fake_openai() as (url, calls, _):
         async def body(p):

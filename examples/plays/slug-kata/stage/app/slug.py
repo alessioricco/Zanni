@@ -1,2 +1,2 @@
-def slugify(text: str, max_length: int | None = None) -> str:
+def slugify(text: str) -> str:
     raise NotImplementedError

@@ -202,7 +202,8 @@ async def _answer(cue: Cue, stage, role: Role, models, servers, seat: str, log: 
                     cost=money(result.cost) if result and result.cost is not None else None,
                     models=[{"provider": result.provider, "model": result.model_name}] if result else [])
     log.event("report", seat=seat, cue=cue.cue, outcome=report.outcome, summary=report.summary, changes=changes)
-    log.event("cost", seat=seat, model=result.model if result else None, amount=report.cost.amount if report.cost else None)
+    log.event("cost", seat=seat, model=result.model if result else None, amount=report.cost.amount if report.cost else None,
+              input_tokens=result.input_tokens if result else None, output_tokens=result.output_tokens if result else None)
     if result:
         cost = f"${report.cost.amount}" if report.cost else "unknown"
         say(f"    {'stopped at its budget' if result.over_budget else 'done'} on {result.model}: "
