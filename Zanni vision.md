@@ -64,7 +64,7 @@ cast:
   product-owner: github.com/zanni-roles/product-owner@1.0.0
   tester: github.com/someone/tester@1.4.0
   coder: { role: github.com/zanni-roles/coder@1.0.0, seats: 2, host: local }
-house_rules:
+house_rules
   budget: 20.00
   gates: [plan, release]
 ```
