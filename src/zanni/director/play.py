@@ -107,7 +107,11 @@ class Production:
         if stopped := self._stopped():
             return stopped
         reads, writes = list(reads or []), list(writes or [])
-        if self.cues == 0 and (missing := await self.stage.missing(self.state.script.stage.expects)):
+        try:
+            missing = await self.stage.missing(self.state.script.stage.expects) if self.cues == 0 else []
+        except StageError as e:
+            return self._refuse("cue", f"the stage can't be read: {e.code}: {e}")
+        if missing:
             return self._refuse("cue", f"the stage doesn't hold what the script expects: {', '.join(missing)}")
         seat = self._seat_for(target)
         if isinstance(seat, str):
@@ -260,7 +264,10 @@ class Production:
             by = run.runs_on
         else:  # on a snapshot, never the stage itself, so a verifier can't change it (D45)
             with tempfile.TemporaryDirectory(prefix="zanni-verify-") as tmp:
-                marker = await self.stage.snapshot(Path(tmp))
+                try:
+                    marker = await self.stage.snapshot(Path(tmp))
+                except StageError as e:
+                    return self._refuse("run_verifier", f"the stage can't be read for a snapshot: {e.code}: {e}")
                 passed, detail = await run_command(run.command, tmp, run.timeout)
             by = "director"
         self.state.verdicts[name] = Verdict(name, passed, detail, run.source, marker, self.state.round)
@@ -462,6 +469,14 @@ class Production:
                     self.stop_run("director-turns")
                     break
                 self._end_round("director-turns")
+                continue
+            if down := getattr(self.stage.backend, "down", None):  # an mcp stage stopped answering (D47)
+                self.log.event("stage-unavailable", detail=down)
+                decision = await self.gates.pause(down)
+                if decision.action != "resume":
+                    self.stop_run("paused")
+                    break
+                self.stage.backend.down = None  # try again: the next operation reconnects
                 continue
             self.state.turns += 1
             self._turn_charged = Decimal(0)

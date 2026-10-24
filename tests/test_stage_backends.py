@@ -3,6 +3,9 @@ the stage. Each backend is added to BACKENDS: folder here, git (item 4) and mcp 
 
 import asyncio
 import contextlib
+import importlib.util
+import sys
+from pathlib import Path
 
 import pytest
 
@@ -51,7 +54,50 @@ async def git(tmp_path):
         await stage.close()
 
 
-BACKENDS = {"folder": folder, "git": git}
+EXAMPLE_SERVER = Path(__file__).parents[1] / "examples/stage-servers/sqlite/server.py"
+STAGE_TOKEN = "stage-token-fake"
+
+
+def sqlite_server_module():
+    """The example stage server (examples/stage-servers/sqlite/server.py), loaded as a module."""
+    spec = importlib.util.spec_from_file_location("sqlite_stage_server", EXAMPLE_SERVER)
+    module = importlib.util.module_from_spec(spec)
+    writes, sys.dont_write_bytecode = sys.dont_write_bytecode, True  # no __pycache__ in examples/
+    try:
+        spec.loader.exec_module(module)
+    finally:
+        sys.dont_write_bytecode = writes
+    return module
+
+
+@contextlib.asynccontextmanager
+async def sqlite_stage_server(tmp_path, files: dict[str, str], token=STAGE_TOKEN, port=0):
+    """The example stage server on loopback, seeded with `files`; yields (its /mcp URL, its store)."""
+    from zanni.engine.a2a_server import listening
+
+    module = sqlite_server_module()
+    app, store = module.build_app(tmp_path / "stage.db", token)
+    for path, text in files.items():
+        store.write(path, text, None, "seed")
+    async with listening(lambda url: app, port=port) as server:
+        yield f"{server.url}/mcp", store
+
+
+@contextlib.asynccontextmanager
+async def mcp(tmp_path):
+    from zanni.engine.stage_backend import McpBackend
+
+    async with sqlite_stage_server(tmp_path, SEED) as (url, _):
+        backend = McpBackend(url, STAGE_TOKEN)
+        await backend.open()
+        stage = Stage(backend)
+        try:
+            yield stage
+        finally:
+            await stage.close()
+
+
+BACKENDS = {"folder": folder, "git": git, "mcp": mcp}
 
 
 @pytest.fixture(params=sorted(BACKENDS))

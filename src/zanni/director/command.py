@@ -26,7 +26,7 @@ from zanni.director.prompt import instructions
 from zanni.director.rehearsal import parse_listen
 from zanni.director.rules import stage_missing
 from zanni.director.state import PlayState
-from zanni.stage import Stage, folder_stage
+from zanni.stage import Stage, StageError, folder_stage
 from zanni.files.check import against_script, check, check_script, describe_verifiers, resolve, verifier_commands
 from zanni.files.errors import FileErrors
 from zanni.files.loader import load_file
@@ -36,6 +36,7 @@ from zanni.log import Log
 
 DIRECTOR_FILE = "director.yaml"
 JOIN_TOKEN, OWNER_TOKEN, VERIFIER_TOKEN = "ZANNI_JOIN_TOKEN", "ZANNI_OWNER_TOKEN", "ZANNI_VERIFIER_TOKEN"
+STAGE_TOKEN = "ZANNI_STAGE_TOKEN"  # the director's token for an mcp stage (D47)
 
 
 class CannotStart(Exception):
@@ -111,8 +112,9 @@ def local_seats(director: ActorConfiguration, base: Path) -> dict[str, list[tupl
     return out
 
 
-def open_stage(play: PlayFile, play_path: Path, run_id: str) -> Stage:
-    """The play's stage, ready to run on: a folder that exists, or a git repository cloned onto the run's branch."""
+def open_stage(play: PlayFile, play_path: Path, run_id: str, stage_token: str | None = None) -> Stage:
+    """The play's stage: a folder that exists, a git repository cloned onto the run's branch, or an mcp server
+    (connected when the run starts, in _run)."""
     spec = play.stage
     if spec.backend == "folder":
         root = (play_path.parent / spec.path).resolve()
@@ -130,7 +132,13 @@ def open_stage(play: PlayFile, play_path: Path, run_id: str) -> Stage:
             return Stage(GitBackend.open(url, spec.branch, clone, f"zanni/{play.name}/{run_id}"))
         except CannotClone as e:
             raise CannotStart(str(e)) from None
-    raise CannotStart(f"the {spec.backend} stage isn't supported here")
+    if not stage_token:
+        raise CannotStart(f"this play's stage is an mcp server, and {STAGE_TOKEN} isn't in the director "
+                          f"configuration's `credentials` (or has no value); add {STAGE_TOKEN}: ${{{STAGE_TOKEN}}}, "
+                          "with the server's token in the environment (D47)")
+    from zanni.engine.stage_backend import McpBackend
+
+    return Stage(McpBackend(spec.url, stage_token))
 
 
 def trusted_verifiers(director: ActorConfiguration, base: Path) -> list[str]:
@@ -186,8 +194,8 @@ def run_play(play_path: Path, *, director_path: Path | None = None, update: bool
             verifier_token = secrets.token_urlsafe(32)  # for local verifier seats only: made for this run
         host, port = parse_listen(listen)
         run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-        stage = open_stage(play, play_path, run_id)  # last: a git stage is cloned only when all else is ready
-        if missing := stage_missing(stage.backend.root, script.stage.expects):
+        stage = open_stage(play, play_path, run_id, credential(director, STAGE_TOKEN))  # last: clone only when ready
+        if stage.kind != "mcp" and (missing := stage_missing(stage.backend.root, script.stage.expects)):
             raise CannotStart(f"the stage doesn't hold what the script expects (stage.expects): {', '.join(missing)}")
     except FileErrors as e:
         print(f"{play_path} can't start; nothing was started.", file=sys.stderr)
@@ -227,6 +235,21 @@ async def _run(play_path, play, script, prose, director, director_file, packages
     from zanni.engine.serve import serving
 
     folder = play_path.parent
+    if stage.kind == "mcp":  # connect, and check what the script expects, before anything starts (exit 2)
+        try:
+            await stage.backend.open()
+            missing = await stage.missing(script.stage.expects)
+        except Exception as e:
+            await stage.close()
+            detail = str(e) if isinstance(e, StageError) else f"{type(e).__name__}: {e}"
+            print(f"{play_path}: couldn't reach the stage's server at {play.stage.url}: {detail}; nothing was "
+                  "started.", file=sys.stderr)
+            return 2
+        if missing:
+            await stage.close()
+            print(f"{play_path}: the stage doesn't hold what the script expects (stage.expects): {', '.join(missing)}"
+                  "; nothing was started.", file=sys.stderr)
+            return 2
     log = Log(folder / "log" / f"{run_id}.jsonl", run_id)
     state = PlayState(play, script)
     casting = Director(join_token=join_token, parts=part_slots(play, folder, script, packages),
@@ -281,6 +304,7 @@ async def _run(play_path, play, script, prose, director, director_file, packages
             running.unlink()
         if production.local is not None:
             await production.local.stop_all()
+        await stage.close()
         log.event("run-stopped", reason=reason, completed=completed, spend=state.spend_text().replace("$", ""))
     verdicts = ", ".join(f"{v.name} {'passed' if v.passed else 'failed'}" for v in state.verdicts.values())
     say(f"The play {'is done' if completed else 'stopped: ' + reason}. Rounds: {state.round}; spent "
