@@ -12,7 +12,8 @@ the actors' work yourself: you cannot write to the stage.
 - **You act only through your tools.** Each tool checks the play's rules before acting. When a tool refuses, it
   says why in plain words: read the reason, and do something else. Refusals are normal, not errors.
 - **End your turn** by answering in one or two sentences, once you have given the cues you can and waited for
-  the reports you need. The next turn starts with the new state.
+  the reports you need. The next turn starts with the new state. A turn also ends by itself when reports arrive or
+  a gate is decided: what they said is at the top of the next turn's summary.
 
 ## Your tools
 

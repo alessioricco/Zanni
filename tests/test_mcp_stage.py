@@ -116,7 +116,7 @@ def test_the_play_pauses_when_the_server_goes_away_and_resumes_when_its_back(tmp
         result = await p.direct(run_turn(p, steps))
         await decided
         await backend.close()
-        return result, steps.seen, p
+        return result, [s for s in steps.seen if not s.startswith("prompt: ")], p
 
     (reason, completed), seen, p = asyncio.run(go())
     assert (reason, completed) == ("checked", False)

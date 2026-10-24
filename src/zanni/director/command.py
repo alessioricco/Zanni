@@ -271,7 +271,8 @@ async def _run(play_path, play, script, prose, director, director_file, packages
 
     async def turn(prompt) -> TurnOutcome:
         result = await run_director_turn(models, text, prompt, tools, build=build,
-                                         spending=production.director_spending)
+                                         spending=production.director_spending, end_turn=production.turn_should_end,
+                                         requests_per_turn=play.house_rules.requests_per_turn)
         return TurnOutcome(result.model, result.cost, result.requests, result.fallbacks, result.input_tokens,
                            result.output_tokens)
 

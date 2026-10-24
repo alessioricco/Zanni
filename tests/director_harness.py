@@ -8,7 +8,7 @@ from collections.abc import Callable
 from decimal import Decimal
 from pathlib import Path
 
-from pydantic_ai.messages import ModelResponse, TextPart, ToolCallPart, ToolReturnPart
+from pydantic_ai.messages import ModelResponse, TextPart, ToolCallPart, ToolReturnPart, UserPromptPart
 from pydantic_ai.models.function import FunctionModel
 
 from zanni.actor.contract import ResolvedModel
@@ -94,12 +94,14 @@ class Steps:
 
     def __init__(self, steps: list):
         self.steps = list(steps)
-        self.seen: list[str] = []  # every tool result the model received, in order
+        self.seen: list[str] = []  # every tool result and turn prompt the model received, in order
 
     def __call__(self, messages, info):
         for part in messages[-1].parts:
             if isinstance(part, ToolReturnPart):
                 self.seen.append(f"{part.tool_name}: {part.content}")
+            elif isinstance(part, UserPromptPart):
+                self.seen.append(f"prompt: {part.content}")
         step = self.steps.pop(0) if self.steps else "end"
         if callable(step):
             step = step(messages)
@@ -115,7 +117,8 @@ def run_turn(p: Production, steps: Callable, models=None, build=None) -> Callabl
 
     async def turn(prompt):
         result = await run_director_turn(models or [priced()], text, prompt, p.tools(), build=build or (lambda rm: model),
-                                         spending=p.director_spending)
+                                         spending=p.director_spending, end_turn=p.turn_should_end,
+                                         requests_per_turn=p.state.play.house_rules.requests_per_turn)
         return TurnOutcome(result.model, result.cost, result.requests, result.fallbacks)
 
     return turn

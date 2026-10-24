@@ -14,7 +14,7 @@ from zanni.engine.fallback import classify
 from zanni.engine.models import build_model
 from zanni.engine.run import cost_of
 
-REQUESTS_PER_TURN = 25  # model requests in one turn, so one turn can't run away; the next turn starts fresh
+REQUESTS_PER_TURN = 25  # the default of the house rule `requests_per_turn` (D49)
 
 
 @dataclass
@@ -32,11 +32,15 @@ class TurnResult:
 async def run_director_turn(models: list[ResolvedModel], instructions: str, prompt: Callable[[], str],
                             tools: list[Callable], *, build: Callable[[ResolvedModel], Model] = build_model,
                             requests_per_turn: int = REQUESTS_PER_TURN,
-                            spending: Callable[[Decimal | None], bool] | None = None) -> TurnResult:
+                            spending: Callable[[Decimal | None], bool] | None = None,
+                            end_turn: Callable[[], bool] | None = None) -> TurnResult:
     """Run one turn. `prompt` is called for each attempt, so a fallback model sees the state as it is now.
 
     `spending` is told the turn's spend so far after every model response, before its tool calls run (D39); when
     it returns True, the turn ends there: overshoot is bounded by one model call, as for an actor's cue.
+
+    `end_turn` is asked before each model request after the first; when it returns True (a long wait just ended,
+    D49), the turn ends there, and the tools' results reach the model in the next turn's summary instead.
 
     Raises AllModelsFailed when every model failed (the director then pauses the play, D33).
     """
@@ -52,6 +56,9 @@ async def run_director_turn(models: list[ResolvedModel], instructions: str, prom
             async with agent.iter(prompt()) as run:
                 async for node in run:
                     usage = run.usage
+                    if end_turn is not None and Agent.is_model_request_node(node) and usage.requests and end_turn():
+                        output = "(the turn ended after a long wait; the next one starts from the play's state)"
+                        break
                     if not Agent.is_call_tools_node(node):
                         continue
                     if spending is not None and spending(_add(spent, cost_of(usage, rm)[0])):
