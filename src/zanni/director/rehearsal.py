@@ -76,3 +76,61 @@ async def conduct(director: Director, rehearsal: Rehearsal, rehearsal_path: Path
         say(f"  verify {check.name}: {'passed' if proc.returncode == 0 else 'FAILED'} ({tail})")
     director.log.event("run-stopped", reason="rehearsal finished" if outcome.lost is None else f"seat lost: {outcome.lost}")
     return outcome
+
+
+class CannotServe(Exception):
+    """A rehearsal that can't be served: no role package around it, or no join token."""
+
+
+def parse_listen(value: str | None) -> tuple[str, int]:
+    """`host:port`, `[v6]:port`, or `port` alone; the default is 127.0.0.1 on a free port (D29)."""
+    if not value:
+        return "127.0.0.1", 0
+    if value.isdigit():
+        return "127.0.0.1", int(value)
+    host, sep, port = value.rpartition(":")
+    if not sep or not port.isdigit():
+        raise CannotServe(f"--listen {value!r} isn't host:port; write e.g. --listen 0.0.0.0:8765")
+    return host.strip("[]") or "127.0.0.1", int(port)
+
+
+def serve_rehearsal(path: Path, rehearsal: Rehearsal, *, listen: str | None, join_token: str | None,
+                    say: Callable[[str], None] = print) -> RehearsalOutcome:
+    """`zanni <rehearsal> --serve`: wait for an actor anywhere that fits, give it the cues, release it, verify."""
+    import asyncio
+    from datetime import UTC, datetime
+
+    from zanni import __version__
+    from zanni.actor.roles import load_role
+    from zanni.director.contract import DirectorInfo
+    from zanni.engine.serve import serving
+    from zanni.files.hashing import package_hash
+
+    folder = path.parent.parent
+    if path.parent.name != "rehearsals" or not (folder / "role.yaml").is_file():
+        raise CannotServe(f"{path} isn't in a role package's rehearsals/ folder, so there is no role to cast; "
+                          "move it into <role>/rehearsals/")
+    if not join_token:
+        raise CannotServe("ZANNI_JOIN_TOKEN isn't set; set it to the play's join token, and give actors the same "
+                          "value in their configuration's credentials")
+    host, port = parse_listen(listen)
+    role = load_role(folder)
+    run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    run_dir = Path.home() / ".zanni/rehearsals" / rehearsal.rehearsal / run_id
+    director = rehearsal_director(rehearsal, path, role.manifest.name, package_hash(folder), run_dir, run_id,
+                                  join_token=join_token, say=say)
+    info = DirectorInfo(name=f"zanni rehearsal {rehearsal.rehearsal}",
+                        description=rehearsal.description or f"The rehearsal {rehearsal.rehearsal}",
+                        version=__version__, play=f"rehearsal:{rehearsal.rehearsal}", script=str(path))
+
+    async def serve() -> RehearsalOutcome:
+        async with serving(director, info, host, port) as server:
+            where = server.url if host not in ("0.0.0.0", "::") else (
+                f"http://{host}:{server.port} (actors on other machines use this machine's address, port {server.port})")
+            say(f"Serving rehearsal '{rehearsal.rehearsal}' for the role {role.manifest.name} at {where}; "
+                "waiting for an actor")
+            return await conduct(director, rehearsal, path, run_dir, role.manifest.name, say)
+
+    outcome = asyncio.run(serve())
+    say(f"Rehearsal {'passed' if outcome.passed else 'FAILED'}. Stage and log: {run_dir}")
+    return outcome

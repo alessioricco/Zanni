@@ -55,10 +55,33 @@ def join(path: Path, actor: ActorConfiguration) -> int:
     return outcome.exit_code
 
 
+def serve(path: Path, rehearsal: Rehearsal, listen: str | None) -> int:
+    """Serve a rehearsal to an actor anywhere (D29). 0 if it passed, 1 if not, 2 if it couldn't start."""
+    import os
+
+    from zanni.director.rehearsal import CannotServe, serve_rehearsal
+
+    try:
+        outcome = serve_rehearsal(path.resolve(), rehearsal, listen=listen, join_token=os.environ.get("ZANNI_JOIN_TOKEN"))
+    except FileErrors as e:
+        return problems(str(path), e.errors)
+    except (CannotServe, OSError) as e:
+        print(f"{path}: {e}; nothing was started.", file=sys.stderr)
+        return 2
+    except KeyboardInterrupt:
+        print("Stopped before the rehearsal finished.", file=sys.stderr)
+        return 1
+    return 0 if outcome.passed else 1
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="zanni", description="Run what a Zanni file describes.")
     parser.add_argument("--version", action="version", version=f"zanni {__version__}")
     parser.add_argument("--check", action="store_true", help="only validate the file; never run anything")
+    parser.add_argument("--serve", action="store_true",
+                        help="serve a rehearsal to an actor on this machine or another (D29)")
+    parser.add_argument("--listen", metavar="HOST:PORT",
+                        help="with --serve: where the director listens (default 127.0.0.1, a free port)")
     parser.add_argument("file", nargs="?",
                         help="an actor configuration, a play file, a role manifest, a script (SCRIPT.md), "
                              "a rehearsal, or a folder")
@@ -70,6 +93,14 @@ def main(argv: list[str] | None = None) -> int:
         doc, notes = check(args.file)
     except FileErrors as e:
         return problems(args.file, e.errors)
+    if (args.serve or args.listen) and not isinstance(doc, Rehearsal):
+        print(f"{args.file}: --serve and --listen work with a rehearsal only; nothing was started.", file=sys.stderr)
+        return 2
+    if args.listen and not args.serve:
+        print(f"{args.file}: --listen needs --serve; nothing was started.", file=sys.stderr)
+        return 2
+    if args.serve and not args.check:
+        return serve(Path(args.file), doc, args.listen)
     if isinstance(doc, ActorConfiguration) and not args.check:
         kind, where = play_target(Path(args.file).parent, doc.play)
         if kind == "rehearsal":
