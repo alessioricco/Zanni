@@ -1,0 +1,23 @@
+# The director's own configuration (D34). Model names are examples: a cloud model with tool calling, then a local
+# one on any OpenAI-compatible server; both priced, under the play's budget. ZANNI_STAGE_TOKEN is the stage server's
+# token: only the director holds it, and seats reach the stage through the director (D47).
+name: director
+role: zanni:director
+play: ./play.yaml
+models:
+  - provider: anthropic
+    model: claude-haiku-5-5
+  - provider: ollama
+    model: qwen3.8:27b
+    base_url: ${OLLAMA_BASE_URL}
+    price: { input: 0, output: 0 }
+credentials:
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+  ZANNI_JOIN_TOKEN: ${ZANNI_JOIN_TOKEN}
+  ZANNI_OWNER_TOKEN: ${ZANNI_OWNER_TOKEN}
+  ZANNI_STAGE_TOKEN: ${ZANNI_STAGE_TOKEN}
+seats:
+  writer: [./writer-1.yaml]
+  editor: [./editor-1.yaml]
+verifier_seats:
+  local: [./checker.yaml]       # the director starts it, with a verifier token made for the run

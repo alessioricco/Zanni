@@ -1,0 +1,6 @@
+# A local verifier seat (D45): Zanni's built-in role, no model. It runs notes-structure on its own snapshot of the
+# stage, pulled over MCP, and reports the command's exit code. On another machine, it would be listed under
+# verifier_seats: remote in director.yaml, and present ZANNI_VERIFIER_TOKEN.
+name: checker
+role: zanni:verifier
+play: ./play.yaml

@@ -14,7 +14,8 @@ parts:
     writes: [app/]
 stage:
   expects: [vision.md, backlog/round-1.md]
-gates: [plan]
+gates:
+  - { name: plan, every: round, before: [coder] }   # the tests approved each round, before any code (D48)
 verifiers:
   tests-fail:
     description: the tests run, and at least one fails (new tests fail before the code exists)
@@ -40,7 +41,8 @@ into `tests/`, one test file per backlog item (for example `tests/test_slug.py` 
 Tell it which module each item's code lives in, as the spec says.
 *Verifier:* `tests-fail`.
 
-**Gate: plan.** A person approves the tests before any code is written.
+**Gate: plan**, every round. A person approves the round's tests before any code is written; no coder gets a cue
+before that.
 
 ### Scene 2: Build
 Cast one **coder** per backlog item, up to two, and give each one item: its module in `app/`, and its tests.

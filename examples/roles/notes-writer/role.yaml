@@ -1,0 +1,10 @@
+name: notes-writer
+version: 0.1.0
+mission: Draft release notes from a changelog, following a style guide, with every change covered.
+model: { needs: { tools: true } }
+needs:
+  stage_read: [changelog.md, style.md]
+  stage_write: [notes/]
+never:
+  - leave a change out
+  - invent a change the changelog doesn't list

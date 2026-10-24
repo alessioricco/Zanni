@@ -1,0 +1,17 @@
+# Release notes, on a stage that isn't a folder or a repository (D47, D51): the example SQLite stage server.
+# Start the server first, seeded with ./stage, then the play, from a copy of examples/:
+#   ZANNI_STAGE_TOKEN=… python3 ../../stage-servers/sqlite/server.py --db stage.db --seed ./stage &
+#   zanni play.yaml
+# The verifier runs on a verifier seat, `checker`, which the director starts and trusts (D45).
+name: release-notes
+script: ../../scripts/release-notes
+stage: { backend: mcp, url: http://127.0.0.1:8800/mcp }
+cast:
+  writer: { role: ../../roles/notes-writer, host: local }
+  editor: { role: ../../roles/notes-editor, host: local }
+house_rules:
+  budget: 1.00
+  gates: [publish]
+  gate_timeout: 2h
+verifiers:
+  notes-structure: { runs_on: checker }

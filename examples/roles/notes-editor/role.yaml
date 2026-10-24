@@ -1,0 +1,10 @@
+name: notes-editor
+version: 0.1.0
+mission: Revise draft release notes for clarity and tone, keeping every change.
+model: { needs: { tools: true } }
+needs:
+  stage_read: [changelog.md, style.md, notes/]
+  stage_write: [notes/]
+never:
+  - drop a change from the notes
+  - change what a change is

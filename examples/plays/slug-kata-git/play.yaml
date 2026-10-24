@@ -1,0 +1,15 @@
+# The slug kata on a git stage (D46, D51): the same script and roles as ../slug-kata, with the stage in a repository.
+# Each run works on its own branch, zanni/slug-kata-git/<run-id>, one commit per write with the seat as author, and
+# the director pushes it at each approved gate and at the end when the play is done (push: approved).
+# Make the remote first, then run it like the folder kata, from a copy of examples/:
+#   python3 make-remote.py && zanni play.yaml
+name: slug-kata-git
+script: ../../scripts/slug-kata
+stage: { backend: git, url: ./remote.git, branch: main, push: approved }
+cast:
+  tester: { role: ../../roles/slug-tester, host: local }
+  coder: { role: ../../roles/slug-coder, seats: 1-2, host: local }
+house_rules:
+  budget: 1.00
+  gates: [plan]
+  gate_timeout: 2h

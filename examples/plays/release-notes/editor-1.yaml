@@ -1,0 +1,13 @@
+# A local seat (D36). Model names are examples: a local model with tool calling first, a cloud model second.
+name: editor-1
+role: ../../roles/notes-editor
+play: ./play.yaml
+models:
+  - provider: ollama
+    model: qwen3.8:27b
+    base_url: ${OLLAMA_BASE_URL}
+    price: { input: 0, output: 0 }
+  - provider: anthropic
+    model: claude-haiku-5-5
+credentials:
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
