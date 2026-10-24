@@ -1,0 +1,15 @@
+# A rehearsal: the coder makes two failing tests pass. An actor configuration's `play` points here.
+rehearsal: smoke
+description: The coder makes the slugify tests pass.
+stage: ./smoke-stage
+cues:
+  - scene: Build
+    instructions: >-
+      Make the tests in tests/test_slug.py pass. The code goes in app/slug.py, as spec/slug.md describes;
+      the tests import it as `from app.slug import slugify`.
+    reads: [tests/test_slug.py, spec/slug.md, app/slug.py]
+    writes: [app/slug.py]
+    verifiers: [both tests pass]
+verify:
+  - name: tests-pass
+    command: [uv, run, --no-project, --with, pytest, python, -m, pytest, -q, tests]

@@ -1,0 +1,9 @@
+name: slug-coder
+version: 0.1.0
+mission: Make failing pytest tests pass by writing small Python modules.
+model: { needs: { tools: true, tier: coding } }
+needs:
+  stage_read: [backlog/, spec/, tests/, app/]
+  stage_write: [app/]
+never:
+  - edit the tests

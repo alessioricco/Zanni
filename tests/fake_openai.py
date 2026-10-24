@@ -38,7 +38,8 @@ class _Handler(BaseHTTPRequestHandler):
                 message = {"role": "assistant", "content": step}
         elif model.startswith("write:") and not any(m["role"] == "tool" for m in messages):
             path = model.removeprefix("write:")
-            args = json.dumps({"path": path, "content": "def slugify(text):\n    return text\n"})
+            content = self.server.files.get(path, "def slugify(text):\n    return text\n")
+            args = json.dumps({"path": path, "content": content})
             message = {"role": "assistant", "content": None,
                        "tool_calls": [{"id": "call_1", "type": "function",
                                        "function": {"name": "stage_write", "arguments": args}}]}
@@ -61,9 +62,11 @@ def fake_openai():
     server = ThreadingHTTPServer(("127.0.0.1", 0), _Handler)
     server.daemon_threads = True
     server.calls, server.scripts, server.lock = [], {}, threading.Lock()
+    server.files = {}  # path -> what `write:<path>` writes, instead of the default one-liner
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:
+        server.scripts["files"] = server.files  # reachable as scripts["files"], without changing what this yields
         yield f"http://127.0.0.1:{server.server_address[1]}/v1", server.calls, server.scripts
     finally:
         server.shutdown()

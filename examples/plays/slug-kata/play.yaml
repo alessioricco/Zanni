@@ -1,0 +1,14 @@
+# The slug kata: a tester and up to two coders, on this machine, with a folder stage (D40).
+# Run it from a copy, since the stage is the play's own folder: cp -r examples <somewhere>, then
+# zanni <somewhere>/examples/plays/slug-kata/play.yaml (docs/getting-started.md, "Running a play").
+name: slug-kata
+script: ../../scripts/slug-kata
+stage: ./stage
+cast:
+  tester: { role: ../../roles/slug-tester, host: local }
+  coder: { role: ../../roles/slug-coder, seats: 1-2, host: local }
+house_rules:
+  budget: 1.00
+  gates: [plan]
+  gate_timeout: 2h
+  max_director_turns: 30

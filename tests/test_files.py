@@ -40,6 +40,15 @@ def broken(tmp_path: Path, example: Path, old: str, new: str) -> Path:
     (NEWSROOM_PLAY, "Play file: would start the director for the play 'city-desk'."),
     (REHEARSAL, "Rehearsal: 'smoke', run when an actor configuration's `play` points here, or served with --serve."),
     (REHEARSAL_ACTOR, "Actor configuration: would start 'slug-tester-1', playing a role in a play."),
+    (EXAMPLES / "scripts/slug-kata", "Script: 'slug-kata' 0.1.0."),
+    (EXAMPLES / "plays/slug-kata/play.yaml", "Play file: would start the director for the play 'slug-kata'."),
+    (EXAMPLES / "plays/slug-kata/director.yaml", "Director configuration: would start the director for the play ./play.yaml."),
+    (EXAMPLES / "plays/slug-kata/tester-1.yaml", "Actor configuration: would start 'tester-1', playing a role in a play."),
+    (EXAMPLES / "plays/slug-kata/coder-1.yaml", "Actor configuration: would start 'coder-1', playing a role in a play."),
+    (EXAMPLES / "plays/slug-kata/coder-2.yaml", "Actor configuration: would start 'coder-2', playing a role in a play."),
+    (EXAMPLES / "roles/slug-coder", "Role manifest: the role 'slug-coder' 0.1.0."),
+    (EXAMPLES / "roles/slug-coder/rehearsals/smoke.yaml",
+     "Rehearsal: 'smoke', run when an actor configuration's `play` points here, or served with --serve."),
 ])
 def test_examples_validate(example, first_line):
     result = zanni(example)
