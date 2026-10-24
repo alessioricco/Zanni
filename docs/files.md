@@ -56,7 +56,7 @@ One production of a script: the script it performs, the director, a role for eac
 # examples/plays/habit-tracker/play.yaml
 name: habit-tracker
 script: github.com/someone/habit-tracker@1.0.0
-director: wss://director.example.com
+director: https://director.example.com
 stage: git@github.com:alessio/habit-tracker.git
 cast:
   product-owner: github.com/zanni-roles/product-owner@1.0.0

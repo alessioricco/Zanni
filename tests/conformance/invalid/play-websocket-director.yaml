@@ -1,0 +1,6 @@
+name: x
+script: github.com/someone/script@1.0.0
+director: wss://director.example.com
+stage: ./s
+cast:
+  a: roles/a

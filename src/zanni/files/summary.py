@@ -38,7 +38,7 @@ def summarise(doc: ActorConfiguration | PlayFile | RoleManifest | Script | Lockf
         lines.append(f"  house rules: budget {budget}; human gates: {', '.join(rules.gates) or 'none'}{cap}")
         return lines
     if isinstance(doc, Rehearsal):
-        lines = [f"Rehearsal: '{doc.rehearsal}', run with no director when an actor configuration's `play` points here.",
+        lines = [f"Rehearsal: '{doc.rehearsal}', run when an actor configuration's `play` points here, or served with --serve.",
                  f"  stage: {doc.stage} (copied fresh for every run)", "  cues:"]
         lines += [f"    {i}. {cue.scene}: {cue.instructions[:70]}" for i, cue in enumerate(doc.cues, start=1)]
         lines.append(f"  verify: {', '.join(v.name for v in doc.verify) or 'nothing'}")

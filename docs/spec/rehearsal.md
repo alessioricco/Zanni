@@ -1,6 +1,6 @@
 # Rehearsal
 
-A rehearsal runs one actor with no director: its cues come from a file, and its stage is a local folder (D26). It is how a role is tried out and tested before it joins a play, and a role package can ship rehearsals as its own tests, in `rehearsals/`.
+A rehearsal runs one actor on cues from a file, against a copy of a local folder, with no play file or script (D26). A director is started for it, so the actor works over the same wire as in a play (D29). It is how a role is tried out and tested before it joins a play, and a role package can ship rehearsals as its own tests, in `rehearsals/`.
 
 ```yaml
 # examples/roles/slug-tester/rehearsals/smoke.yaml
@@ -38,12 +38,41 @@ models:
 `zanni slug-tester.yaml` then:
 
 1. **Copies the stage:** copies the rehearsal's `stage` folder to a fresh run folder, `<state_dir>/rehearsals/<rehearsal>/<run-id>/stage`. The role package is never written to.
-2. **Sets permissions:** gives the actor the seat permissions its role asks for (`needs.stage_read`, `needs.stage_write`), enforced by the stage (D12).
-3. **Runs the cues:** runs the actor on each cue in order, as if a director had sent it (`zanni.cue`), and prints each `zanni.report`.
-4. **Verifies:** runs each `verify` command in the stage copy, and prints whether it passed.
-5. **Logs:** appends every event to `<state_dir>/rehearsals/<rehearsal>/<run-id>/log.jsonl`, in the play log's format (D18): `run-started`, `cue`, `report`, `cost`, `verdict`, `run-stopped`.
+2. **Starts a director:** in the same process, on `127.0.0.1`, with a join token made up for the run. Its one part is the actor's role, and the part's ceilings are the role's needs (`needs.stage_read`, `needs.stage_write`). The stage enforces them (D12).
+3. **Joins it:** the actor joins over A2A, exactly as it would join a remote director, and reaches the stage through the director's MCP server.
+4. **Runs the cues:** the director sends each cue in order as a `zanni.cue`; the actor answers each with a `zanni.report`, which is printed.
+5. **Releases the seat:** after the last report.
+6. **Verifies:** runs each `verify` command in the stage copy, and prints whether it passed.
+7. **Logs:** two logs go in the run folder:
+   - `log.jsonl`, the director's, in the play log's format (D18): `run-started`, `actor-joined`, `cue`, `report`, `cost`, `seat-released`, `verdict`, `run-stopped`;
+   - `actor-log.jsonl`, the actor's own ([The actor's log](actor-configuration.md#the-actors-log)).
 
 `zanni rehearsal.yaml`, on its own, validates the rehearsal and runs nothing.
+
+## Serving a rehearsal
+
+`zanni rehearsal.yaml --serve` serves the rehearsal to an actor anywhere: on this machine, or on another that can reach it (D29).
+
+```
+$ export ZANNI_JOIN_TOKEN=…        # the same value goes in the actor's credentials
+$ zanni examples/roles/slug-tester/rehearsals/smoke.yaml --serve --listen 0.0.0.0:8765
+Serving rehearsal 'smoke' for the role slug-tester at http://0.0.0.0:8765; waiting for an actor
+```
+
+- **Its role:** the rehearsal must be in a role package's `rehearsals/` folder. That role is the one part, with one seat, and its needs are the part's ceilings.
+- **Which actors fit:** an actor fits if it plays a role of that name (otherwise `role-mismatch`), with the same content hash as the package (otherwise `hash-mismatch`), and joins with the token in `ZANNI_JOIN_TOKEN`, which is required.
+- **The address:** `--listen host:port` sets where the director listens. The default is `127.0.0.1` on a free port. The address actors use is printed.
+- **Joining:** the actor's configuration points its `play` at that address.
+- **The run:** the director copies the stage to `~/.zanni/rehearsals/<rehearsal>/<run-id>/`, sends the cues to the first actor that fits, and releases its seat. It then runs `verify` and exits with the codes of [D28](#exit-codes).
+- **Losing the actor:** if the actor stops answering, its seat is released with `no-heartbeat`, and the rehearsal fails.
+
+## Exit codes
+
+| Code | Means |
+|---|---|
+| 0 | Every cue was reported `done`, and every `verify` check passed. |
+| 1 | The rehearsal ran, but a cue failed, a check failed, or the seat was lost. |
+| 2 | The files have problems, or nothing could start. |
 
 ## Fields
 

@@ -49,7 +49,7 @@ def main(argv: list[str] | None = None) -> int:
         doc, notes = check(args.file)
     except FileErrors as e:
         return problems(args.file, e.errors)
-    runs_rehearsal = isinstance(doc, ActorConfiguration) and any("run with no director" in n for n in notes)
+    runs_rehearsal = isinstance(doc, ActorConfiguration) and any("run with a director started for it" in n for n in notes)
     if runs_rehearsal and not args.check:
         return rehearse(Path(args.file), doc)
     print("\n".join(summarise(doc) + notes))

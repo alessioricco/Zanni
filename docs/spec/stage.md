@@ -50,6 +50,22 @@ The director serves the stage as an MCP server. Its tools are the five operation
 
 Actors need nothing but MCP, which is how they reach every other tool.
 
+The server, as served by Zanni's director (D31):
+
+- **Transport and address:** Streamable HTTP, at the cast's `stage.mcp_url`. Zanni's director serves it at `/stage/mcp` under its own address.
+- **Credentials:** the seat's `stage.token`, as an HTTP bearer token on every request. A missing, unknown, expired or revoked token gets HTTP 401.
+- **The tools:**
+
+  | Tool | Arguments | Result |
+  |---|---|---|
+  | `stage_read` | `path` | The file's text. |
+  | `stage_write` | `path`, `content` | The new change marker. |
+  | `stage_list` | `path` (optional; the root when empty) | The files under it that the seat may read. |
+  | `stage_delete` | `path` | The new change marker. |
+  | `stage_changes` | `since` (optional) | `{ changes: [{ path, change }], marker }`, with only the paths the seat may read. |
+
+- **Errors:** a refused operation is a tool result with `isError` set, whose text is `<code>: <message>`, using the errors of the [operations](#operations), such as `not-permitted: this seat may not write app/x.py; it may write: tests/`.
+
 ### Git backends: direct access for a checkout
 
 Coding engines work on a real checkout, so a `git` stage may also give a seat direct access to the repository:
@@ -112,5 +128,5 @@ stage: { backend: folder, path: ./chapters }
 
 ## Not in this spec yet
 
-- **Run time:** the operations' behaviour at run time, and the MCP tool schemas in detail, come with milestone 5 ("Stage backends").
+- **The git backend at run time,** and direct git access, come with milestone 5 ("Stage backends"). The `folder` backend and the MCP server run from milestone 3 (D31).
 - **Narrowing:** narrowing a seat's permissions from the play is not in the first version.

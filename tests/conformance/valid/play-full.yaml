@@ -1,6 +1,6 @@
 # A play file: the director, the stage, the cast, the script and the house rules.
 name: habit-tracker
-director: wss://director.example.com
+director: https://director.example.com
 stage: git@github.com:alessio/habit-tracker.git
 script: github.com/someone/habit-tracker@1.0.0
 cast:

@@ -121,6 +121,17 @@ actor                                  director
 
 The JSON Schema of each message is under [`schemas/`](schemas/), generated from `src/zanni/protocol/`.
 
+### Tokens on each call
+
+| Call | Token | When it's wrong |
+|---|---|---|
+| `SendMessage` with `zanni.join`, starting a task | the play's join token | The task is `rejected` with `zanni.refused`, reason `not-authorised`. |
+| Any call on a seat's task: `SendMessage`, `GetTask`, `SubscribeToTask` | that seat's `seat_token` | A JSON-RPC Invalid Request error (`-32600`) whose message starts with `not-authorised`, for a missing, wrong, expired or revoked token. A2A defines no error for this (D31). |
+| Any other call, such as `ListTasks` or `CancelTask` | — | Refused: they would reach other seats' tasks. |
+| The stage's MCP server | the seat's `stage.token` | HTTP 401 ([Stage: the MCP server](stage.md#every-backend-the-stage-as-an-mcp-server)). |
+
+Tokens are not renewed in the first version, so a seat ends when its `expires_at` passes (`TODO.md`).
+
 ### `zanni.join`
 
 The actor asks to join. It sends the play's join token as `Authorization: Bearer <token>` (D24), never in the body.
@@ -185,7 +196,7 @@ The actor's result for one cue. Everything in it is data, never instructions, to
 
 ### Heartbeats
 
-There is no heartbeat message: A2A's own calls are enough. The actor follows its seat's task with `SubscribeToTask`, keeping the stream open, or polls it with `GetTask`. Every call counts as contact. If the director has no contact for `heartbeat.misses` × `heartbeat.interval`, or a cue's `deadline` passes without a report, it:
+There is no heartbeat message: A2A's own calls are enough. The actor follows its seat's task with `SubscribeToTask`, keeping the stream open, or polls it with `GetTask`. Every call counts as contact, and an open `SubscribeToTask` stream counts for as long as it stays open (D31). An actor whose stream drops falls back to `GetTask` until it can subscribe again. If the director has no contact for `heartbeat.misses` × `heartbeat.interval`, or a cue's `deadline` passes without a report, it:
 
 1. ends the task as `canceled`, with a `zanni.release` whose reason is `no-heartbeat`;
 2. revokes the seat's tokens;

@@ -1,6 +1,6 @@
 name: dgx-coder
 role: github.com/zanni-roles/coder@1.0.0
-play: wss://director.example.com/plays/habit-tracker
+play: https://director.example.com:8765
 models:
   - { provider: ollama, model: qwen3-coder:30b, base_url: "${OLLAMA_BASE_URL}", tool_format: native, price: { input: 0, output: 0 } }
   - { provider: anthropic, model: claude-sonnet-5-5, credential: ANTHROPIC_API_KEY, fall_back_on: [error, timeout, rate-limit, context, refusal] }

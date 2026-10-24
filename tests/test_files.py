@@ -38,7 +38,7 @@ def broken(tmp_path: Path, example: Path, old: str, new: str) -> Path:
     (SCRIPT, "Script: 'software-team' 1.0.0."),
     (NEWSROOM, "Script: 'newsroom' 0.1.0."),
     (NEWSROOM_PLAY, "Play file: would start the director for the play 'city-desk'."),
-    (REHEARSAL, "Rehearsal: 'smoke', run with no director when an actor configuration's `play` points here."),
+    (REHEARSAL, "Rehearsal: 'smoke', run when an actor configuration's `play` points here, or served with --serve."),
     (REHEARSAL_ACTOR, "Actor configuration: would start 'slug-tester-1', playing a role in a play."),
 ])
 def test_examples_validate(example, first_line):
@@ -70,7 +70,7 @@ def test_play_summary_shows_cast_and_house_rules():
     (PLAY, "seats: 1-4", "seats: 4-1", "line 9, cast.coder.seats: the range 4-1 goes down"),
     (PLAY, "host: local", "hots: local", "line 9, cast.coder.hots: is not a known field; did you mean `host`?"),
     (PLAY, "budget: 20.00", "budget: -1", "line 11, house_rules.budget: should be at least 0, not -1"),
-    (PLAY, "director: wss://", "director: ftp://", "line 4, director: \"ftp://director.example.com\" is not a director address"),
+    (PLAY, "director: https://", "director: ftp://", "line 4, director: \"ftp://director.example.com\" is not a director address"),
     (PLAY, "  gates: [plan, release]", "  gates: [plan, release]\n  token: abc", "line 13, house_rules.token: looks like a secret"),
     (PLAY, "script: github.com/someone/habit-tracker@1.0.0", "script: github.com/someone/habit-tracker",
      'line 3, script: "github.com/someone/habit-tracker" has no version'),
@@ -105,7 +105,7 @@ def test_role_folder_reports_a_tool_missing_from_mcp_json(tmp_path):
 
 
 def test_actor_pointing_at_a_rehearsal_says_it_runs_with_no_director():
-    assert "play: the rehearsal 'smoke', 1 cue, run with no director" in zanni(REHEARSAL_ACTOR).stdout
+    assert "play: the rehearsal 'smoke', 1 cue, run with a director started for it" in zanni(REHEARSAL_ACTOR).stdout
 
 
 def test_role_folder_lists_its_rehearsals():

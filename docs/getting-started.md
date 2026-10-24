@@ -30,7 +30,7 @@ uv run zanni examples/plays/habit-tracker/play.yaml
 ```
 Play file: would start the director for the play 'habit-tracker'.
   script: github.com/someone/habit-tracker@1.0.0
-  director: wss://director.example.com
+  director: https://director.example.com
   stage: git git@github.com:alessio/habit-tracker.git (branch main)
   cast:
     product-owner: github.com/zanni-roles/product-owner@1.0.0, 1 seat

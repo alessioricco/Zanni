@@ -36,7 +36,7 @@ house_rules:
 |---|---|---|---|---|---|
 | `name` | text | yes | — | the director | The play's name, used in the log and in summaries. |
 | `script` | package reference ([references](actor-configuration.md#package-references)) | yes | — | the director | The script this play performs. A local path may point to `SCRIPT.md` or to its folder, relative to the play file. |
-| `director` | URL (`ws`, `wss`, `http`, `https`) | no | this machine | the actor | Where actors connect to join. Each actor decides whether it trusts this address. |
+| `director` | `http` or `https` URL | no | this machine | the actor | Where actors connect to join: the director's A2A address, where its card is served (D30). Each actor decides whether it trusts this address. |
 | `stage` | git URL, folder path, or `{ backend, … }` ([stage](stage.md#in-the-play-file)) | yes | — | the stage | The play's workspace, and the backend that stores it and enforces each seat's permissions. |
 | `cast` | map of part name → cast entry | yes, at least one | — | the director | A role for each of the script's parts. |
 | `house_rules` | house rules | no | no limits | the director | Limits set when the director starts. Nothing in a role, the script or an actor can loosen them. |

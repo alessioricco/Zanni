@@ -148,17 +148,37 @@ def load_rehearsal(path: Path) -> tuple[Loaded, Rehearsal]:
     return loaded, rehearsal
 
 
+def play_target(base: Path, play: str) -> tuple[str, str]:
+    """What an actor configuration's `play` points at (D30): director, play-url, play, rehearsal or missing.
+
+    Reads local files only; a URL is classified by its form, never fetched.
+    """
+    if "://" in play:
+        if not re.match(r"^https?://\S+$", play):
+            return "bad-url", play
+        return ("play-url" if play.lower().endswith((".yaml", ".yml")) else "director"), play
+    target = base / play
+    if not target.is_file():
+        return "missing", str(target)
+    return ("rehearsal" if "cues" in load_file(target).data else "play"), str(target)
+
+
 def check_actor_play(loaded: Loaded, actor: ActorConfiguration) -> list[str]:
-    """An actor configuration's `play` may point at a local rehearsal, to run with no director (D26)."""
-    target = Path(loaded.file).parent / actor.play
-    if "://" in actor.play or not target.is_file():
+    """An actor configuration's `play`: a director, a play file, or a local rehearsal (D26, D30)."""
+    kind, where = play_target(Path(loaded.file).parent, actor.play)
+    if kind == "bad-url":
+        raise FileErrors([FileError(loaded.file, loaded.line(("play",)), ("play",),
+                                    f'"{actor.play}" is not an address zanni can join',
+                                    "use an http:// or https:// URL, a play file or a rehearsal (D30)")])
+    if kind == "director":
+        return [f"  play: join the director at {where}"]
+    if kind == "play-url":
+        return [f"  play: join the director named in the play file {where}"]
+    if kind != "rehearsal":
         return []
-    play_loaded = load_file(target)
-    if "cues" not in play_loaded.data:
-        return []
-    _, rehearsal = load_rehearsal(target)
+    _, rehearsal = load_rehearsal(Path(where))
     cues = f"{len(rehearsal.cues)} cue{'s' if len(rehearsal.cues) > 1 else ''}"
-    return [f"  play: the rehearsal '{rehearsal.rehearsal}', {cues}, run with no director"]
+    return [f"  play: the rehearsal '{rehearsal.rehearsal}', {cues}, run with a director started for it"]
 
 
 def check_role_folder(folder: Path, loaded: Loaded, role: RoleManifest) -> list[str]:

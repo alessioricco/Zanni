@@ -195,8 +195,9 @@ StageSpec = Annotated[Stage, BeforeValidator(_stage)]
 
 
 def _director(value: object) -> object:
-    if isinstance(value, str) and not re.match(r"^(wss?|https?)://\S+$", value):
-        raise ValueError(f'"{value}" is not a director address; write a URL such as wss://director.example.com')
+    if isinstance(value, str) and not re.match(r"^https?://\S+$", value):
+        raise ValueError(f'"{value}" is not a director address; write an http(s) URL such as '
+                         'https://director.example.com (D30)')
     return value
 
 

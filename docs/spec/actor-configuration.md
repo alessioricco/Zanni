@@ -29,10 +29,47 @@ It is recognised by having both `role` and `play`, and it is the file passed to 
 |---|---|---|---|---|---|
 | `name` | text | no | none | the actor | This instance's name, used in the log and in summaries. |
 | `role` | package reference | yes | — | the director, at casting | The role this actor plays. The director casts the actor only into a part whose cast entry names this role. |
-| `play` | URL or path | yes | — | the actor | The play file to join, or a local [rehearsal](rehearsal.md) to run with no director. The actor decides which plays and directors it is willing to join. |
+| `play` | URL or path | yes | — | the actor | Where to join: a director's URL, a play file, or a local [rehearsal](rehearsal.md) ([below](#where-the-actor-joins)). The actor decides which plays and directors it is willing to join. |
 | `models` | list of model entries, at least one | yes | — | the actor | The models this actor runs, in order (D11). |
 | `credentials` | map of name → value | no | none | the actor, and `zanni` | This instance's credentials ([below](#credentials)). |
 | `state_dir` | path | no | `~/.zanni/actors/<name>` | the actor | Where the actor keeps its working memory and state. It is discarded or kept by the actor; the play's shared state lives on the stage. |
+
+## Where the actor joins
+
+`play` takes one of three forms (D30):
+
+| Value | Recognised by | What the actor does |
+|---|---|---|
+| A director | an `http://` or `https://` URL not ending in `.yaml` or `.yml` | Fetches the director's card from `/.well-known/agent-card.json` under that URL, and joins. |
+| A play file | a local path to a play file, or an `http(s)` URL ending in `.yaml` or `.yml` | Reads the play's `director`, and joins it. |
+| A rehearsal | a local path to a [rehearsal](rehearsal.md) | Runs it, with a director started for it on this machine (D29). |
+
+- **Before joining:** the actor prints the play and script named on the director's card. It refuses a director whose card doesn't carry the [casting extension](casting-extension.md) at a version it speaks, and sends it nothing.
+- **Joining:** the actor presents `ZANNI_JOIN_TOKEN` from its `credentials` (D24).
+- **The run:** the actor follows its seat's cues until it is released.
+- **Exit codes:** `zanni` exits with:
+  - 0 when the seat is released with `done`;
+  - 1 when it's released for any other reason;
+  - 2 when the join is refused or nothing could start.
+
+  For a rehearsal, the codes are the rehearsal's own (D28).
+- **Not yet:** a play file with no `director` means "this machine": the director starts those seats itself, which comes with milestone 4.
+
+## The actor's log
+
+Every actor keeps its own log, on its own machine, whether its director is local or remote (D32). The log is JSON Lines, in the play log's format (D18), at `<state_dir>/plays/<play>/<seat>/log.jsonl`; for a rehearsal, it is `actor-log.jsonl` in the run folder.
+
+| Event | Fields | When |
+|---|---|---|
+| `joined` | `director`, `play`, `script`, `seat`, `part`, `permissions`, `expires_at` | The actor is cast. Tokens are never logged. |
+| `join-refused` | `director`, `reason`, `message` | The director refuses the actor. |
+| `cue` | `seat`, `scene`, `cue` | A cue arrives. |
+| `fallback` | `seat`, `model`, `reason`, `detail` | A model failed, and the actor moved on (D20). |
+| `report` | `seat`, `cue`, `outcome`, `summary`, `changes` | The actor sends its report. |
+| `cost` | `seat`, `model`, `amount` | The cue's spend, `null` when unknown (D7). |
+| `released` | `seat`, `reason` | The seat ends. |
+
+The director keeps the play's log; neither log depends on the other.
 
 ## Package references
 

@@ -454,3 +454,80 @@ The loop is about 25 lines.
 
 - **Exit codes:** CI and scripts need to tell "the role did poorly" (1) from "the files are wrong" (2).
 - **`--check`:** "flags only override" holds: `--check` only narrows what the file would do.
+
+## D29. The director's casting side is real code; a rehearsal is served by it (2026-10-24)
+
+**Decision:**
+
+- **Where:** the director's casting side lives in `src/zanni/director/`, and milestone 4 extends it rather than replacing it:
+  - its card;
+  - join checks (`src/zanni/protocol/fit.py`);
+  - seats and their tokens;
+  - cues and reports;
+  - heartbeats and release;
+  - the stage's MCP server.
+- **Cues come from a rehearsal**, until milestone 4 gives the director a script to read.
+- **`zanni <rehearsal> --serve`** serves a rehearsal as a play with one part, on the network:
+  - **The part:** named after the role package that holds the rehearsal (the folder above `rehearsals/`). Its ceilings are that role's needs, and it has one seat.
+  - **The checks:** an actor fits if its card names a role of that name (`role-mismatch` otherwise), and its role's content hash matches the package's (`hash-mismatch` otherwise). A rehearsal has no cast entry, so the check is by name and hash instead of by reference: a local reference differs from machine to machine, but the hash doesn't.
+  - **The join token:** from `ZANNI_JOIN_TOKEN` in the director's environment, required.
+  - **The address:** `--listen host:port` sets it, and defaults to `127.0.0.1` on a free port. The address is printed.
+  - **The run:** the director serves one seat, runs the `verify` commands once the seat is released, and exits with D28's codes.
+- **A local rehearsal runs over A2A too.** When an actor configuration's `play` is a local rehearsal, `zanni <actor configuration>` starts this director in the same process, on `127.0.0.1`, with a join token it makes up for the run. The actor joins it over A2A. So every rehearsal exercises the real wire, and the rehearsal's output and exit codes stay as D28.
+
+**Why:** Alessio's call at ask point A of milestone 3. A fake director would test the actor against Zanni's own assumptions; a real one is half of milestone 4 already written, and lets one actor on another machine join for real.
+
+**Supersedes:** "with no director" in D26. A rehearsal still needs no play file or script; it now runs with a director started for it.
+
+## D30. What an actor configuration's `play` may point at (2026-10-24)
+
+**Decision:** `play` is one of:
+
+| Value | Recognised by | What the actor does |
+|---|---|---|
+| A director | an `http://` or `https://` URL not ending in `.yaml` or `.yml` | Fetches the director's card from `/.well-known/agent-card.json` under that URL. |
+| A play file | a local path to a play file, or an `http(s)` URL ending in `.yaml` or `.yml` | Reads the play's `director` and joins it. A play file with no `director` can't be joined yet: starting local seats is milestone 4. |
+| A rehearsal | a local path to a rehearsal | Runs it with a director started for it (D29). |
+
+- **Before joining:** the actor prints the director's play and script, from its card. It refuses to join a director whose card doesn't carry the casting extension at a version it speaks, saying so in plain words. Nothing is sent to that director.
+- **Exit codes:**
+  - 0 when the seat is released with `done`;
+  - 1 when it's released for any other reason;
+  - 2 when the join is refused or nothing could start.
+
+- **Director addresses are `http(s)`:** A2A's JSON-RPC binding (D21) runs over HTTP, so a play's `director` is an `http` or `https` URL. The `ws` and `wss` addresses the play file used to allow are gone.
+
+**Why:** Alessio's call at ask point B. A director's URL is all a remote actor needs. A play file is what a user already has, and a rehearsal keeps D26.
+
+## D31. The folder stage is served over MCP from milestone 3 (2026-10-24)
+
+**Decision:**
+
+- **The server:** the director serves the `folder` stage as an MCP server, over Streamable HTTP. The address goes in the cast's `stage.mcp_url`; Zanni's director uses `/stage/mcp` under its own address.
+- **Tokens:** each call carries the seat's stage token as an HTTP bearer token. A missing, unknown, expired or revoked token gets HTTP 401.
+- **The tools:** `stage_read`, `stage_write`, `stage_list`, `stage_delete` and `stage_changes`, with the arguments and results of `docs/spec/stage.md`.
+  - **Errors:** a refused operation is a tool result with `isError` and the text `<code>: <message>`, such as `not-permitted: this seat may not write app/x.py; …`.
+- **The actor's side:** Zanni's actor reaches the stage through the official `mcp` client. It turns those errors back into the stage errors its local tools raise, so a model sees the same tools and the same errors on a local and a remote stage.
+- **Calls on a seat's A2A task:** a call with a missing, wrong, expired or revoked seat token fails with a JSON-RPC Invalid Request error (`-32600`) whose message starts with `not-authorised`. A2A defines no error for this.
+- **An open stream counts as contact:** an open `SubscribeToTask` stream counts as contact for as long as it stays open.
+- **Milestone 5:** the git backend, and direct git access (D16), stay there.
+
+**Why:** Alessio's call at ask point C. `zanni.cast` already requires `stage.mcp_url`, and without it an actor on another machine has no stage.
+
+## D32. Each actor keeps its own log; machines are described by role, not hardware (2026-10-24)
+
+**Decision:**
+
+- **The actor's log:** every actor keeps its own log on its own machine, in JSON Lines (D18), at `<state_dir>/plays/<play>/<seat>/log.jsonl`. For a rehearsal, it goes next to the director's log in the run folder, as `actor-log.jsonl`. It records:
+  - `joined`: the director's URL, play and script, the seat, part, permissions and expiry, never a token;
+  - `join-refused`, `cue`, `fallback`, `report` and `cost`;
+  - `released`.
+
+  The director keeps the play's log. Neither depends on the other.
+- **Where an actor runs is up to whoever runs it.** A director never assumes its actors' machines. In time, a director may hire actors that other people offer online.
+- **The project describes machines by their role:**
+  - in docs, decisions, examples and recorded runs, a machine is named for what it does, such as "director and actor on one machine", "the actor on a second machine on the same network" or "a local model server";
+  - recorded runs still name exact models and versions (golden rule 7);
+  - the maintainer's own machines are kept out of the repository.
+
+**Why:** Alessio's answer at ask point D of milestone 3: each actor must be able to log its own work locally, and one contributor's setup is a detail that shouldn't shape the project for everyone else.
