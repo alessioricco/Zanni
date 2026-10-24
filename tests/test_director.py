@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from zanni.actor.stage import FolderStage
+from zanni.stage import folder_stage
 from zanni.director.casting import Director, PartSlot, SeatLost
 from zanni.director.contract import Outgoing
 from zanni.files.hashing import package_hash
@@ -43,7 +43,7 @@ def director(tmp_path, *, seats=1, interval=1, clock=None):
     clock = clock or Clock()
     (tmp_path / "stage").mkdir(exist_ok=True)
     d = Director(join_token=JOIN_TOKEN, parts=[PartSlot("tester", fits_tester, seats)],
-                 stage=FolderStage(tmp_path / "stage", [], []), log=Log(tmp_path / "log.jsonl", "r1"),
+                 stage=folder_stage(tmp_path / "stage"), log=Log(tmp_path / "log.jsonl", "r1"),
                  heartbeat_interval=interval, heartbeat_misses=3, clock=lambda: clock.t, utcnow=lambda: clock.utc)
     return d, clock
 

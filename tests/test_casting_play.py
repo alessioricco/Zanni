@@ -21,7 +21,7 @@ from pydantic_ai.models.function import FunctionModel
 from tests.director_harness import EXAMPLES, TOKEN, actor, actor_runner, kata, priced, production, staged, until
 from tests.fake_openai import fake_openai
 from zanni.actor.contract import CueTask, ResolvedModel
-from zanni.actor.stage import FolderStage
+from zanni.stage import folder_stage
 from zanni.director.contract import DirectorInfo
 from zanni.director.local import LocalSeats
 from zanni.engine.run import run_cue
@@ -263,7 +263,7 @@ def test_an_actor_stops_at_its_cues_budget_within_one_model_call(tmp_path):
 
     expensive = ResolvedModel(ModelEntry(provider="openai-compatible", model="m", base_url="http://x/v1",
                                          price={"input": 1000, "output": 1000}))  # $0.001 per token
-    stage = FolderStage(tmp_path, ["/"], [])
+    stage = folder_stage(tmp_path).seat(["/"], [])
     task = CueTask(instructions="i", skills={}, prompt="p", stage=stage, models=[expensive], budget=Decimal("0.10"))
     result = asyncio.run(run_cue(task, build=lambda rm: FunctionModel(endless)))
     assert result.over_budget and result.cost >= Decimal("0.10") and result.requests == len(calls) == 2

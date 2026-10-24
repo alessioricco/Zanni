@@ -80,7 +80,7 @@ def test_a_verdict_is_logged_with_its_source_and_goes_stale_after_a_write(tmp_pa
     verdict = [e for e in events(tmp_path) if e["event"] == "verdict"][0]
     assert verdict["verifier"] == "tests-pass" and verdict["passed"] and verdict["source"] == "script"
     assert "tests-pass: every test passes [passed]" in p.summary()
-    p.stage.seat([], ["app/"], "coder-1").write("app/slug.py", "x = 2\n")
+    run(p.stage.seat([], ["app/"], "coder-1").write("app/slug.py", "x = 2\n"))
     assert "[passed, but the stage changed since]" in p.summary()
     p.state.gates["plan"] = "approved"
     assert "the stage changed after it passed; run it again" in run(p.stop("done"))

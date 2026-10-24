@@ -4,9 +4,8 @@ import os
 
 import pytest
 
-from tests.stage_over_mcp import served
-from zanni.actor.contract import StageError
-from zanni.actor.stage import FolderStage
+from tests.stage_over_mcp import Local, served
+from zanni.stage import StageError, folder_stage
 
 
 @pytest.fixture(params=["local", "mcp"])
@@ -15,9 +14,9 @@ def stage(request, tmp_path):
     (tmp_path / "spec/a.md").write_text("AC1")
     (tmp_path / "app").mkdir()
     (tmp_path / "app/x.py").write_text("x = 1")
-    local = FolderStage(tmp_path, read=["spec/"], write=["tests/"])
+    local = folder_stage(tmp_path).seat(read=["spec/"], write=["tests/"])
     if request.param == "local":
-        yield local
+        yield Local(local)
         return
     with served({"seat-a": local}) as remote:
         yield remote["seat-a"]

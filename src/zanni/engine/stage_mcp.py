@@ -29,7 +29,7 @@ from zanni.director.contract import Casting
 
 STAGE_TOOLS = ("stage_read", "stage_write", "stage_list", "stage_delete", "stage_changes")
 # A refused operation's text ends with `<code>: <message>`; the MCP SDK puts its own prefix before it.
-STAGE_ERROR = re.compile(r"\b(invalid-path|not-permitted|not-found|unknown-marker|unavailable|not-authorised): (.*)",
+STAGE_ERROR = re.compile(r"\b(invalid-path|not-permitted|not-found|not-text|unknown-marker|unavailable|not-authorised): (.*)",
                          re.DOTALL)
 logging.getLogger("httpx2").setLevel(logging.WARNING)
 
@@ -57,36 +57,36 @@ def stage_server(casting: Casting, host: str) -> tuple[Mount, object]:
             raise ToolError("not-authorised: this seat's stage token is no longer valid")
         return stage
 
-    def run(operation):
+    async def run(operation):
         try:
-            return operation(seat_stage())
+            return await operation(seat_stage())
         except StageError as e:
             raise ToolError(f"{e.code}: {e}") from None
 
     @server.tool()
-    def stage_read(path: str) -> str:
+    async def stage_read(path: str) -> str:
         """Read a file from the stage. Paths are relative to the stage root, e.g. backlog/round-1.md."""
-        return run(lambda s: s.read(path))
+        return await run(lambda s: s.read(path))
 
     @server.tool()
-    def stage_write(path: str, content: str) -> str:
+    async def stage_write(path: str, content: str) -> str:
         """Write a whole file to the stage, replacing it if it exists. Returns the new change marker."""
-        return run(lambda s: s.write(path, content))
+        return await run(lambda s: s.write(path, content))
 
     @server.tool()
-    def stage_list(path: str = "") -> list[str]:
+    async def stage_list(path: str = "") -> list[str]:
         """List the files under a stage folder that you may read; empty for the root."""
-        return run(lambda s: s.list(path))
+        return await run(lambda s: s.list(path))
 
     @server.tool()
-    def stage_delete(path: str) -> str:
+    async def stage_delete(path: str) -> str:
         """Delete a file from the stage. Returns the new change marker."""
-        return run(lambda s: s.delete(path))
+        return await run(lambda s: s.delete(path))
 
     @server.tool()
-    def stage_changes(since: str | None = None) -> dict:
+    async def stage_changes(since: str | None = None) -> dict:
         """What changed on the stage since a change marker (or since the start), and the current marker."""
-        changes, marker = run(lambda s: s.changes(since))
+        changes, marker = await run(lambda s: s.changes(since))
         return {"changes": [{"path": p, "change": c} for p, c in changes], "marker": marker}
 
     # DNS-rebinding protection only makes sense on loopback, where the SDK turns it on; a director listening on

@@ -6,7 +6,7 @@ from decimal import Decimal
 import pytest
 
 from tests.test_director import JOIN_TOKEN, URL, Clock, join_message
-from zanni.actor.stage import FolderStage
+from zanni.stage import folder_stage
 from zanni.director import rules
 from zanni.director.casting import Director, PartSlot
 from zanni.director.state import PlayState, Verdict
@@ -159,7 +159,7 @@ def two_seats(tmp_path, max_per_host=None):
     (tmp_path / "stage").mkdir(exist_ok=True)
     clock = Clock()
     return Director(join_token=JOIN_TOKEN, parts=[PartSlot("tester", lambda p: None, 3)],
-                    stage=FolderStage(tmp_path / "stage", [], []), log=Log(tmp_path / "log.jsonl", "r1"),
+                    stage=folder_stage(tmp_path / "stage"), log=Log(tmp_path / "log.jsonl", "r1"),
                     clock=lambda: clock.t, utcnow=lambda: clock.utc, max_per_host=max_per_host)
 
 
@@ -186,9 +186,9 @@ def test_a_report_holds_only_its_own_seats_changes(tmp_path):
         cue = lambda n: Cue(kind="zanni.cue", cue=f"c-{n}", scene="s", instructions="i")  # noqa: E731
         wa, wb = asyncio.create_task(d.cue(a, cue(1))), asyncio.create_task(d.cue(b, cue(2)))
         await asyncio.sleep(0)
-        a.stage.write("a.txt", "a")
-        b.stage.write("b.txt", "b")
-        a.stage.write("a2.txt", "a")
+        await a.stage.write("a.txt", "a")
+        await b.stage.write("b.txt", "b")
+        await a.stage.write("a2.txt", "a")
         claimed = ["1", "2", "3"]  # the actor sees every change; the director knows better
         await d.report("t1", Report(kind="zanni.report", cue="c-1", outcome="done", summary="", changes=claimed, cost=None))
         await d.report("t2", Report(kind="zanni.report", cue="c-2", outcome="done", summary="", changes=claimed, cost=None))
@@ -200,9 +200,13 @@ def test_a_report_holds_only_its_own_seats_changes(tmp_path):
 
 @pytest.mark.parametrize("since,expected", [(0, ["1", "3"]), (1, ["3"]), (3, [])])
 def test_made_by_counts_from_a_marker(tmp_path, since, expected):
-    stage = FolderStage(tmp_path, [], ["/"], who="a")
-    other = stage.seat([], ["/"], who="b")
-    stage.write("x", "1")
-    other.write("y", "2")
-    stage.write("z", "3")
+    stage = folder_stage(tmp_path)
+    a, b = stage.seat([], ["/"], who="a"), stage.seat([], ["/"], who="b")
+
+    async def go():
+        await a.write("x", "1")
+        await b.write("y", "2")
+        await a.write("z", "3")
+
+    asyncio.run(go())
     assert stage.made_by("a", since) == expected

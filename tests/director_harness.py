@@ -14,7 +14,7 @@ from pydantic_ai.models.function import FunctionModel
 from zanni.actor.contract import ResolvedModel
 from zanni.actor.roles import load_role
 from zanni.actor.seat import play_seat
-from zanni.actor.stage import FolderStage
+from zanni.stage import folder_stage
 from zanni.director.casting import Director, PartSlot
 from zanni.director.contract import DirectorInfo
 from zanni.director.gates import Gates
@@ -81,7 +81,7 @@ def production(tmp_path, play, script, stage, *, say=lambda _: None, interval=2)
     parts = [PartSlot(name, fits(load_role(tmp_path / f"roles/{name}").manifest.name), script.parts[name].seats.max)
              for name in play.cast]
     log = Log(tmp_path / "log.jsonl", "r1")
-    casting = Director(join_token=TOKEN, parts=parts, stage=FolderStage(stage, [], []), log=log,
+    casting = Director(join_token=TOKEN, parts=parts, stage=folder_stage(stage), log=log,
                        heartbeat_interval=interval, say=say)
     state = PlayState(play, script)
     gates = Gates(state, log, play.house_rules.gate_timeout, say=say)

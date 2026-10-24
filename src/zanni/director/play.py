@@ -12,7 +12,7 @@ from datetime import timedelta
 from decimal import Decimal, InvalidOperation
 
 from zanni.actor.contract import AllModelsFailed, StageError
-from zanni.actor.stage import FolderStage
+from zanni.stage import Stage
 from zanni.director import rules
 from zanni.director.casting import Director, Seat, SeatLost, stamp
 from zanni.director.gates import Gates
@@ -53,7 +53,7 @@ RunTurn = Callable[[Callable[[], str]], Awaitable[TurnOutcome]]
 class Production:
     """One run of a play: its state, its seats (through the casting side), its stage, its log and its gates."""
 
-    def __init__(self, *, state: PlayState, casting: Director, stage: FolderStage, log: Log,
+    def __init__(self, *, state: PlayState, casting: Director, stage: Stage, log: Log,
                  verifiers: dict[str, tuple[list[str] | None, int, str]], gates: Gates,
                  say: Callable[[str], None] = print, local=None, recast_wait: float = 180):
         self.state, self.casting, self.log, self.gates, self.say = state, casting, log, gates, say
@@ -89,7 +89,7 @@ class Production:
         return sum(1 for p in self.pending.values() if p.writes)
 
     def marker(self) -> int:
-        return len(self.stage.record)
+        return self.stage.marker()
 
     # --- the tools (each returns plain words for the model)
 
@@ -99,7 +99,7 @@ class Production:
         if stopped := self._stopped():
             return stopped
         reads, writes = list(reads or []), list(writes or [])
-        if self.cues == 0 and (missing := rules.stage_missing(self.stage.root, self.state.script.stage.expects)):
+        if self.cues == 0 and (missing := await self.stage.missing(self.state.script.stage.expects)):
             return self._refuse("cue", f"the stage doesn't hold what the script expects: {', '.join(missing)}")
         seat = self._seat_for(target)
         if isinstance(seat, str):
@@ -244,7 +244,7 @@ class Production:
             return self._refuse("run_verifier", refusal)
         command, timeout, source, _ = self.verifiers[name]
         marker = self.marker()
-        passed, detail = await run_command(command, self.stage.root, timeout)
+        passed, detail = await run_command(command, self.stage.backend.root, timeout)
         self.state.verdicts[name] = Verdict(name, passed, detail, source, marker, self.state.round)
         self.log.event("verdict", scene=f"round {self.state.round}", verifier=name, kind="hard", passed=passed,
                        detail=detail[-500:], source=source)
@@ -273,7 +273,7 @@ class Production:
         return f"{name}: rejected: {decision.note}. Revise the work as the note says, then ask again."
 
     def _gate_summary(self, summary: str) -> str:
-        changed = sorted({p for p, _, _ in self.stage.record[self.last_gate_marker:]})
+        changed = self.stage.changed_since(self.last_gate_marker)
         verdicts = ", ".join(f"{v.name} {'passed' if v.passed else 'failed'}" for v in self.state.verdicts.values())
         return (f"{summary.strip()}\nRound {self.state.round}. Files changed since the last gate: "
                 f"{', '.join(changed) or 'none'}. Verdicts: {verdicts or 'none yet'}.")
@@ -346,15 +346,15 @@ class Production:
         if self.state.stopped is None:
             self.state.stopped = (reason, completed)
 
-    def read(self, path: str) -> str:
+    async def read(self, path: str) -> str:
         try:
-            return self.view.read(path)
+            return await self.view.read(path)
         except StageError as e:
             return f"{e.code}: {e}"
 
-    def list_files(self, path: str = "") -> list[str] | str:
+    async def list_files(self, path: str = "") -> list[str] | str:
         try:
-            return self.view.list(path)
+            return await self.view.list(path)
         except StageError as e:
             return f"{e.code}: {e}"
 
@@ -488,13 +488,13 @@ class Production:
             done rules hold (refused otherwise, and the play goes on). With done=false it ends as not completed."""
             return await production.stop(reason, done)
 
-        def read(path: str) -> str:
+        async def read(path: str) -> str:
             """Read a file on the stage."""
-            return production.read(path)
+            return await production.read(path)
 
-        def list_files(path: str = "") -> list[str] | str:
+        async def list_files(path: str = "") -> list[str] | str:
             """List the files under a folder of the stage; empty for the root."""
-            return production.list_files(path)
+            return await production.list_files(path)
 
         return [cue, wait_for_reports, run_verifier, ask_gate, cast, release, end_round, stop, read, list_files]
 

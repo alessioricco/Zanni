@@ -20,7 +20,7 @@ def skill_toolset(skills: dict[str, str]) -> FunctionToolset:
 def stage_toolset(stage: Stage) -> FunctionToolset:
     """The five stage operations, with the same names and errors over MCP (D16, D31).
 
-    `stage` is a local FolderStage (plain calls) or a RemoteStage over MCP (coroutines): the tools are the same.
+    `stage` is a seat's view on the director's side, or a RemoteStage over MCP: the tools are the same.
     """
 
     def refuse(e: StageError) -> ModelRetry:

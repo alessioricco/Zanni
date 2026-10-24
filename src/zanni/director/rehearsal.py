@@ -7,7 +7,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from zanni.actor.stage import FolderStage
+from zanni.stage import folder_stage
 from zanni.director.casting import Director, PartSlot, SeatLost
 from zanni.files.schemas import Rehearsal
 from zanni.log import Log
@@ -48,7 +48,7 @@ def rehearsal_director(rehearsal: Rehearsal, rehearsal_path: Path, role_name: st
     """Copy the rehearsal's stage fresh into `run_dir/stage`, and make the director that will serve it."""
     shutil.copytree(rehearsal_path.parent / rehearsal.stage, run_dir / "stage")
     return Director(join_token=join_token or secrets.token_urlsafe(32), parts=[role_part(role_name, role_hash)],
-                    stage=FolderStage(run_dir / "stage", [], []), log=Log(run_dir / "log.jsonl", run_id), say=say,
+                    stage=folder_stage(run_dir / "stage"), log=Log(run_dir / "log.jsonl", run_id), say=say,
                     **settings)
 
 

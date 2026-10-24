@@ -24,6 +24,7 @@ from zanni.director.prompt import instructions
 from zanni.director.rehearsal import parse_listen
 from zanni.director.rules import stage_missing
 from zanni.director.state import PlayState
+from zanni.stage import folder_stage
 from zanni.files.check import against_script, check, check_script, describe_verifiers, resolve, verifier_commands
 from zanni.files.errors import FileErrors
 from zanni.files.loader import load_file
@@ -185,7 +186,6 @@ def run_play(play_path: Path, *, director_path: Path | None = None, update: bool
 async def _run(play_path, play, script, prose, director, director_file, packages, stage_root, models, join_token,
                owner_token, host, port, say, build, interactive) -> int:
     from zanni import __version__
-    from zanni.actor.stage import FolderStage
     from zanni.director.console import console, stdin_lines
     from zanni.director.contract import DirectorInfo
     from zanni.engine.director_agent import run_director_turn
@@ -196,7 +196,7 @@ async def _run(play_path, play, script, prose, director, director_file, packages
     log = Log(folder / "log" / f"{run_id}.jsonl", run_id)
     state = PlayState(play, script)
     casting = Director(join_token=join_token, parts=part_slots(play, folder, script, packages),
-                       stage=FolderStage(stage_root, [], []), log=log, say=say,
+                       stage=folder_stage(stage_root), log=log, say=say,
                        max_per_host=play.house_rules.max_seats_per_host,
                        require_pricing=play.house_rules.budget is not None)
     gates = Gates(state, log, play.house_rules.gate_timeout, say=say)

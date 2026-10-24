@@ -12,7 +12,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 
-from zanni.actor.stage import FolderStage
+from zanni.stage import SeatStage, Stage
 from zanni.director.contract import Outgoing
 from zanni.log import Log
 from zanni.protocol.card import EXTENSION_URI, ActorCardParams
@@ -48,7 +48,7 @@ class Seat:
     seat_token: str
     stage_token: str
     expires_at: datetime
-    stage: FolderStage
+    stage: SeatStage
     last_contact: float
     host: str | None = None  # the address it joined from (max_seats_per_host)
     cue_marker: int = 0  # the stage's record length when the pending cue was sent (D41)
@@ -78,7 +78,7 @@ def card_params(join: Join) -> ActorCardParams:
 class Director:
     """One play's casting: its parts, its seats, and the play's log."""
 
-    def __init__(self, *, join_token: str, parts: list[PartSlot], stage: FolderStage, log: Log,
+    def __init__(self, *, join_token: str, parts: list[PartSlot], stage: Stage, log: Log,
                  heartbeat_interval: int = 30, heartbeat_misses: int = 3, token_ttl: timedelta = timedelta(hours=24),
                  clock: Callable[[], float] = time.monotonic, utcnow: Callable[[], datetime] = lambda: datetime.now(UTC),
                  say: Callable[[str], None] = lambda _: None, max_per_host: int | None = None,
@@ -225,7 +225,8 @@ class Director:
             raise SeatLost(seat.id, seat.reason or "released")
         answer = asyncio.get_running_loop().create_future()
         seat.pending = (cue, answer)
-        seat.cue_marker = len(self.stage.record)
+        seat.cue_marker = self.stage.marker()
+        seat.stage.note = f"{cue.cue}: {cue.scene}"  # written into the backend's history, such as a commit message
         seat.deadline = datetime.fromisoformat(cue.deadline.replace("Z", "+00:00")) if cue.deadline else None
         self.log.event("cue", seat=seat.id, scene=cue.scene, cue=cue.cue,
                        budget=cue.limits.budget.amount if cue.limits.budget else None)

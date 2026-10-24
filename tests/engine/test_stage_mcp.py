@@ -7,7 +7,7 @@ import pytest
 
 from tests.stage_over_mcp import Tokens, served
 from zanni.actor.contract import StageError
-from zanni.actor.stage import FolderStage
+from zanni.stage import folder_stage
 from zanni.engine.stage_mcp import STAGE_TOOLS, remote_stage
 
 
@@ -15,7 +15,7 @@ from zanni.engine.stage_mcp import STAGE_TOOLS, remote_stage
 def stages(tmp_path):
     (tmp_path / "spec").mkdir()
     (tmp_path / "spec/a.md").write_text("AC1")
-    shared = FolderStage(tmp_path, [], [])
+    shared = folder_stage(tmp_path)
     return {"tester-token": shared.seat(["spec/"], ["tests/"]), "coder-token": shared.seat(["/"], ["app/"])}
 
 

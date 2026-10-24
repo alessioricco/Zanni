@@ -10,27 +10,18 @@ from decimal import Decimal
 from typing import Protocol
 
 from zanni.files.schemas import ModelEntry
-
-
-class StageError(Exception):
-    """A refused stage operation; `code` is one of the stage spec's errors (docs/spec/stage.md)."""
-
-    def __init__(self, code: str, message: str):
-        super().__init__(message)
-        self.code = code
+from zanni.stage.errors import StageError  # noqa: F401  re-exported: the actor's code raises and catches it
 
 
 class Stage(Protocol):
-    """The stage operations every backend offers (docs/spec/stage.md), for one seat.
+    """The stage operations every stage offers to a seat (docs/spec/stage.md), as coroutines: a seat's view on the
+    director's side (zanni.stage.SeatStage), or the stage over MCP on the actor's (D31)."""
 
-    A remote stage (over MCP, D31) offers the same methods as coroutines.
-    """
-
-    def read(self, path: str) -> str: ...
-    def write(self, path: str, content: str) -> str: ...
-    def list(self, path: str = "") -> list[str]: ...
-    def delete(self, path: str) -> str: ...
-    def changes(self, since: str | None = None) -> tuple[list[tuple[str, str]], str]: ...
+    async def read(self, path: str) -> str: ...
+    async def write(self, path: str, content: str) -> str: ...
+    async def list(self, path: str = "") -> list[str]: ...
+    async def delete(self, path: str) -> str: ...
+    async def changes(self, since: str | None = None) -> tuple[list[tuple[str, str]], str]: ...
 
 
 @dataclass(frozen=True)

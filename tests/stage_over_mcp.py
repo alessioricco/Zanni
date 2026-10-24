@@ -31,6 +31,17 @@ class Synchronous:
         return lambda *args: asyncio.run_coroutine_threadsafe(method(*args), self.loop).result(30)
 
 
+class Local:
+    """A seat's view on the director's side, called synchronously, so the same tests run on both sides."""
+
+    def __init__(self, seat):
+        self.seat, self.root = seat, seat.stage.backend.root
+
+    def __getattr__(self, name):
+        method = getattr(self.seat, name)
+        return lambda *args: asyncio.run(method(*args))
+
+
 @contextlib.contextmanager
 def served(stages: dict, tokens: Tokens | None = None):
     tokens = tokens or Tokens(stages)
@@ -52,7 +63,7 @@ def served(stages: dict, tokens: Tokens | None = None):
     running = asyncio.run_coroutine_threadsafe(main(), loop)
     url, remotes = asyncio.run_coroutine_threadsafe(asyncio.wait_for(asyncio.shield(ready), 30), loop).result(30)
     try:
-        yield {t: Synchronous(r, loop, stages[t].root) for t, r in remotes.items()} | {"url": url, "tokens": tokens}
+        yield {t: Synchronous(r, loop, stages[t].stage.backend.root) for t, r in remotes.items()} | {"url": url, "tokens": tokens}
     finally:
         loop.call_soon_threadsafe(stop.set)
         running.result(30)
