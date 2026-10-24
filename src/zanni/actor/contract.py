@@ -67,6 +67,7 @@ class CueTask:
     models: list[ResolvedModel]  # in order (D11); the next is tried on the entry's fall_back_on reasons (D20)
     mcp_servers: list[McpServerSpec] = field(default_factory=list)
     needs_tools: bool = False  # the role's model.needs.tools
+    budget: Decimal | None = None  # the cue's limits.budget: the run stops once its spend reaches it (D39)
 
 
 @dataclass(frozen=True)
@@ -89,6 +90,7 @@ class CueResult:
     cost: Decimal | None  # None when unknown, never zero (D7)
     cost_source: str  # "genai-prices", "configuration" or "unknown"
     fallbacks: list[Fallback] = field(default_factory=list)
+    over_budget: bool = False  # it stopped at the cue's budget (D39)
 
 
 class AllModelsFailed(Exception):

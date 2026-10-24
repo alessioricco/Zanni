@@ -13,7 +13,10 @@ from pathlib import Path
 from zanni import __version__
 from zanni.actor.contract import AllModelsFailed, CueTask, McpServerSpec, ResolvedModel
 from zanni.actor.roles import Role
+from decimal import Decimal
+
 from zanni.engine.a2a_client import DirectorClient, DirectorError, NotAuthorised, Status
+from zanni.engine.pricing import all_priced
 from zanni.engine.run import run_cue
 from zanni.engine.stage_mcp import remote_stage
 from zanni.files.hashing import package_hash
@@ -109,7 +112,8 @@ async def play_seat(url: str, actor: ActorConfiguration, role: Role, models: lis
         log = Log(log_at(director.play), run_id)
         say(f"Joining the play '{director.play}' (script {director.script}) at {url}")
         try:
-            task_id, answer = await client.join(actor_card(actor, role, models), join_token, part)
+            pricing = "known" if all_priced(models) else "unknown"  # under a budget, unknown is refused (D39)
+            task_id, answer = await client.join(actor_card(actor, role, models), join_token, part, pricing)
         except DirectorError as e:
             raise CannotJoin(str(e)) from None
         if isinstance(answer, Refused):
@@ -179,8 +183,9 @@ async def _answer(cue: Cue, stage, role: Role, models, servers, seat: str, log: 
     say(f"  cue {cue.cue}: {cue.scene}")
     log.event("cue", seat=seat, scene=cue.scene, cue=cue.cue)
     start = (await stage.changes())[1]
+    budget = Decimal(cue.limits.budget.amount) if cue.limits.budget else None
     task = CueTask(instructions=role.instructions, skills=role.skills, prompt=cue_prompt(cue), stage=stage,
-                   models=models, mcp_servers=servers, needs_tools=role.manifest.model.needs.tools)
+                   models=models, mcp_servers=servers, needs_tools=role.manifest.model.needs.tools, budget=budget)
     try:
         result, failure = await runner(task), None
     except AllModelsFailed as e:
@@ -191,7 +196,8 @@ async def _answer(cue: Cue, stage, role: Role, models, servers, seat: str, log: 
         say(f"    {f.model} failed ({f.reason}); {'trying the next model' if result or f is not attempts[-1] else 'no model left'}")
     after = (await stage.changes())[1]
     changes = [str(i) for i in range(int(start) + 1, int(after) + 1)]  # one marker per change since the cue began
-    report = Report(kind="zanni.report", cue=cue.cue, outcome="done" if result else "failed",
+    outcome = ("over-budget" if result.over_budget else "done") if result else "failed"
+    report = Report(kind="zanni.report", cue=cue.cue, outcome=outcome,
                     summary=result.output if result else str(failure), changes=changes,
                     cost=money(result.cost) if result and result.cost is not None else None,
                     models=[{"provider": result.provider, "model": result.model_name}] if result else [])
@@ -199,7 +205,8 @@ async def _answer(cue: Cue, stage, role: Role, models, servers, seat: str, log: 
     log.event("cost", seat=seat, model=result.model if result else None, amount=report.cost.amount if report.cost else None)
     if result:
         cost = f"${report.cost.amount}" if report.cost else "unknown"
-        say(f"    done on {result.model}: {len(result.tool_calls)} tool calls, "
+        say(f"    {'stopped at its budget' if result.over_budget else 'done'} on {result.model}: "
+            f"{len(result.tool_calls)} tool calls, "
             f"{result.input_tokens} in / {result.output_tokens} out tokens, cost {cost}")
     else:
         say("    failed: every model failed")

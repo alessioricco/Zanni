@@ -124,7 +124,7 @@ def actor_runner(files: dict[str, str], summary: str = "Done.", cost_per_token=N
     """A scripted actor: writes `files` on the stage, then answers `summary`."""
 
     def respond(messages, info):
-        if not any(isinstance(p, ToolReturnPart) for m in messages for p in m.parts):
+        if files and not any(isinstance(p, ToolReturnPart) for m in messages for p in m.parts):
             return ModelResponse(parts=[ToolCallPart("stage_write", {"path": k, "content": v}) for k, v in files.items()])
         return ModelResponse(parts=[TextPart(summary)])
 

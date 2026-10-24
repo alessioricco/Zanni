@@ -81,13 +81,15 @@ class Director:
     def __init__(self, *, join_token: str, parts: list[PartSlot], stage: FolderStage, log: Log,
                  heartbeat_interval: int = 30, heartbeat_misses: int = 3, token_ttl: timedelta = timedelta(hours=24),
                  clock: Callable[[], float] = time.monotonic, utcnow: Callable[[], datetime] = lambda: datetime.now(UTC),
-                 say: Callable[[str], None] = lambda _: None, max_per_host: int | None = None):
+                 say: Callable[[str], None] = lambda _: None, max_per_host: int | None = None,
+                 require_pricing: bool = False):
         self.join_token = join_token
         self.parts = {p.name: p for p in parts}
         self.stage, self.log = stage, log
         self.interval, self.misses = heartbeat_interval, heartbeat_misses
         self.token_ttl, self.clock, self.utcnow, self.say = token_ttl, clock, utcnow, say
         self.max_per_host = max_per_host
+        self.require_pricing = require_pricing  # the play has a budget: unpriced actors are refused (D39)
         self.seats: dict[str, Seat] = {}  # by task id
         self.cast_event = asyncio.Event()
         self.end_task: Callable[[str], Awaitable[None]] | None = None  # set by the server: ends an A2A task
@@ -107,6 +109,10 @@ class Director:
             return self._refuse(reason, message)
         params = card_params(join)
         who = dict(actor=params.actor or join.card.get("name"), role=params.role.ref)
+        if self.require_pricing and join.pricing != "known":
+            return self._refuse("unpriced", "this play has a budget, and the actor's models aren't all priced, so "
+                                            "its cost would be unknown; add `price:` to each model entry in its "
+                                            "configuration (D7)", **who)
         if join.part is not None and join.part not in self.parts:
             return self._refuse("no-such-part", f"this play has no part {join.part!r}; its parts are: "
                                                 f"{', '.join(self.parts)}", **who)
@@ -256,6 +262,14 @@ class Director:
             seat.pending[1].set_exception(SeatLost(seat.id, reason))
         if self.end_task is not None:
             await self.end_task(seat.task_id)
+
+    async def lose(self, seat: Seat, why: str) -> None:
+        """End a seat the director knows is gone, such as a local seat whose process exited: as a missed heartbeat."""
+        if seat.revoked:
+            return
+        release = Release(kind="zanni.release", reason="no-heartbeat", message=why)
+        self._revoke(seat, "no-heartbeat")
+        await self._end(seat, Outgoing("canceled", release), "no-heartbeat")
 
     def overdue(self) -> list[Seat]:
         """Active seats past their heartbeat, or past a cue's deadline (casting-extension.md, "Heartbeats")."""

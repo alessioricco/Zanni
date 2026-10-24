@@ -103,9 +103,10 @@ class DirectorClient:
             raise _call_error(e) from None
         raise DirectorError("the director answered with no task")
 
-    async def join(self, card: dict, token: str | None, part: str | None = None) -> tuple[str, Cast | Refused]:
+    async def join(self, card: dict, token: str | None, part: str | None = None,
+                   pricing: str = "unknown") -> tuple[str, Cast | Refused]:
         """Ask to join; the answer is the seat's task id, and the cast or the refusal (casting-extension.md)."""
-        task = await self._send_message(Join(kind="zanni.join", card=card, part=part), token)
+        task = await self._send_message(Join(kind="zanni.join", card=card, part=part, pricing=pricing), token)
         self._contexts[task.id] = task.context_id
         status = _status(task)
         if not isinstance(status.message, (Cast, Refused)):

@@ -99,20 +99,30 @@ def test_an_actor_configuration_joins_a_director(tmp_path, through):
     assert [json.loads(line)["event"] for line in logs[0].read_text().splitlines()][0] == "joined"
 
 
-def test_joining_needs_the_join_token_in_credentials(tmp_path):
+def test_joining_needs_the_join_token_in_credentials_or_the_environment(tmp_path, monkeypatch):
+    monkeypatch.delenv("ZANNI_JOIN_TOKEN")
     with director(tmp_path) as (url, _):
         config = configuration(tmp_path, url, token=False)
         actor, _ = check(config)
-        with pytest.raises(Unresolved, match="ZANNI_JOIN_TOKEN"):
+        with pytest.raises(Unresolved, match="ZANNI_JOIN_TOKEN isn't in the actor configuration's `credentials` or "
+                                             "the environment"):
             join_play(config, actor)
 
 
-def test_a_play_file_without_a_director_cant_be_joined_yet(tmp_path):
+def test_the_join_token_may_come_from_the_environment_alone(tmp_path):
+    with director(tmp_path) as (url, done):
+        config = configuration(tmp_path, url, token=False)
+        actor, _ = check(config)
+        outcome = join_play(config, actor, say=lambda _: None, runner=scripted())
+    assert outcome.exit_code == 0 and outcome.reason == "done"
+
+
+def test_a_play_file_without_a_director_is_joined_through_its_director_only(tmp_path):
     shutil.copytree(EXAMPLES / "roles", tmp_path / "roles")
     (tmp_path / "play.yaml").write_text("name: x\nscript: ./s\nstage: ./st\ncast:\n  a: roles/a\n")
     config = configuration(tmp_path, "./play.yaml")
     actor, _ = check(config)
-    with pytest.raises(CannotJoin, match="milestone 4"):
+    with pytest.raises(CannotJoin, match="it runs on its director's machine"):
         join_play(config, actor)
 
 

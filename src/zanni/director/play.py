@@ -23,6 +23,7 @@ from zanni.protocol.encoding import money
 from zanni.protocol.messages import Cue
 
 DEFAULT_DEADLINE = 60  # minutes: a cue nobody answers can't hold an unattended play forever
+RESENT = "\n\n(The seat that had this cue was lost. Continue from what is on the stage now.)"
 
 
 @dataclass
@@ -52,7 +53,7 @@ class Production:
 
     def __init__(self, *, state: PlayState, casting: Director, stage: FolderStage, log: Log,
                  verifiers: dict[str, tuple[list[str] | None, int, str]], gates: Gates,
-                 say: Callable[[str], None] = print, local=None):
+                 say: Callable[[str], None] = print, local=None, recast_wait: float = 180):
         self.state, self.casting, self.log, self.gates, self.say = state, casting, log, gates, say
         self.stage = stage
         self.view = stage.seat(["/"], [])  # the director reads the whole stage, and writes nothing
@@ -61,6 +62,7 @@ class Production:
         self.pending: dict[str, Pending] = {}
         self.cues = 0
         self.last_gate_marker = 0
+        self.recast_wait = recast_wait  # seconds a lost seat's part waits for its next seat before giving up
 
     # --- helpers
 
@@ -114,11 +116,7 @@ class Production:
                   reads=reads, writes=writes, deadline=stamp(self.casting.utcnow() + timedelta(minutes=minutes)),
                   verifiers=[f"{n}: {v.description}" for n, v in self.state.script.verifiers.items()],
                   limits={"budget": money(amount)} if amount is not None else {})
-        if amount is not None:
-            self.state.reservations[cue.cue] = amount
-        pending = Pending(cue, seat, writes=bool(writes))
-        self.pending[cue.cue] = pending
-        pending.task = asyncio.create_task(self._follow(pending))
+        self._send(cue, seat, amount)
         self.say(f"  cue {cue.cue} to {seat.id}: {scene}{f' (budget ${amount})' if amount is not None else ''}")
         return (f"cue {cue.cue} sent to {seat.id} (part {seat.part}), due within {minutes} minutes"
                 + (f", with a budget of ${amount}" if amount is not None else ""))
@@ -138,16 +136,24 @@ class Production:
                     else f"no seat of {target} is cast right now; cast it, or wait_for_reports while it is recast")
         return idle[0]
 
+    def _send(self, cue: Cue, seat: Seat, amount: Decimal | None) -> None:
+        if amount is not None:
+            self.state.reservations[cue.cue] = amount
+        pending = Pending(cue, seat, writes=bool(cue.writes))
+        self.pending[cue.cue] = pending
+        pending.task = asyncio.create_task(self._follow(pending))
+
     async def _follow(self, p: Pending) -> None:
-        """Wait for one cue's report, then account for it (D39, D41)."""
+        """Wait for one cue's report, then account for it (D39, D41); resend it if its seat is lost."""
         try:
             report = await self.casting.cue(p.seat, p.cue)
         except SeatLost as e:
             await self._lost(p, e.reason)
             return
         finally:
-            self.state.reservations.pop(p.cue.cue, None)
-            self.pending.pop(p.cue.cue, None)
+            if self.pending.get(p.cue.cue) is p:
+                self.pending.pop(p.cue.cue)
+                self.state.reservations.pop(p.cue.cue, None)
         cost = Decimal(report.cost.amount) if report.cost else None
         self.state.charge(cost)
         self.state.inbox.append(Report(p.cue.cue, p.seat.id, p.seat.part, p.cue.scene, report.outcome, report.summary,
@@ -155,26 +161,72 @@ class Production:
         self.say(f"  report from {p.seat.id} on {p.cue.cue}: {report.outcome}, "
                  f"cost {'$' + report.cost.amount if report.cost else 'unknown'}")
         if cost is None and self.state.budget is not None:
+            if self.local is not None:
+                self.local.released(p.seat.actor)
             await self.casting.release(p.seat, "budget", "your cost was unknown, and this play has a budget (D7)")
             await self._recast(p.seat, "its cost was unknown under a budget")
 
     async def _lost(self, p: Pending, reason: str) -> None:
-        self.state.inbox.append(Report(p.cue.cue, p.seat.id, p.seat.part, p.cue.scene, "lost",
-                                       f"the seat ended before it answered ({reason})", [], None))
+        """The seat ended before it answered: recast its part, and resend the cue to the next seat (D36)."""
         self.say(f"  {p.seat.id} was lost ({reason}) during {p.cue.cue}")
-        await self._recast(p.seat, reason)
+        amount = self.state.reservations.get(p.cue.cue)
+        new = await self._recast(p.seat, reason) if not self.state.stopped else None
+        if new is None or self.state.stopped:
+            self.state.inbox.append(Report(p.cue.cue, p.seat.id, p.seat.part, p.cue.scene, "lost",
+                                           f"the seat ended before it answered ({reason}), and no seat of "
+                                           f"{p.seat.part} took its place in time", [], None))
+            return
+        cue = p.cue.model_copy(update={"cue": p.cue.cue + "-again", "instructions": p.cue.instructions + RESENT})
+        self.log.event("cue-resent", cue=p.cue.cue, seat=new.id, was=p.seat.id)
+        self.say(f"  resending {p.cue.cue} to {new.id}")
+        self._send(cue, new, amount)
 
-    async def _recast(self, seat: Seat, reason: str) -> None:
-        """Reopen the seat's part: a local seat is restarted, within its limit (D36); others wait for a join."""
+    async def _recast(self, seat: Seat, reason: str) -> Seat | None:
+        """Reopen the seat's part: a local seat is restarted, within its limit (D36); others are waited for.
+        Returns an idle seat of the part (another one already cast, or the next to join), or None if none comes
+        within `recast_wait`."""
         if self.local is not None:
-            await self.local.restart(seat, reason)
+            await self.local.restart(seat.actor, reason)
+        loop = asyncio.get_running_loop()
+        until = loop.time() + self.recast_wait
+        while loop.time() < until and not self.state.stopped:
+            idle = [s for s in self.active_seats(seat.part) if s is not seat and not self.busy(s)]
+            if idle:
+                return idle[0]
+            await asyncio.sleep(0.2)
+        return None
+
+    async def local_seat_exited(self, name: str) -> None:
+        """A local seat's process exited on its own: end its seat at once rather than waiting for its heartbeat."""
+        seat = next((s for s in self.active_seats() if s.actor == name), None)
+        if seat is None:  # it never joined: restart it, within its limit
+            await self.local.restart(name, "it exited before joining")
+            return
+        if self.busy(seat):
+            await self.casting.lose(seat, "its process exited")  # the pending cue's follower recasts and resends
+        else:
+            await self.casting.lose(seat, "its process exited")
+            await self._recast(seat, "its process exited")
+
+    async def finish(self) -> None:
+        """Release every seat (done, or play-stopped), wait for their answers, and stop the local seats."""
+        reason = "done" if self.state.stopped and self.state.stopped[1] else "play-stopped"
+        for p in list(self.pending.values()):
+            if p.task:
+                p.task.cancel()
+        seats = self.active_seats()
+        if self.local is not None:
+            for seat in seats:
+                self.local.released(seat.actor)
+        await asyncio.gather(*[self.casting.release(s, reason) for s in seats], return_exceptions=True)
+        if self.local is not None:
+            await self.local.stop_all()
 
     async def wait_for_reports(self) -> str:
         if not self.pending and not self.state.inbox:
             return "nothing is pending, and there are no new reports"
-        tasks = [p.task for p in list(self.pending.values()) if p.task]
-        if tasks:
-            await asyncio.gather(*tasks, return_exceptions=True)
+        while tasks := [p.task for p in list(self.pending.values()) if p.task and not p.task.done()]:
+            await asyncio.gather(*tasks, return_exceptions=True)  # a lost seat's cue may be resent meanwhile
         return self.take_reports() or "no new reports"
 
     def take_reports(self) -> str:
@@ -247,9 +299,9 @@ class Production:
             return self._refuse("release", f"there is no active seat {seat!r}")
         if self.busy(found[0]):
             return self._refuse("release", f"{seat} is working on a cue; wait_for_reports first")
-        await self.casting.release(found[0], "done", reason)
         if self.local is not None:
-            self.local.released(found[0])
+            self.local.released(found[0].actor)
+        await self.casting.release(found[0], "done", reason)
         return f"{seat} released"
 
     async def end_round(self, reason: str) -> str:

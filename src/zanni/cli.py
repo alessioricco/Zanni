@@ -34,14 +34,35 @@ def rehearse(path: Path, actor: ActorConfiguration) -> int:
     return 0 if outcome.passed else 1
 
 
+WATCH_STDIN = "ZANNI_WATCH_STDIN"  # set by a director for its local seats: exit when its pipe closes (D36)
+
+
+def exit_with_stdin() -> None:
+    """A local seat exits as soon as its director's pipe (our stdin) closes, even mid-cue: no orphan keeps spending."""
+    import os
+    import threading
+
+    def watch():
+        while sys.stdin.buffer.read(1024):
+            pass
+        print("The director's pipe closed; stopping this seat.", file=sys.stderr, flush=True)
+        os._exit(1)
+
+    threading.Thread(target=watch, daemon=True, name="zanni-director-pipe").start()
+
+
 def join(path: Path, actor: ActorConfiguration) -> int:
     """Join the director an actor configuration's `play` names (D30). 0 if released with done, 1 if not, 2 if
     refused or it couldn't start."""
+    import os
+
     from zanni.actor.join import join_play
     from zanni.actor.resolve import Unresolved
     from zanni.actor.seat import CannotJoin
     from zanni.engine.models import ModelSetupError
 
+    if os.environ.pop(WATCH_STDIN, None) == "1":
+        exit_with_stdin()
     try:
         outcome = join_play(path, actor)
     except FileErrors as e:
@@ -82,6 +103,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="serve a rehearsal to an actor on this machine or another (D29)")
     parser.add_argument("--listen", metavar="HOST:PORT",
                         help="with --serve: where the director listens (default 127.0.0.1, a free port)")
+    parser.add_argument("--play", metavar="URL_OR_FILE",
+                        help="for an actor configuration: join this director or play instead of its `play` (D36)")
     parser.add_argument("file", nargs="?",
                         help="an actor configuration, a play file, a role manifest, a script (SCRIPT.md), "
                              "a rehearsal, or a folder")
@@ -99,6 +122,14 @@ def main(argv: list[str] | None = None) -> int:
     if args.listen and not args.serve:
         print(f"{args.file}: --listen needs --serve; nothing was started.", file=sys.stderr)
         return 2
+    if args.play:
+        if not isinstance(doc, ActorConfiguration) or doc.is_director:
+            print(f"{args.file}: --play overrides an actor configuration's `play` only; nothing was started.",
+                  file=sys.stderr)
+            return 2
+        target = args.play if "://" in args.play else str(Path(args.play).resolve())
+        doc = doc.model_copy(update={"play": target})
+        notes = [f"  play: {target} (from --play)"]
     if args.serve and not args.check:
         return serve(Path(args.file), doc, args.listen)
     if isinstance(doc, ActorConfiguration) and not args.check:

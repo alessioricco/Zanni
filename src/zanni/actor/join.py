@@ -1,6 +1,7 @@
 """`zanni <actor configuration>` when `play` is a director or a play file: find the director, join, play (D30)."""
 
 import asyncio
+import os
 import re
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -59,8 +60,9 @@ def director_url(base: Path, play: str) -> str:
     else:  # the play file's own fields only: its script is the director's business, not the actor's
         doc = validate(load_file(Path(where)), PlayFile)
     if not doc.director:
-        raise CannotJoin(f"the play {doc.name} has no `director` address; a play run on this machine starts its "
-                         "own seats, which comes with milestone 4")
+        raise CannotJoin(f"the play {doc.name} has no `director` address: it runs on its director's machine, which "
+                         "starts its local seats itself (zanni play.yaml); to join it from here, use --play "
+                         "<the director's URL>")
     return doc.director
 
 
@@ -69,10 +71,10 @@ def join_play(config_path: Path, actor: ActorConfiguration, *, say: Callable[[st
     base = config_path.parent
     url = director_url(base, actor.play)
     role, models = ready_actor(base, actor, say)
-    if JOIN_TOKEN not in actor.credentials:
-        raise Unresolved(f"{JOIN_TOKEN} isn't in the actor configuration's `credentials`; add it, e.g. "
-                         f"{JOIN_TOKEN}: ${{{JOIN_TOKEN}}}, with the play's join token in the environment")
-    token = expand(f"${{{JOIN_TOKEN}}}", actor.credentials)
+    if JOIN_TOKEN not in actor.credentials and JOIN_TOKEN not in os.environ:
+        raise Unresolved(f"{JOIN_TOKEN} isn't in the actor configuration's `credentials` or the environment; add "
+                         f"it, e.g. {JOIN_TOKEN}: ${{{JOIN_TOKEN}}}, with the play's join token in the environment")
+    token = expand(f"${{{JOIN_TOKEN}}}", actor.credentials)  # credentials first, then the environment (D36)
     run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     state = state_dir(actor, role)
 
