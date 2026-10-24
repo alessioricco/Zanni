@@ -440,3 +440,17 @@ Strings arrived exactly in every case. Approved by Alessio at ask point B.
 The loop is about 25 lines.
 
 **Why the extra:** `google-genai` is a large dependency most installs don't need. The pin stays exact (D8).
+
+## D28. Running a rehearsal from the command line; the log's `fallback` event (2026-10-24)
+
+**Decision:**
+
+- **Running:** `zanni <actor configuration>` runs the rehearsal its `play` points at.
+  - **Exit codes:** 0 when every cue is done and every `verify` check passed; 1 when the rehearsal ran but failed; 2 when the files have problems or nothing could start (a missing credential, a model that can't call tools).
+- **`--check`:** validates any file without running anything, for CI and for looking before running.
+- **The `fallback` event:** the run log gains `fallback` (`seat`, `model`, `reason`, `detail`). D18 had no place to record which model was skipped and why, and D27 requires it.
+
+**Why:**
+
+- **Exit codes:** CI and scripts need to tell "the role did poorly" (1) from "the files are wrong" (2).
+- **`--check`:** "flags only override" holds: `--check` only narrows what the file would do.

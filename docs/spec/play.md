@@ -125,6 +125,7 @@ It is recognised by having `lock_version`.
 | `verdict` | `scene`, `verifier`, `kind` (`hard` or `soft`), `passed`, `detail` | A verifier runs. |
 | `gate` | `gate`, `decision` (`approved` or `rejected`), `by` | A human decides a gate. |
 | `cost` | `seat`, `model`, `amount` (decimal string in USD, or `null` if unknown) | A seat reports its spend. |
+| `fallback` | `seat`, `model`, `reason`, `detail` | A model failed and the actor moved to its next one, or stopped (D27, D28). |
 | `seat-released` | `seat`, `reason` | The director ends a seat. |
 | `run-stopped` | `reason` (the stop rule, a gate, the budget, or a person) | The run ends. |
 

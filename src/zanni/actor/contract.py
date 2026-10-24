@@ -74,7 +74,9 @@ class Fallback:
 @dataclass(frozen=True)
 class CueResult:
     output: str
-    model: str  # the model that produced the output
+    model: str  # the model that produced the output, as "provider model"
+    provider: str
+    model_name: str
     tool_calls: list[str]
     input_tokens: int
     output_tokens: int

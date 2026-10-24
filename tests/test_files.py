@@ -19,7 +19,8 @@ REHEARSAL_ACTOR = EXAMPLES / "slug-tester.yaml"  # an actor configuration whose 
 
 
 def zanni(path: Path) -> subprocess.CompletedProcess:
-    return subprocess.run([sys.executable, "-m", "zanni", str(path)], capture_output=True, text=True)
+    """Validate only: an actor configuration pointing at a rehearsal would otherwise run it (D28)."""
+    return subprocess.run([sys.executable, "-m", "zanni", "--check", str(path)], capture_output=True, text=True)
 
 
 def broken(tmp_path: Path, example: Path, old: str, new: str) -> Path:

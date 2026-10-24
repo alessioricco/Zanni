@@ -44,7 +44,8 @@ async def run_cue(task: CueTask, *, build: Callable[[ResolvedModel], Model] = bu
         usage = result.usage
         cost, source = cost_of(usage, rm)
         calls = [p.tool_name for m in result.all_messages() for p in m.parts if p.part_kind == "tool-call"]
-        return CueResult(output=str(result.output), model=rm.label(), tool_calls=calls,
+        return CueResult(output=str(result.output), model=rm.label(), provider=rm.entry.provider,
+                         model_name=rm.entry.model, tool_calls=calls,
                          input_tokens=usage.input_tokens, output_tokens=usage.output_tokens, requests=usage.requests,
                          cost=cost, cost_source=source, fallbacks=fallbacks)
     raise AllModelsFailed(fallbacks)
