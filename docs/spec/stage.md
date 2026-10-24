@@ -64,7 +64,7 @@ The server, as served by Zanni's director (D31):
   | `stage_delete` | `path` | The new change marker. |
   | `stage_changes` | `since` (optional) | `{ changes: [{ path, change }], marker }`, with only the paths the seat may read. |
 
-- **Errors:** a refused operation is a tool result with `isError` set, whose text is `<code>: <message>`, using the errors of the [operations](#operations), such as `not-permitted: this seat may not write app/x.py; it may write: tests/`.
+- **Errors:** a refused operation is a tool result with `isError` set, whose text ends with `<code>: <message>`, using the errors of the [operations](#operations), such as `not-permitted: this seat may not write app/x.py; it may write: tests/`. An MCP server library may put its own words before it.
 
 ### Git backends: direct access for a checkout
 

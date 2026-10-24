@@ -506,7 +506,7 @@ The loop is about 25 lines.
 - **The server:** the director serves the `folder` stage as an MCP server, over Streamable HTTP. The address goes in the cast's `stage.mcp_url`; Zanni's director uses `/stage/mcp` under its own address.
 - **Tokens:** each call carries the seat's stage token as an HTTP bearer token. A missing, unknown, expired or revoked token gets HTTP 401.
 - **The tools:** `stage_read`, `stage_write`, `stage_list`, `stage_delete` and `stage_changes`, with the arguments and results of `docs/spec/stage.md`.
-  - **Errors:** a refused operation is a tool result with `isError` and the text `<code>: <message>`, such as `not-permitted: this seat may not write app/x.py; …`.
+  - **Errors:** a refused operation is a tool result with `isError`, whose text ends with `<code>: <message>`, such as `not-permitted: this seat may not write app/x.py; …`. It only has to end with it, because the `mcp` SDK puts `Error executing tool <name>: ` before every tool error's text.
 - **The actor's side:** Zanni's actor reaches the stage through the official `mcp` client. It turns those errors back into the stage errors its local tools raise, so a model sees the same tools and the same errors on a local and a remote stage.
 - **Calls on a seat's A2A task:** a call with a missing, wrong, expired or revoked seat token fails with a JSON-RPC Invalid Request error (`-32600`) whose message starts with `not-authorised`. A2A defines no error for this.
 - **An open stream counts as contact:** an open `SubscribeToTask` stream counts as contact for as long as it stays open.

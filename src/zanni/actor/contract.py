@@ -19,7 +19,10 @@ class StageError(Exception):
 
 
 class Stage(Protocol):
-    """The stage operations every backend offers (docs/spec/stage.md), for one seat."""
+    """The stage operations every backend offers (docs/spec/stage.md), for one seat.
+
+    A remote stage (over MCP, D31) offers the same methods as coroutines.
+    """
 
     def read(self, path: str) -> str: ...
     def write(self, path: str, content: str) -> str: ...
