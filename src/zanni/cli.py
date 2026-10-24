@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 from zanni import __version__
-from zanni.files.check import check
+from zanni.files.check import check, play_target
 from zanni.files.errors import FileErrors
 from zanni.files.schemas import ActorConfiguration, Lockfile, Rehearsal, RoleManifest, Script
 from zanni.files.summary import summarise
@@ -34,6 +34,27 @@ def rehearse(path: Path, actor: ActorConfiguration) -> int:
     return 0 if outcome.passed else 1
 
 
+def join(path: Path, actor: ActorConfiguration) -> int:
+    """Join the director an actor configuration's `play` names (D30). 0 if released with done, 1 if not, 2 if
+    refused or it couldn't start."""
+    from zanni.actor.join import join_play
+    from zanni.actor.resolve import Unresolved
+    from zanni.actor.seat import CannotJoin
+    from zanni.engine.models import ModelSetupError
+
+    try:
+        outcome = join_play(path, actor)
+    except FileErrors as e:
+        return problems(str(path), e.errors)
+    except (Unresolved, ModelSetupError) as e:
+        print(f"{path}: {e}; nothing was started.", file=sys.stderr)
+        return 2
+    except CannotJoin as e:
+        print(f"{path}: couldn't join: {e}", file=sys.stderr)
+        return 2
+    return outcome.exit_code
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="zanni", description="Run what a Zanni file describes.")
     parser.add_argument("--version", action="version", version=f"zanni {__version__}")
@@ -49,9 +70,14 @@ def main(argv: list[str] | None = None) -> int:
         doc, notes = check(args.file)
     except FileErrors as e:
         return problems(args.file, e.errors)
-    runs_rehearsal = isinstance(doc, ActorConfiguration) and any("run with a director started for it" in n for n in notes)
-    if runs_rehearsal and not args.check:
-        return rehearse(Path(args.file), doc)
+    if isinstance(doc, ActorConfiguration) and not args.check:
+        kind, where = play_target(Path(args.file).parent, doc.play)
+        if kind == "rehearsal":
+            return rehearse(Path(args.file), doc)
+        if kind in ("director", "play-url", "play"):
+            return join(Path(args.file), doc)
+        print(f"{args.file}: the play {where} doesn't exist; nothing was started.", file=sys.stderr)
+        return 2
     print("\n".join(summarise(doc) + notes))
     if isinstance(doc, (RoleManifest, Script, Lockfile, Rehearsal)) or args.check:
         print("Valid.")

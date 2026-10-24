@@ -57,7 +57,7 @@ It is recognised by having both `role` and `play`, and it is the file passed to 
 
 ## The actor's log
 
-Every actor keeps its own log, on its own machine, whether its director is local or remote (D32). The log is JSON Lines, in the play log's format (D18), at `<state_dir>/plays/<play>/<seat>/log.jsonl`; for a rehearsal, it is `actor-log.jsonl` in the run folder.
+Every actor keeps its own log, on its own machine, whether its director is local or remote (D32). The log is JSON Lines, in the play log's format (D18), at `<state_dir>/plays/<play>/<run-id>/log.jsonl`, one folder per run (a refused join has no seat); for a rehearsal, it is `actor-log.jsonl` in the run folder.
 
 | Event | Fields | When |
 |---|---|---|

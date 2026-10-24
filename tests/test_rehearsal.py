@@ -47,7 +47,7 @@ def good_writer():
 
 def test_a_rehearsal_runs_writes_logs_and_verifies(tmp_path, monkeypatch):
     monkeypatch.setenv("OLLAMA_BASE_URL", "http://127.0.0.1:9")  # never contacted: the model is scripted
-    monkeypatch.setattr("zanni.actor.rehearsal.check_tool_support", lambda *a: None)
+    monkeypatch.setattr("zanni.actor.join.check_tool_support", lambda *a: None)
     config = setup(tmp_path)
     actor, _ = check(config)
     lines: list[str] = []
@@ -60,7 +60,10 @@ def test_a_rehearsal_runs_writes_logs_and_verifies(tmp_path, monkeypatch):
     report = outcome.reports[0]
     assert report.outcome == "done" and report.changes == ["1"] and report.cost is not None  # priced at 0 in config
     events = [json.loads(line)["event"] for line in (outcome.run_dir / "log.jsonl").read_text().splitlines()]
-    assert events == ["run-started", "cue", "report", "cost", "verdict", "run-stopped"]
+    assert events == ["run-started", "actor-joined", "cue", "report", "cost", "seat-released", "verdict", "run-stopped"]
+    own = [json.loads(line) for line in (outcome.run_dir / "actor-log.jsonl").read_text().splitlines()]
+    assert [e["event"] for e in own] == ["joined", "cue", "report", "cost", "released"]  # the actor's own log (D32)
+    assert own[-1]["reason"] == "done" and own[0]["seat"] == "slug-tester-1"
     assert any("verify tests-pass: passed" in line for line in lines)
 
 

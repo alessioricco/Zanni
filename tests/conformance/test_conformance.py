@@ -17,7 +17,7 @@ COMMAND = shlex.split(os.environ.get("ZANNI_CMD", "uv run zanni"))
 
 
 def run(path: Path) -> subprocess.CompletedProcess:
-    return subprocess.run([*COMMAND, str(path)], capture_output=True, text=True, timeout=60)
+    return subprocess.run([*COMMAND, "--check", str(path)], capture_output=True, text=True, timeout=60)
 
 
 def expected(path: Path) -> dict[str, str]:

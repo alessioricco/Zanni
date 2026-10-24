@@ -21,7 +21,7 @@ credentials:
 
 
 def zanni(path: Path) -> subprocess.CompletedProcess:
-    return subprocess.run([sys.executable, "-m", "zanni", str(path)], capture_output=True, text=True)
+    return subprocess.run([sys.executable, "-m", "zanni", "--check", str(path)], capture_output=True, text=True)
 
 
 def write(tmp_path: Path, text: str = CONFIG, mode: int = 0o600) -> Path:

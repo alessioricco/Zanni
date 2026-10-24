@@ -18,7 +18,7 @@ Against this implementation:
 uv run pytest tests/conformance
 ```
 
-Against another implementation, set `ZANNI_CMD` to the command that runs it. It is called as `$ZANNI_CMD <file>`:
+Against another implementation, set `ZANNI_CMD` to the command that runs it. It is called as `$ZANNI_CMD --check <file>`, so that a valid actor configuration is validated, never run (D28):
 
 ```bash
 ZANNI_CMD="/path/to/other-zanni" uv run pytest tests/conformance

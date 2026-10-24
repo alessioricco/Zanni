@@ -518,7 +518,7 @@ The loop is about 25 lines.
 
 **Decision:**
 
-- **The actor's log:** every actor keeps its own log on its own machine, in JSON Lines (D18), at `<state_dir>/plays/<play>/<seat>/log.jsonl`. For a rehearsal, it goes next to the director's log in the run folder, as `actor-log.jsonl`. It records:
+- **The actor's log:** every actor keeps its own log on its own machine, in JSON Lines (D18), at `<state_dir>/plays/<play>/<run-id>/log.jsonl`, one folder per run, since a refused join has no seat. For a rehearsal, it goes next to the director's log in the run folder, as `actor-log.jsonl`. It records:
   - `joined`: the director's URL, play and script, the seat, part, permissions and expiry, never a token;
   - `join-refused`, `cue`, `fallback`, `report` and `cost`;
   - `released`.
