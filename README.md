@@ -8,7 +8,7 @@ An open-source engine for teams of AI personas. Each process is a **zanni**, an 
 - **Verifiers decide when work is done**, not the actor that did it.
 - **Built on standards:** AGENTS.md, Agent Skills, MCP and A2A. Zanni specifies only the gaps, and [the spec](docs/spec/README.md) is the product.
 
-**Status: early development.** `zanni <file>` validates Zanni files and shows what it would run. Nothing runs actors yet; see the [roadmap](ROADMAP.md).
+**Status: early development.** `zanni <file>` validates Zanni files, and runs one actor on its models in a [rehearsal](docs/spec/rehearsal.md), with no director. Directors and plays come next; see the [roadmap](ROADMAP.md).
 
 ## Quick start
 

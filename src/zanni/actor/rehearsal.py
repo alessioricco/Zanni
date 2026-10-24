@@ -11,10 +11,11 @@ from pathlib import Path
 
 from zanni.actor.contract import AllModelsFailed, CueResult, CueTask
 from zanni.actor.mcp_config import mcp_servers
-from zanni.actor.resolve import resolve_models
+from zanni.actor.resolve import Unresolved, resolve_usable_models
 from zanni.actor.roles import load_role, resolve_role_folder
 from zanni.actor.stage import FolderStage
 from zanni.engine.capabilities import check_tool_support
+from zanni.engine.models import build_model
 from zanni.engine.run import run_cue
 from zanni.files.check import load_rehearsal
 from zanni.files.schemas import ActorConfiguration, Rehearsal, RehearsalCue
@@ -66,8 +67,13 @@ def run_rehearsal(config_path: Path, actor: ActorConfiguration, *, say: Callable
     rehearsal_path = (base / actor.play).resolve()
     _, rehearsal = load_rehearsal(rehearsal_path)
     role = load_role(resolve_role_folder(actor.role, base))
-    models = resolve_models(actor)
-    for rm in models:  # catch a model that can't do what the role needs before anything runs (D5, D27)
+    models, skipped = resolve_usable_models(actor)
+    for label, reason in skipped:
+        say(f"Skipping {label}: {reason}")
+    if not models:
+        raise Unresolved(skipped[0][1] if skipped else "the actor configuration lists no model")
+    for rm in models:  # catch a model that can't be built, or can't do what the role needs, before anything runs
+        build_model(rm)
         check_tool_support(rm, role.manifest.model.needs.tools, rm.base_url)
 
     run_id = run_id or datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")

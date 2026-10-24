@@ -18,13 +18,27 @@ src/zanni/
                     #   SkillFrontmatter, McpConfig
     kinds.py        # which kind of file this is, from its keys
     summary.py      # what a valid file would run, in a few lines
+  actor/            # running an actor (no engine imports)
+    contract.py     # CueTask in, CueResult out: what Zanni hands the engine, and gets back
+    roles.py        # a role folder -> instructions and skills (D4)
+    resolve.py      # ${NAME} from the actor's credentials, then the environment (D20); models resolved
+    mcp_config.py   # a role's mcp.json, with every ${NAME} resolved
+    stage.py        # the folder stage backend: operations, permissions, change markers (D12)
+    rehearsal.py    # runs an actor on a rehearsal: stage copy, cues, reports, log, verify (D26)
   protocol/         # the casting extension's messages and card params, as Pydantic models (no a2a-sdk)
     encoding.py     # numbers as decimal strings: Count, Seconds, Timestamp, Money, Range (D23)
     card.py         # what each Agent Card carries in the extension's params
     messages.py     # join, cast, refused, cue, report, release, released
     fit.py          # does an actor's card fit a part: role, hash, needs within ceilings
     schemas.py      # generates docs/spec/schemas/*.schema.json
-  engine/           # the engine adapter (empty for now)
+  engine/           # the engine adapter: the only code that imports Pydantic AI, mcp or a2a-sdk (D1)
+    run.py          # run_cue: one cue on the actor's models, in order, with fallback and cost (D27)
+    models.py       # a resolved model entry -> a Pydantic AI model
+    fallback.py     # a failure -> one of D20's reasons
+    text_tools.py   # the opt-in text tool format (D5)
+    tools.py        # load_skill and the stage_* tools
+    mcp.py          # a role's MCP servers as toolsets
+    capabilities.py # asks Ollama whether a model can call tools
 examples/           # one valid file of each kind
 tests/              # unit tests, CLI tests
 tests/conformance/  # data-driven tests that any implementation can run
@@ -61,17 +75,25 @@ Each step raises `FileErrors` with every problem it found. `cli.main` catches it
 - **Standards are checked, not tightened.** `SkillFrontmatter` and `McpConfig` ignore fields they don't define, because SKILL.md and `mcp.json` are shared with other tools (D19).
 - **Shorthand is normalised before validation.** A cast entry can be a plain package reference. A `BeforeValidator` turns it into `{role: …}`, so there is one model and error paths stay clean.
 
-## The engine adapter (coming)
+## The engine adapter
 
-`src/zanni/engine/` will be the only place that imports Pydantic AI, `mcp` and `a2a-sdk` (golden rule 4, D1). It will contain:
+`src/zanni/engine/` is the only place that imports Pydantic AI, `mcp` and `a2a-sdk` (golden rule 4, D1). `tests/test_engine_guard.py` fails if anything else does. Zanni hands it a `CueTask` (plain data in `zanni.actor.contract`) and gets back a `CueResult`:
 
-- **Roles:** loading `AGENTS.md` and skills on demand (D4).
-- **Models:** building a model from the host's model list, with the opt-in text tool format for models without native tool calling (D5).
-- **Tools:** loading a role's `mcp.json` (D3).
-- **A2A:** serving an actor's Agent Card and cues over the official `a2a-sdk` (D2, D6).
-- **Cost:** cost per run, where an unknown cost stays unknown (D7).
+```
+zanni slug-tester.yaml
+  └─ actor.rehearsal.run_rehearsal
+       ├─ actor.roles.load_role         instructions + skills (D4)
+       ├─ actor.resolve.resolve_models  models with credentials and URLs resolved (D20)
+       ├─ engine.models.build_model     every model built, and Ollama asked about tools, before anything runs
+       ├─ actor.stage.FolderStage       a fresh stage copy, with the role's permissions
+       ├─ for each cue: engine.run.run_cue(CueTask) -> CueResult
+       │     an Agent with load_skill, the stage_* tools (sequential) and the role's MCP servers;
+       │     on a failure, classify it and fall back if the entry lists the reason (D27)
+       ├─ protocol.messages.Report      each result as a validated zanni.report; cost or null (D7)
+       └─ verify commands, then the log: run-started, cue, report, cost, fallback, verdict, run-stopped
+```
 
-The [spike report](spikes/pydantic-ai.md) shows a working prototype of each part.
+Joining a director over A2A comes in milestone 3.
 
 ## Dependencies
 

@@ -17,7 +17,10 @@ The full suite needs no API key, no network and no model. That is a hard rule: C
 | `tests/test_cli.py` | `--version` and usage |
 | `tests/conformance/` | The spec: files through the `zanni` command and exit codes; casting messages through the published JSON Schemas (`test_protocol.py`) |
 | `tests/test_protocol_*.py` | The protocol models: the encoding, the card fit checks, and that `docs/spec/schemas/` matches the models |
-| `tests/engine/` | Casting messages survive `a2a-sdk` unchanged |
+| `tests/engine/` | The engine with scripted models (`FunctionModel`): the run loop, fallback, the text tool format, MCP servers, the Ollama check; and casting messages surviving `a2a-sdk` |
+| `tests/test_actor_*.py`, `tests/test_rehearsal.py` | Roles, credential resolution, the folder stage, and a whole rehearsal with a scripted model |
+| `tests/test_engine_guard.py` | Only `src/zanni/engine/` imports Pydantic AI, `mcp`, `a2a-sdk` and their providers |
+| `tests/live/` | A real rehearsal on a real model; skipped unless `ZANNI_LIVE_CONFIG` names an actor configuration |
 
 ## Conformance tests
 
@@ -53,7 +56,14 @@ For casting messages, add a JSON file to `tests/conformance/protocol/valid/` or 
 
 - **Message tests:** test the user-facing message, not internals. A test like `test_broken_copies_fail_in_plain_words` runs the real command on a real file and checks the exact text users see.
 - **Examples stay valid:** `test_examples_validate` fails if a schema change breaks one.
-- **Tests that need a model** (coming with the engine adapter) must skip with a clear message when no model is configured, and must never be the only proof of a claim (golden rule 7).
+- **No real model in the suite.** Use `tests/engine/fakes.py`: `MemoryStage`, and `scripted(...)`, a `FunctionModel` that plays tool calls, replies or exceptions in order, and records what it was sent.
+- **Live tests** skip with a clear message when no model is configured:
+
+  ```bash
+  ZANNI_LIVE_CONFIG=~/zanni/slug-tester.yaml uv run pytest tests/live
+  ```
+
+  They never replace recorded runs as the proof of a claim (golden rule 7). Recorded runs are in `docs/runs/`.
 
 ## CI
 

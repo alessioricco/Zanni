@@ -1,7 +1,7 @@
 # Command reference
 
 ```
-zanni [-h] [--version] [file]
+zanni [-h] [--version] [--check] [file]
 ```
 
 There is one command, and it takes one file or folder. The file decides what runs; options only override what a file could say.
@@ -11,6 +11,7 @@ There is one command, and it takes one file or folder. The file decides what run
 | | Meaning |
 |---|---|
 | `file` | An actor configuration, a play file, a role manifest, a script (`SCRIPT.md`), a lockfile, or a folder. The kind comes from its keys ([Zanni files](files.md)). A folder holding `role.yaml` is checked as a whole role package; a folder holding `SCRIPT.md` is checked as that script. |
+| `--check` | Only validate the file; never run anything, even an actor configuration pointing at a rehearsal. |
 | `--version` | Print `zanni <version>` and exit. |
 | `-h`, `--help` | Print the usage and exit. |
 
@@ -21,7 +22,9 @@ There is one command, and it takes one file or folder. The file decides what run
 3. **Validate it** against that kind's schema, and collect every problem. A play is also checked against its script when the script is local, and against `play.lock` when there is one. A role folder also has its `AGENTS.md`, skills and `mcp.json` checked.
 4. **Print a summary** of what it would run, or the list of problems.
 
-It doesn't start anything yet. Running actors and directors comes in later milestones ([roadmap](../ROADMAP.md)).
+5. **Run it,** when it is an actor configuration whose `play` is a [rehearsal](spec/rehearsal.md), unless `--check` is given. The actor runs each cue on its models, then the rehearsal's `verify` checks run.
+
+Joining a director, and starting one, come in milestones 3 and 4 ([roadmap](../ROADMAP.md)).
 
 ## Output
 
@@ -53,7 +56,8 @@ A file with problems prints them on standard error, one per line, in this form:
 
 | Code | Meaning |
 |---|---|
-| `0` | The file is valid |
-| `2` | The file has problems, can't be read, or no file was given |
+| `0` | The file is valid, or the rehearsal passed |
+| `1` | The rehearsal ran but didn't pass: a cue failed on every model, or a `verify` check failed |
+| `2` | The file has problems, can't be read, nothing could start (such as a missing credential, or a model that can't call tools), or no file was given |
 
 Scripts and CI can rely on these codes, and the [conformance tests](testing.md#conformance-tests) check them.

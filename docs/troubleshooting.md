@@ -165,6 +165,56 @@ SCRIPT.md, line 8: has no prose after the frontmatter; describe the acts and sce
 
 The prose is what the director follows, so it is required.
 
+## Running a rehearsal
+
+### "can't call tools natively"
+
+```
+gemma-native.yaml: ollama gemma3:4b can't call tools natively (its capabilities: completion, vision), and this role needs tools; add `tool_format: text` to its model entry; nothing was started.
+```
+
+`zanni` asked the Ollama server what the model can do, before running. Add `tool_format: text` to that model entry, or use a model that calls tools.
+
+### "has no value"
+
+```
+slug-tester.yaml: ${NOT_SET_ANYWHERE} has no value: add NOT_SET_ANYWHERE to the actor configuration's `credentials`, or set it in the environment; nothing was started.
+```
+
+A `${NAME}` in the configuration, or in the role's `mcp.json`, has no value. `zanni` reads the environment, not a `.env` file; load one with `set -a; . ./.env; set +a`.
+
+When only some models can't be resolved, such as a cloud fallback on a machine with no cloud key, the actor runs with the others and says which it skipped:
+
+```
+Skipping anthropic claude-haiku-5-5: ${ANTHROPIC_API_KEY} has no value: add ANTHROPIC_API_KEY to the actor configuration's `credentials`, or set it in the environment
+```
+
+The error above appears only when no model is left.
+
+### "is a remote role"
+
+```
+github.com/someone/slug-tester@0.1.0: is a remote role, and fetching roles comes with milestone 4; clone it and use the local folder, e.g. role: ./roles/tester
+```
+
+### "Google models need the `google` extra"
+
+```
+google.yaml: google gemini-x: Google models need the `google` extra; install it with: uv sync --extra google; nothing was started.
+```
+
+### A model failed, and the next one ran
+
+```
+    ollama qwen3.8:27b failed (error); trying the next model
+```
+
+The actor moved to the next model in its configuration, because the failure's reason (`error`, `timeout`, `rate-limit`, `context` or `refusal`) is in that entry's `fall_back_on`. The run log records a `fallback` event with the details.
+
+### "Rehearsal FAILED" with "no tests ran"
+
+The actor ran, but its work didn't pass the rehearsal's `verify` checks. Look at the stage copy and `log.jsonl` in the folder the last line names. In the recorded runs, this is how a small model's broken tool block was caught ([docs/runs/milestone-2.md](runs/milestone-2.md)).
+
 ## Role folders
 
 `zanni <role folder>` checks the whole package.

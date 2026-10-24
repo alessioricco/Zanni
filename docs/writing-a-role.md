@@ -113,3 +113,45 @@ A role is shared, so a secret in `mcp.json` must be a `${NAME}` reference, never
 ## 5. Publishing
 
 A role lives in a git repository, at the root or in a folder of one. Tag each version `vX.Y.Z`; for a role in a subfolder, use `path/to/role/vX.Y.Z`. Plays refer to it as `host/owner/name@version`, such as `github.com/someone/tester@1.4.0`, and pin it to a commit in their `play.lock` ([versions](spec/role-package.md#versions)). A play can also use a local folder: `tester: roles/tester`.
+
+## 6. Rehearse it
+
+A rehearsal runs your role on cues, against a copy of a stage folder, with no director. It is the role's own test, and it ships with the package:
+
+```
+roles/slug-tester/
+  rehearsals/
+    smoke.yaml        # the cues and the checks
+    smoke-stage/      # the starting state, copied fresh for every run
+```
+
+```yaml
+# rehearsals/smoke.yaml
+rehearsal: smoke
+stage: ./smoke-stage
+cues:
+  - scene: Specify
+    instructions: Read backlog/round-1.md and spec/slug.md. Write one pytest test for each acceptance criterion …
+verify:
+  - name: tests-pass
+    command: [uv, run, --no-project, --with, pytest, python, -m, pytest, -q, tests]
+```
+
+To run it, point an actor configuration's `play` at the rehearsal, and run that configuration:
+
+```yaml
+# slug-tester.yaml, on your machine
+name: slug-tester-1
+role: ./roles/slug-tester
+play: ./roles/slug-tester/rehearsals/smoke.yaml
+models:
+  - { provider: ollama, model: qwen3.8:27b, base_url: "${OLLAMA_BASE_URL}" }
+```
+
+```bash
+uv run zanni slug-tester.yaml
+```
+
+- **Comparing models:** the same rehearsal, run with different `models`, is how to compare models on your role. [`docs/runs/milestone-2.md`](runs/milestone-2.md) shows one comparison.
+- **Checking the folder:** `zanni <role folder>` also checks every rehearsal in `rehearsals/`.
+- **Safety:** a rehearsal's `verify` commands run on your machine, so run rehearsals only from roles you trust. See the [rehearsal spec](spec/rehearsal.md).

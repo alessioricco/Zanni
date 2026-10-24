@@ -1,6 +1,6 @@
 # Models and keys
 
-> **Status:** nothing in Zanni calls a model yet. `zanni` already validates an actor configuration's models and credentials, and enforces the safeguards below ([actor configuration spec](spec/actor-configuration.md)). Running models comes with the engine adapter ([roadmap](../ROADMAP.md), milestone 2); a spike has already tried it on real models ([spike report](spikes/pydantic-ai.md)).
+> **Status:** an actor runs its models today, in a [rehearsal](spec/rehearsal.md). Recorded runs on `qwen3.8:27b`, `gemma3:4b` and `claude-haiku-5-5` are in [docs/runs/milestone-2.md](runs/milestone-2.md).
 
 ## Each actor brings its own models and keys
 
@@ -39,7 +39,7 @@ Every field is in the [actor configuration spec](spec/actor-configuration.md).
   - it refuses a configuration that other users can read, and gives the `chmod` to run;
   - it refuses one that git tracks;
   - it never prints, logs or sends credentials to the director.
-- **A credential may come from the environment instead**, as `${VAR}`. This is useful in CI.
+- **A credential may come from the environment instead**, as `${VAR}`. This is useful in CI. `zanni` reads the environment, not a `.env` file. If your keys live in a `.env`, load it into your shell first: `set -a; . ./.env; set +a`.
 
 ## Any model, local or cloud
 
@@ -47,7 +47,8 @@ No role, script or play depends on a particular model or vendor:
 
 - **Roles state what they need:** tool calling, a context size, a tier such as `judgement`. A role may suggest a default.
 - **Local models aren't tied to one server.** They are reached through any OpenAI-compatible endpoint: Ollama, LM Studio, llama.cpp, vLLM and others. You don't need a local server if you use a cloud model, and you don't need a cloud key if you only use local models.
-- **Models without native tool calling** can use an opt-in text-based tool format. It is opt-in per model, so models that call tools natively are never affected (D5).
+- **Models without native tool calling** can use an opt-in text-based tool format: `tool_format: text` in the model entry. It is opt-in per model, so models that call tools natively are never affected (D5). For an Ollama model, `zanni` asks the server what the model can do before running. If the role needs tools and the model can't call them, `zanni` refuses to start and suggests `tool_format: text`.
+- **Google models** need an optional extra: `uv sync --extra google`.
 - **Quality is checked, not assumed.** The director can't see which model an actor used, so verifiers decide whether work is done.
 
 ## Cost

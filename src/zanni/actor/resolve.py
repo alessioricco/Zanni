@@ -36,14 +36,35 @@ def expand(value: str, credentials: Mapping[str, str], env: Mapping[str, str] | 
 
 
 def resolve_models(actor: ActorConfiguration, env: Mapping[str, str] | None = None) -> list[ResolvedModel]:
+    """Every model, resolved; raises Unresolved on the first value that can't be found."""
+    usable, skipped = resolve_usable_models(actor, env)
+    if skipped:
+        raise Unresolved(skipped[0][1])
+    return usable
+
+
+def resolve_usable_models(actor: ActorConfiguration, env: Mapping[str, str] | None = None
+                          ) -> tuple[list[ResolvedModel], list[tuple[str, str]]]:
+    """The models whose credentials and URLs resolve, and (label, reason) for each one that doesn't.
+
+    An actor can still run when a fallback model's credential is missing (say, no cloud key on this machine);
+    it runs with the models it can use, and says which it skipped.
+    """
     env = os.environ if env is None else env
-    resolved = []
+    usable, skipped = [], []
     for entry in actor.models:
-        if entry.credential:
-            api_key = expand(f"${{{entry.credential}}}", actor.credentials, env)
-        else:
-            var = PROVIDER_KEYS[entry.provider]
-            api_key = expand(f"${{{var}}}", actor.credentials, env) if var and (var in actor.credentials or var in env) else None
-        base_url = expand(entry.base_url, actor.credentials, env) if entry.base_url else None
-        resolved.append(ResolvedModel(entry=entry, api_key=api_key, base_url=base_url))
-    return resolved
+        try:
+            usable.append(_resolve_one(actor, entry, env))
+        except Unresolved as e:
+            skipped.append((f"{entry.provider} {entry.model}", str(e)))
+    return usable, skipped
+
+
+def _resolve_one(actor: ActorConfiguration, entry, env: Mapping[str, str]) -> ResolvedModel:
+    if entry.credential:
+        api_key = expand(f"${{{entry.credential}}}", actor.credentials, env)
+    else:
+        var = PROVIDER_KEYS[entry.provider]
+        api_key = expand(f"${{{var}}}", actor.credentials, env) if var and (var in actor.credentials or var in env) else None
+    base_url = expand(entry.base_url, actor.credentials, env) if entry.base_url else None
+    return ResolvedModel(entry=entry, api_key=api_key, base_url=base_url)

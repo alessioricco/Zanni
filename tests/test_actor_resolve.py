@@ -38,3 +38,11 @@ def test_without_a_credential_the_providers_usual_variable_is_used():
     a = actor(models=[{"provider": "anthropic", "model": "claude-haiku-5-5"}], credentials={})
     assert resolve_models(a, env={"ANTHROPIC_API_KEY": "env-key"})[0].api_key == "env-key"
     assert resolve_models(a, env={})[0].api_key is None
+
+
+def test_a_model_whose_credential_is_missing_is_skipped_not_fatal():
+    from zanni.actor.resolve import resolve_usable_models
+    a = actor(credentials={"ANTHROPIC_API_KEY": "${NOT_SET}"})
+    usable, skipped = resolve_usable_models(a, env={"OLLAMA_BASE_URL": "http://gpu:11434"})
+    assert [m.entry.model for m in usable] == ["qwen3.8:27b"]
+    assert skipped[0][0] == "anthropic claude-haiku-5-5" and "${NOT_SET} has no value" in skipped[0][1]
