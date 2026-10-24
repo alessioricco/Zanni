@@ -24,7 +24,34 @@ async def folder(tmp_path):
         await stage.close()
 
 
-BACKENDS = {"folder": folder}
+def git_remote(tmp_path, files: dict[str, str], name="remote.git") -> str:
+    """A bare repository in tmp_path whose `main` holds `files`: a stage's remote, with no network."""
+    from zanni.stage.git import run_git
+
+    work, bare = tmp_path / "seed", tmp_path / name
+    work.mkdir()
+    for path, text in files.items():
+        (work / path).parent.mkdir(parents=True, exist_ok=True)
+        (work / path).write_text(text)
+    for args in (("init", "--quiet", "--initial-branch=main"), ("add", "."), ("commit", "--quiet", "-m", "seed")):
+        assert run_git(*args, cwd=work).returncode == 0
+    assert run_git("clone", "--quiet", "--bare", str(work), str(bare)).returncode == 0
+    return str(bare)
+
+
+@contextlib.asynccontextmanager
+async def git(tmp_path):
+    from zanni.stage.git import GitBackend
+
+    remote = git_remote(tmp_path, SEED)
+    stage = Stage(GitBackend.open(remote, "main", tmp_path / "clone", "zanni/kata/run-1"))
+    try:
+        yield stage
+    finally:
+        await stage.close()
+
+
+BACKENDS = {"folder": folder, "git": git}
 
 
 @pytest.fixture(params=sorted(BACKENDS))

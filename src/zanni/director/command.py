@@ -10,6 +10,7 @@ import asyncio
 import contextlib
 import json
 import os
+import re
 import secrets
 import sys
 from collections.abc import Callable
@@ -25,7 +26,7 @@ from zanni.director.prompt import instructions
 from zanni.director.rehearsal import parse_listen
 from zanni.director.rules import stage_missing
 from zanni.director.state import PlayState
-from zanni.stage import folder_stage
+from zanni.stage import Stage, folder_stage
 from zanni.files.check import against_script, check, check_script, describe_verifiers, resolve, verifier_commands
 from zanni.files.errors import FileErrors
 from zanni.files.loader import load_file
@@ -110,6 +111,28 @@ def local_seats(director: ActorConfiguration, base: Path) -> dict[str, list[tupl
     return out
 
 
+def open_stage(play: PlayFile, play_path: Path, run_id: str) -> Stage:
+    """The play's stage, ready to run on: a folder that exists, or a git repository cloned onto the run's branch."""
+    spec = play.stage
+    if spec.backend == "folder":
+        root = (play_path.parent / spec.path).resolve()
+        if not root.is_dir():
+            raise CannotStart(f"the stage folder {root} doesn't exist")
+        return folder_stage(root)
+    if spec.backend == "git":
+        from zanni.stage.git import CannotClone, GitBackend
+
+        url = spec.url
+        if not re.match(r"^([a-z][a-z0-9+.-]*://|[^/\s]+@[^:\s]+:)", url):  # a local path, relative to the play file
+            url = str((play_path.parent / url).resolve())
+        clone = play_path.parent / "log" / f"{run_id}-stage"
+        try:
+            return Stage(GitBackend.open(url, spec.branch, clone, f"zanni/{play.name}/{run_id}"))
+        except CannotClone as e:
+            raise CannotStart(str(e)) from None
+    raise CannotStart(f"the {spec.backend} stage isn't supported here")
+
+
 def trusted_verifiers(director: ActorConfiguration, base: Path) -> list[str]:
     """The names of the verifier seats the director's configuration lists: local ones by their files' names (D45)."""
     local = [name for _, name in local_seats(director, base).get(VERIFIER_PART, [])]
@@ -139,14 +162,6 @@ def run_play(play_path: Path, *, director_path: Path | None = None, update: bool
         check_script(script_loaded, script)
         if errors := against_script(load_file(play_path), play, script):
             raise FileErrors(errors)
-        if play.stage.backend != "folder":
-            raise CannotStart("this play's stage is a git repository, and the git stage comes with milestone 5; use "
-                              "a folder stage for now (stage: ./stage)")
-        stage_root = (play_path.parent / play.stage.path).resolve()
-        if not stage_root.is_dir():
-            raise CannotStart(f"the stage folder {stage_root} doesn't exist")
-        if missing := stage_missing(stage_root, script.stage.expects):
-            raise CannotStart(f"the stage doesn't hold what the script expects (stage.expects): {', '.join(missing)}")
         models, skipped = resolve_usable_models(director)
         for label, reason in skipped:
             say(f"Skipping the director's {label}: {reason}")
@@ -170,6 +185,10 @@ def run_play(play_path: Path, *, director_path: Path | None = None, update: bool
         if director.verifier_seats.local and not verifier_token:
             verifier_token = secrets.token_urlsafe(32)  # for local verifier seats only: made for this run
         host, port = parse_listen(listen)
+        run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+        stage = open_stage(play, play_path, run_id)  # last: a git stage is cloned only when all else is ready
+        if missing := stage_missing(stage.backend.root, script.stage.expects):
+            raise CannotStart(f"the stage doesn't hold what the script expects (stage.expects): {', '.join(missing)}")
     except FileErrors as e:
         print(f"{play_path} can't start; nothing was started.", file=sys.stderr)
         for err in e.errors:
@@ -190,7 +209,7 @@ def run_play(play_path: Path, *, director_path: Path | None = None, update: bool
     for line in describe_verifiers(play, script):
         say(line)
     try:
-        return asyncio.run(_run(play_path, play, script, prose, director, director_file, packages, stage_root, models,
+        return asyncio.run(_run(play_path, play, script, prose, director, director_file, packages, stage, run_id, models,
                                 join_token, owner_token, verifier_token, host, port, say, build or build_model,
                                 sys.stdin.isatty() if interactive is None else interactive))
     except KeyboardInterrupt:
@@ -199,7 +218,7 @@ def run_play(play_path: Path, *, director_path: Path | None = None, update: bool
         return 1
 
 
-async def _run(play_path, play, script, prose, director, director_file, packages, stage_root, models, join_token,
+async def _run(play_path, play, script, prose, director, director_file, packages, stage, run_id, models, join_token,
                owner_token, verifier_token, host, port, say, build, interactive) -> int:
     from zanni import __version__
     from zanni.director.console import console, stdin_lines
@@ -208,11 +227,10 @@ async def _run(play_path, play, script, prose, director, director_file, packages
     from zanni.engine.serve import serving
 
     folder = play_path.parent
-    run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     log = Log(folder / "log" / f"{run_id}.jsonl", run_id)
     state = PlayState(play, script)
     casting = Director(join_token=join_token, parts=part_slots(play, folder, script, packages),
-                       stage=folder_stage(stage_root), log=log, say=say,
+                       stage=stage, log=log, say=say,
                        max_per_host=play.house_rules.max_seats_per_host,
                        require_pricing=play.house_rules.budget is not None, verifier_token=verifier_token,
                        verifier_seats=frozenset(trusted_verifiers(director, director_file.parent)))
@@ -255,6 +273,7 @@ async def _run(play_path, play, script, prose, director, director_file, packages
             await _wait_for_minimums(production, say)
             reason, completed = await production.direct(turn)
             await production.finish()
+            await _publish(production, play, completed, say)
     finally:
         for task in background:
             task.cancel()
@@ -269,6 +288,18 @@ async def _run(play_path, play, script, prose, director, director_file, packages
         + (" (done was weakly checked: the script has no stop.done_when)" if state.weak_done else ""))
     say(f"The play's log: {log.path}")
     return 0 if completed else 1
+
+
+async def _publish(production: Production, play: PlayFile, completed: bool, say) -> None:
+    """A git stage's run branch, pushed at the end as the stage's `push` says (D46); otherwise, how to publish it."""
+    backend = production.stage.backend
+    if production.stage.kind != "git":
+        return
+    if completed or play.stage.push == "always":
+        await production.push("the end of the run")
+    else:
+        say(f"The run's work is on the branch {backend.run_branch}, in {backend.root}, not pushed (push: approved, and "
+            f"the play didn't finish). To publish it: {backend.push_command()}")
 
 
 async def _wait_for_minimums(production: Production, say) -> None:

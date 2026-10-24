@@ -310,6 +310,7 @@ class Production:
             self.stop_run("gate")
             return f"{name}: nobody decided within the gate_timeout, so the play stopped"
         if decision.action == "approve":
+            await self.push(f"the approved gate {name}")
             return f"{name}: approved{': ' + decision.note if decision.note else ''}"
         return f"{name}: rejected: {decision.note}. Revise the work as the note says, then ask again."
 
@@ -318,6 +319,19 @@ class Production:
         verdicts = ", ".join(f"{v.name} {'passed' if v.passed else 'failed'}" for v in self.state.verdicts.values())
         return (f"{summary.strip()}\nRound {self.state.round}. Files changed since the last gate: "
                 f"{', '.join(changed) or 'none'}. Verdicts: {verdicts or 'none yet'}.")
+
+    async def push(self, why: str) -> None:
+        """A git stage's run branch, pushed to its remote (D46). A push that fails stops nothing: it is logged."""
+        push = getattr(self.stage.backend, "push", None)
+        if push is None:
+            return
+        ok, detail = await push()
+        self.log.event("push", branch=self.stage.backend.run_branch, ok=ok, detail=f"{why}: {detail}")
+        branch = self.stage.backend.run_branch
+        if ok:
+            self.say(f"  pushed {branch} ({why})")
+        else:
+            self.say(f"  couldn't push {branch} ({why}): {detail}; the work stays in {self.stage.backend.root}")
 
     async def cast(self, part: str, seats: int) -> str:
         if stopped := self._stopped():
