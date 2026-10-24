@@ -73,7 +73,7 @@ house_rules
 - **A whole play on one machine.** Seats marked `local` are started by the director itself, so `zanni play.yaml` alone can run a play on a laptop.
 - **Defaults everywhere.** Ports, state folders and timeouts have sensible defaults; a file only says what differs.
 - **No secrets in shared files.** Roles, scripts and plays never hold a secret. Only an actor configuration may hold its own credentials, and `zanni` refuses one that other users can read or that git tracks.
-- **Errors in plain words.** A bad file is rejected before anything starts, with the line and what to change.
+- **Errors in plain words.** A bad file is rejected befor1e anything starts, with the line and what to change.
 - **Flags only override.** Anything a flag can set, a file can set; nothing requires a flag.
 
 ## Vocabulary
