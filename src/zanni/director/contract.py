@@ -36,12 +36,13 @@ class Casting(Protocol):
     """The director's side of every seat. The engine calls these; it decides nothing itself."""
 
     async def join(self, token: str | None, task_id: str, join: Join | None, problem: str | None,
-                   reached_at: str) -> Cast | Refused:
+                   reached_at: str, peer: str | None = None) -> Cast | Refused:
         """A join on a new task. When the message or its card isn't valid, `join` is None and `problem` says why,
         as `<reason>: <message>` with the reason `bad-card` or `unsupported-version`.
 
         `reached_at` is the base URL the actor reached the director by (from the request's Host), so the
-        cast's stage address works from wherever the actor is.
+        cast's stage address works from wherever the actor is. `peer` is the address the join came from: the
+        actor's host, for `max_seats_per_host`.
         """
 
     async def next_for(self, task_id: str) -> Outgoing:

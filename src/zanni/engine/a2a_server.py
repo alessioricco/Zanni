@@ -14,6 +14,7 @@ from a2a.server.agent_execution import AgentExecutor
 from a2a.server.context import ServerCallContext
 from a2a.server.request_handlers import DefaultRequestHandler
 from a2a.server.routes import create_agent_card_routes, create_jsonrpc_routes
+from a2a.server.routes.common import DefaultServerCallContextBuilder
 from a2a.server.tasks import InMemoryTaskStore
 from a2a.types import AgentCard, CancelTaskRequest, Task, TaskStatus, TaskStatusUpdateEvent
 from a2a.utils.errors import ExtensionSupportRequiredError, InvalidParamsError, InvalidRequestError, UnsupportedOperationError
@@ -53,6 +54,19 @@ def bearer(context: ServerCallContext) -> str | None:
     return token.strip() or None if scheme.lower() == "bearer" else None
 
 
+def peer(context: ServerCallContext) -> str | None:
+    return context.state.get("peer")
+
+
+class _WithPeer(DefaultServerCallContextBuilder):
+    """A2A's default context, plus the address the request came from: an actor's host (max_seats_per_host)."""
+
+    def build(self, request):
+        context = super().build(request)
+        context.state["peer"] = request.client.host if request.client else None
+        return context
+
+
 def reached_at(context: ServerCallContext) -> str:
     headers = context.state.get("headers", {})
     scheme = headers.get("x-forwarded-proto", "http")
@@ -77,7 +91,7 @@ class SeatExecutor(AgentExecutor):
             problem = join_problem(context.message)
             join = None if problem else from_a2a(context.message, "zanni.join")
             answer = await self.casting.join(bearer(context.call_context), task_id, join, problem,
-                                             reached_at(context.call_context))
+                                             reached_at(context.call_context), peer(context.call_context))
             state = "rejected" if isinstance(answer, Refused) else "working"
             await event_queue.enqueue_event(Task(id=task_id, context_id=context_id, status=TaskStatus(
                 state=STATES[state], message=to_a2a(answer, task_id=task_id, context_id=context_id))))
@@ -191,7 +205,8 @@ def director_app(casting: Casting, info: DirectorInfo, url: str,
             finally:
                 await handler.aclose()
 
-    routes = [*create_agent_card_routes(card), *create_jsonrpc_routes(handler, "/"), *mounts]
+    routes = [*create_agent_card_routes(card), *create_jsonrpc_routes(handler, "/", context_builder=_WithPeer()),
+              *mounts]
     return Starlette(routes=routes, lifespan=lifespan), handler
 
 

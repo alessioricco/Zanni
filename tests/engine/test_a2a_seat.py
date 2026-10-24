@@ -40,7 +40,8 @@ class FakeCasting:
         self.revoked = False
         self.reached_at = None
 
-    async def join(self, token, task_id, join, problem, reached_at):
+    async def join(self, token, task_id, join, problem, reached_at, peer=None):
+        self.peer = peer
         self.reached_at = reached_at
         if problem:
             reason, _, message = problem.partition(": ")

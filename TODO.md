@@ -34,6 +34,4 @@ Things decided to come later. Each names where it was deferred. Remove an item w
 - [ ] **Actors behind NAT that can't reach the director**, such as a director on a laptop with actors elsewhere: a tunnel or a relay. Actors already connect outwards (D21), so only the director must be reachable.
 - [ ] **Connectors** (vision, open question "Connectors"; roadmap, after the first version).
 - [ ] **Actors offered online, hired by a director.** Where an actor runs is up to whoever runs it (D32); in time, a director may hire actors that other people offer online. This goes with the vision's "actors hosted by other people", out of scope for the first version. Raised by Alessio at milestone 3's ask point D.
-- [ ] **`host-cap` at casting.** The director doesn't yet know an actor's host, so `max_seats_per_host` isn't enforced; it comes with the play's director (milestone 4).
-- [ ] **A report's change markers with several seats.** An actor reports every change made on the stage while its cue ran. With one seat per stage that's exact; with several seats writing at once, a report could include another seat's changes. Fix with the play's director (milestone 4).
 - [ ] **A domain for Zanni**, and moving the casting extension's URI to it (D22).

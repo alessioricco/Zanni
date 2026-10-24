@@ -25,15 +25,22 @@ def check_path(path: str) -> str:
 class FolderStage:
     """One seat's view of a folder stage. Seats of one play share `record`, so markers mean the same to all."""
 
-    def __init__(self, root: Path, read: list[str], write: list[str], record: list[tuple[str, str]] | None = None):
+    def __init__(self, root: Path, read: list[str], write: list[str],
+                 record: list[tuple[str, str, str | None]] | None = None, who: str | None = None):
         self.root = root.resolve()
         self.read_rules = list(read) + list(write)  # writing implies reading
         self.write_rules = list(write)
-        self.record: list[tuple[str, str]] = [] if record is None else record  # (path, change), append-only
+        # (path, change, seat), append-only: the seat that made each change, so reports hold only their own (D41)
+        self.record: list[tuple[str, str, str | None]] = [] if record is None else record
+        self.who = who
 
-    def seat(self, read: list[str], write: list[str]) -> "FolderStage":
+    def seat(self, read: list[str], write: list[str], who: str | None = None) -> "FolderStage":
         """The same stage and record, with another seat's permissions."""
-        return FolderStage(self.root, read, write, self.record)
+        return FolderStage(self.root, read, write, self.record, who)
+
+    def made_by(self, who: str, since: int) -> list[str]:
+        """The change markers of the changes `who` made after the marker `since`."""
+        return [str(i + 1) for i, (_, _, by) in enumerate(self.record) if i >= since and by == who]
 
     def _may(self, rules: list[str], path: str) -> bool:
         return any(covers(rule, path) for rule in rules)
@@ -61,7 +68,7 @@ class FolderStage:
         target = self._target(path, self.write_rules, "write")
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(content)
-        self.record.append((path, "written"))
+        self.record.append((path, "written", self.who))
         return self._marker()
 
     def list(self, path: str = "") -> list[str]:
@@ -82,7 +89,7 @@ class FolderStage:
         if not target.is_file():
             raise StageError("not-found", f"{path} doesn't exist on the stage")
         target.unlink()
-        self.record.append((path, "deleted"))
+        self.record.append((path, "deleted", self.who))
         return self._marker()
 
     def changes(self, since: str | None = None) -> tuple[list[tuple[str, str]], str]:
@@ -91,5 +98,5 @@ class FolderStage:
             if not since.isdigit() or int(since) > len(self.record):
                 raise StageError("unknown-marker", f"{since!r} is not a change marker this stage gave")
             start = int(since)
-        visible = [(p, c) for p, c in self.record[start:] if self._may(self.read_rules, p)]
+        visible = [(p, c) for p, c, _ in self.record[start:] if self._may(self.read_rules, p)]
         return visible, self._marker()

@@ -50,6 +50,8 @@ class Seat:
     expires_at: datetime
     stage: FolderStage
     last_contact: float
+    host: str | None = None  # the address it joined from (max_seats_per_host)
+    cue_marker: int = 0  # the stage's record length when the pending cue was sent (D41)
     streams: int = 0
     outbox: asyncio.Queue = field(default_factory=asyncio.Queue)
     pending: tuple[Cue, asyncio.Future] | None = None
@@ -79,12 +81,13 @@ class Director:
     def __init__(self, *, join_token: str, parts: list[PartSlot], stage: FolderStage, log: Log,
                  heartbeat_interval: int = 30, heartbeat_misses: int = 3, token_ttl: timedelta = timedelta(hours=24),
                  clock: Callable[[], float] = time.monotonic, utcnow: Callable[[], datetime] = lambda: datetime.now(UTC),
-                 say: Callable[[str], None] = lambda _: None):
+                 say: Callable[[str], None] = lambda _: None, max_per_host: int | None = None):
         self.join_token = join_token
         self.parts = {p.name: p for p in parts}
         self.stage, self.log = stage, log
         self.interval, self.misses = heartbeat_interval, heartbeat_misses
         self.token_ttl, self.clock, self.utcnow, self.say = token_ttl, clock, utcnow, say
+        self.max_per_host = max_per_host
         self.seats: dict[str, Seat] = {}  # by task id
         self.cast_event = asyncio.Event()
         self.end_task: Callable[[str], Awaitable[None]] | None = None  # set by the server: ends an A2A task
@@ -96,7 +99,7 @@ class Director:
         self.say(f"Refused a join: {reason} ({message})")
         return Refused(kind="zanni.refused", reason=reason, message=message)
 
-    async def join(self, token, task_id, join, problem, reached_at):
+    async def join(self, token, task_id, join, problem, reached_at, peer=None):
         if not token or not secrets.compare_digest(token, self.join_token):
             return self._refuse("not-authorised", "the join token is missing, or isn't this play's")
         if problem:
@@ -107,6 +110,11 @@ class Director:
         if join.part is not None and join.part not in self.parts:
             return self._refuse("no-such-part", f"this play has no part {join.part!r}; its parts are: "
                                                 f"{', '.join(self.parts)}", **who)
+        if self.max_per_host is not None and peer is not None:
+            on_host = sum(1 for s in self.seats.values() if s.active and s.host == peer)
+            if on_host >= self.max_per_host:
+                return self._refuse("host-cap", f"{on_host} seat(s) are already cast on {peer}, and the play allows "
+                                                f"{self.max_per_host} per host (max_seats_per_host)", **who)
         candidates = [self.parts[join.part]] if join.part else list(self.parts.values())
         refusal = None
         for slot in candidates:
@@ -116,17 +124,18 @@ class Director:
                 if taken >= slot.seats:
                     refusal = ("part-full", f"the part {slot.name} has all its {slot.seats} seat(s) taken")
                     continue
-                return self._cast(slot, task_id, params, join, reached_at)
+                return self._cast(slot, task_id, params, join, reached_at, peer)
         return self._refuse(*refusal, **who)
 
-    def _cast(self, slot: PartSlot, task_id: str, params: ActorCardParams, join: Join, reached_at: str) -> Cast:
+    def _cast(self, slot: PartSlot, task_id: str, params: ActorCardParams, join: Join, reached_at: str,
+              peer: str | None = None) -> Cast:
         number = sum(1 for s in self.seats.values() if s.part == slot.name) + 1
         seat_id = f"{slot.name}-{number}"
         needs = params.role.needs
         seat = Seat(id=seat_id, part=slot.name, task_id=task_id, actor=params.actor or join.card.get("name"),
                     role=params.role.ref, seat_token=secrets.token_urlsafe(32), stage_token=secrets.token_urlsafe(32),
-                    expires_at=self.utcnow() + self.token_ttl, last_contact=self.clock(),
-                    stage=self.stage.seat(needs.stage_read, needs.stage_write))
+                    expires_at=self.utcnow() + self.token_ttl, last_contact=self.clock(), host=peer,
+                    stage=self.stage.seat(needs.stage_read, needs.stage_write, seat_id))
         self.seats[task_id] = seat
         self.log.event("actor-joined", seat=seat_id, part=slot.name, role=seat.role, actor=seat.actor,
                        models=[m.model_dump() for m in params.models])  # self-reported (D11)
@@ -148,6 +157,8 @@ class Director:
             return
         cue, answer = seat.pending
         seat.pending, seat.deadline = None, None
+        # The seat's own changes, from the stage's record, not the actor's list (D41)
+        report = report.model_copy(update={"changes": self.stage.made_by(seat.id, seat.cue_marker)})
         self.log.event("report", seat=seat.id, scene=cue.scene, cue=report.cue, outcome=report.outcome,
                        summary=report.summary, changes=report.changes)
         self.log.event("cost", seat=seat.id, model=report.models[0].model if report.models else None,
@@ -208,8 +219,10 @@ class Director:
             raise SeatLost(seat.id, seat.reason or "released")
         answer = asyncio.get_running_loop().create_future()
         seat.pending = (cue, answer)
+        seat.cue_marker = len(self.stage.record)
         seat.deadline = datetime.fromisoformat(cue.deadline.replace("Z", "+00:00")) if cue.deadline else None
-        self.log.event("cue", seat=seat.id, scene=cue.scene, cue=cue.cue)
+        self.log.event("cue", seat=seat.id, scene=cue.scene, cue=cue.cue,
+                       budget=cue.limits.budget.amount if cue.limits.budget else None)
         await seat.outbox.put(Outgoing("input-required", cue))
         return await answer
 
