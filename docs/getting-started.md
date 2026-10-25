@@ -31,7 +31,7 @@ uv run zanni --check examples/plays/habit-tracker/play.yaml
 Play file: would start the director for the play 'habit-tracker'.
   script: github.com/someone/habit-tracker@1.0.0
   director: https://director.example.com
-  stage: git git@github.com:alessio/habit-tracker.git (branch main)
+  stage: git git@github.com:alessio/habit-tracker.git (branch main; pushes approved)
   cast:
     product-owner: github.com/zanni-roles/product-owner@1.0.0, 1 seat
     tester: github.com/someone/tester@1.4.0, 1 seat
@@ -160,44 +160,49 @@ The recorded runs of this layout are in [docs/runs/milestone-3.md](runs/mileston
    uv run zanni ~/slug-kata-run/plays/slug-kata/play.yaml
    ```
 
-The director pins the script and roles in `play.lock`, lists the verifier commands it will run, starts the local seats, and follows the script. A recorded run, on `qwen3.8:27b` (trimmed paths):
+The director pins the script and roles in `play.lock`, lists the verifier commands it will run, starts the local seats, and follows the script. A recorded run, on `claude-haiku-5-5` (trimmed paths):
 
 ```
 Wrote …/plays/slug-kata/play.lock
-  verifiers, run in the stage folder with your permissions:
-    tests-fail: uv run --no-project --with pytest python -c import subprocess, sys; sys.exit(0 if subprocess.call([sys.executable, '-m', 'pytest', '-q', 'tests']) == 1 else 1) (from the script; timeout 300 s)
-    tests-pass: uv run --no-project --with pytest python -m pytest -q tests (from the script; timeout 300 s)
-Directing 'slug-kata' (slug-kata 0.1.0) at http://127.0.0.1:61086; run 20261024T202101Z
+  verifiers, run on a snapshot of the stage, here with your permissions unless a verifier seat is named:
+    tests-fail: uv run --no-project --with pytest python -c import subprocess, sys; sys.exit(0 if subprocess.call([sys.executable, '-m', 'pytest', '-q', 'tests']) == 1 else 1) (from the script; timeout 300 s; runs here)
+    tests-pass: uv run --no-project --with pytest python -m pytest -q tests (from the script; timeout 300 s; runs here)
+Directing 'slug-kata' (slug-kata 0.1.0) at http://127.0.0.1:56615; run 20261024T232121Z
   started the local seat tester-1 (tester)
   started the local seat coder-1 (coder)
 Waiting for actors to join: tester, coder
 Cast coder-1 (slug-coder 0.1.0) as coder-1
 Cast tester-1 (slug-tester 0.1.0) as tester-1
-  cue r1-c1 to tester-1: Act 1, Scene 1: Specify — Round 1 (budget $0.5000)
-  report from tester-1 on r1-c1: done, cost $0
-  verifier tests-fail: passed
-Gate 'plan' is waiting for a decision: zanni gate <play> approve | reject --note …
-Gate 'plan' rejected by owner: Also cover an input that is only punctuation, such as '!!!', which slugifies to an empty string.
-  cue r1-c2 to tester-1: Act 1, Scene 1: Specify — Round 1 (revision) (budget $0.5000)
-  report from tester-1 on r1-c2: done, cost $0
+  cue r1-c1 to tester-1: Specify (round 1) (budget $0.2)
+  report from tester-1 on r1-c1: done, cost $0.0011627
   verifier tests-fail: passed
 Gate 'plan' is waiting for a decision: zanni gate <play> approve | reject --note …
 Gate 'plan' approved by owner: ok
-  cue r1-c3 to coder-1: Act 1, Scene 2: Build — Round 1, slug (budget $0.5000)
   started the local seat coder-2 (coder)
+  cue r1-c2 to coder-1: Build (budget $0.4969)
 Cast coder-2 (slug-coder 0.1.0) as coder-2
-  cue r1-c4 to coder-2: Act 1, Scene 2: Build — Round 1, words (budget $0.2500)
-  report from coder-1 on r1-c3: done, cost $0
-  report from coder-2 on r1-c4: done, cost $0
+  cue r1-c3 to coder-2: Build (budget $0.2482)
+  report from coder-2 on r1-c3: done, cost $0.0009790
+  report from coder-1 on r1-c2: done, cost $0.0015385
   verifier tests-pass: passed
 Round 2
-  …
+  cue r2-c4 to tester-1: Specify (budget $0.3295)
+  report from tester-1 on r2-c4: done, cost $0.0012549
+  verifier tests-fail: passed
+Gate 'plan' is waiting for a decision: zanni gate <play> approve | reject --note …
+Gate 'plan' approved by owner: ok
+  cue r2-c5 to coder-1: Build (round 2): make the failing tests for slugify's max_length pass. (budget $0.3)
+  report from coder-1 on r2-c5: done, cost $0.0015193
+  verifier tests-pass: passed
 Released coder-1 (done)
-Released coder-2 (done)
 Released tester-1 (done)
-The play is done. Rounds: 2; spent $0.0000; verdicts: tests-fail passed, tests-pass passed.
-The play's log: …/plays/slug-kata/log/20261024T202101Z.jsonl
+Released coder-2 (done)
+The play is done. Rounds: 2; spent $0.0189; verdicts: tests-fail passed, tests-pass passed.
+The play's log: …/plays/slug-kata/log/20261024T232121Z.jsonl
 ```
+
+- **Verifiers run on a snapshot:** each verifier runs in a fresh copy of the stage as it is at that moment, so a command can't change the stage (D45).
+- **The plan gate is asked every round:** the script asks it before the coders' cues in each round (D48).
 
 **Deciding a gate.** When the play waits at a gate, decide it from another terminal, with the same `ZANNI_OWNER_TOKEN`. On the director's own terminal you can also type `approve`, `reject <note>` or `resume`. `zanni gate` finds the running director through `log/director.json` in the play folder. Given a director's URL instead, it works from any machine that can reach it (D38). From a scripted play in the test suite:
 
@@ -224,17 +229,112 @@ Play 'kata', run 20261024T204125Z, round 1, spent $0.0007: running.
 
 The recorded runs, on one machine with local and cloud models and on two machines, are in [docs/runs/milestone-4.md](runs/milestone-4.md).
 
+## A play on a git stage
+
+A play about code usually keeps its stage in a git repository (D46). `examples/plays/slug-kata-git/` is the same kata on a git stage. A repository can't ship inside this one, so the example makes its own remote: a bare repository, `remote.git`, standing in for one on a server.
+
+1. **Copy the examples and make the remote:**
+   ```bash
+   cp -R examples ~/slug-kata-git-run
+   python3 ~/slug-kata-git-run/plays/slug-kata-git/make-remote.py
+   ```
+2. **Check the models and set the two tokens**, as in [Running a play](#running-a-play).
+3. **Run it:**
+   ```bash
+   uv run zanni ~/slug-kata-git-run/plays/slug-kata-git/play.yaml
+   ```
+
+The run reads like the folder kata's. On top of that, the director pushes the run's branch at each approved gate and at the end. From a recorded run on `qwen3.8:27b`:
+
+```
+Gate 'plan' approved by owner: ok
+  pushed zanni/slug-kata-git/20261025T031951Z (the approved gate plan)
+  …
+Released tester-1 (done)
+  pushed zanni/slug-kata-git/20261025T031951Z (the end of the run)
+The play is done. Rounds: 2; spent $0.0000; verdicts: tests-fail passed, tests-pass passed.
+```
+
+- **The run's branch:** the director clones the repository into the play's `log/<run-id>-stage/`, and works on a branch of its own, `zanni/<play>/<run-id>`. It never commits to `main`.
+- **One commit per write:** each commit's author is the seat that wrote it, and its message is the cue. `git log` on the run's branch shows who wrote what.
+- **When it pushes:** with `push: approved`, the default, the director pushes at each approved gate, and at the end when the play is done. A run that stops before then keeps its later work in its clone, and the director prints the command that publishes it:
+  ```
+  The run's work is on the branch zanni/slug-kata-git/20261025T031756Z, in …/log/20261025T031756Z-stage, not pushed (push: approved, and the play didn't finish). To publish it: git -C …/log/20261025T031756Z-stage push origin zanni/slug-kata-git/20261025T031756Z
+  ```
+  With `push: always`, it pushes at the end of every run, finished or not ([spec](spec/stage.md#pushing)).
+- **Your own repository:** put any git remote in `url`, such as `git@github.com:you/app.git`. The director uses git's own credentials on its machine, such as an SSH agent. Seats never touch git; they reach the stage through the director.
+- **Merging:** merging the run's branch is up to you, as with a pull request.
+
+## A play on a stage server
+
+A stage doesn't have to be a folder or a repository. With `backend: mcp`, it's any MCP server offering the five stage tools (D47). `examples/plays/release-notes/` runs on the example stage server, which keeps the stage in SQLite (`examples/stage-servers/sqlite/`). A writer drafts release notes from a changelog, an editor revises them, and a verifier checks their structure.
+
+1. **Copy the examples,** and pick the stage server's token. Only the director presents it to the server; seats never see it:
+   ```bash
+   cp -R examples ~/release-notes-run
+   export ZANNI_STAGE_TOKEN=$(python3 -c "import secrets; print(secrets.token_urlsafe(24))")
+   ```
+2. **Start the stage server,** seeded with the play's starting files:
+   ```bash
+   uv run python ~/release-notes-run/stage-servers/sqlite/server.py --db ~/release-notes-run/stage.db \
+     --listen 127.0.0.1:8800 --seed ~/release-notes-run/plays/release-notes/stage &
+   ```
+   ```
+   Seeded the stage with 3 file(s) from …/plays/release-notes/stage
+   Serving the stage in …/stage.db at http://127.0.0.1:8800/mcp
+   ```
+3. **Check the models and set the join and owner tokens**, as in [Running a play](#running-a-play), then run it:
+   ```bash
+   uv run zanni ~/release-notes-run/plays/release-notes/play.yaml
+   ```
+
+A recorded run, on `qwen3.8:27b` (trimmed paths):
+
+```
+Wrote …/plays/release-notes/play.lock
+  verifiers, run on a snapshot of the stage, here with your permissions unless a verifier seat is named:
+    notes-structure: python3 checks/structure.py (from the script; timeout 60 s; runs on the verifier seat checker)
+Directing 'release-notes' (release-notes 0.1.0) at http://127.0.0.1:65042; run 20261025T030414Z
+  started the local seat writer-1 (writer)
+  started the local seat editor-1 (editor)
+  started the local seat checker (zanni:verifier)
+Waiting for actors to join: writer, editor
+Cast checker (zanni-verifier 1.0.0) as verifier-checker
+Cast writer-1 (notes-writer 0.1.0) as writer-1
+Cast editor-1 (notes-editor 0.1.0) as editor-1
+  cue r1-c1 to writer-1: Scene 1: Draft (budget $0.3)
+  report from writer-1 on r1-c1: done, cost $0
+  cue r1-c2 to editor-1: Scene 2: Edit (budget $0.5000)
+  report from editor-1 on r1-c2: done, cost $0
+  verifier notes-structure: passed (on checker)
+Gate 'publish' is waiting for a decision: zanni gate <play> approve | reject --note …
+Gate 'publish' approved by owner: ok
+Released verifier-checker (done)
+Released writer-1 (done)
+Released editor-1 (done)
+The play is done. Rounds: 1; spent $0.0000; verdicts: notes-structure passed.
+```
+
+- **The work is on the server:** `notes/release-notes.md` is in `stage.db`, with each write's author (the seat) and note (the cue). The play's `stage/` folder only seeded it.
+- **A verifier seat:** `notes-structure` runs on `checker`, a seat running Zanni's built-in `zanni:verifier` role. It runs no model: it pulls a snapshot of the stage, runs the command, and answers with its exit code (D45). The director starts it from `verifier_seats` in `director.yaml`. On another machine, it would join with its own token, `ZANNI_VERIFIER_TOKEN` ([spec](spec/actor-configuration.md#verifier-seats)).
+- **If the server goes away:** the director pauses the play. Start the server again, then resume with `zanni gate <play> resume` ([Troubleshooting](troubleshooting.md#stages)).
+- **Your own stage server:** see [Writing a stage server](writing-a-stage-server.md).
+
+The recorded runs of both plays, on local and cloud models and on two machines, are in [docs/runs/milestone-5.md](runs/milestone-5.md).
+
 ## What works today
 
 | Works | Not yet |
 |---|---|
-| Validating actor configurations, plays, scripts, lockfiles, rehearsals and whole role folders | A git stage: a play's stage is a local folder for now (milestone 5) |
+| Validating actor configurations, plays, scripts, lockfiles, rehearsals and whole role folders | Isolated writes: every seat writes to the one shared stage |
 | Running one actor on a rehearsal, on local or cloud models, with fallback | Renewing a seat's tokens: a seat ends when they expire, after 24 hours |
 | An actor joining a director over A2A, by URL or through a play file's `director` | TLS: the director speaks plain HTTP |
 | Serving a rehearsal to an actor on another machine (`--serve`), with the stage over MCP | A director that survives a restart of its process |
-| Running a whole play: `zanni play.yaml` starts a director that casts local seats and joining actors, follows the script, runs its verifiers and enforces the budget | Gates per round: an enforced gate counts once per play |
+| Running a whole play: `zanni play.yaml` starts a director that casts local seats and joining actors, follows the script, runs its verifiers and enforces the budget | Files that aren't text on the stage |
 | Fetching roles and scripts from git, pinned in `play.lock` | Signed tags, and version ranges |
 | Deciding gates, and resuming a paused play, with `zanni gate` | Telling anyone a gate is waiting |
+| A stage in a folder, a git repository (a branch per run, a commit per write, pushed at approved gates) or any MCP stage server | A seat working on a real git checkout: every seat reaches the stage through the director |
+| Verifiers on a snapshot of the stage, or on verifier seats; gates every round, before a part's cues | |
 | Errors with their line and how to fix them; rejecting secrets in shared files | |
 
 ## Next steps

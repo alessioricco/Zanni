@@ -4,7 +4,7 @@ Zanni runs a team of AI personas as separate processes. Each persona works on it
 
 The name comes from the zanni, the servant characters of the commedia dell'arte: they did the work, each playing whatever character the scenario needed. Each Zanni process is a zanni too: an empty shell, until it is given a role to play.
 
-> **Status:** this page describes the design. Today only the file formats exist; the [roadmap](../ROADMAP.md) shows when each part arrives.
+> **Status:** this page describes the design. [What works today](getting-started.md#what-works-today) lists what runs now, and the [roadmap](../ROADMAP.md) shows what comes next.
 
 ## The words
 
@@ -55,7 +55,19 @@ Actors can run anywhere: a laptop, a GPU workstation, a cloud server. The direct
 
 ## The stage is a workspace
 
-The stage holds the play's shared state. What it is made of depends on the play: a git repository for a play about code, something else for a play about documents. Whatever the backend, it offers the same operations (read, write, list) and enforces the same permissions. Each seat can only read and write the paths its part allows.
+The stage holds the play's shared state. What it is made of depends on the play: a git repository for a play about code, a folder or a document store for a play about documents. Whatever it's made of, every seat gets the same five operations (read, write, list, delete, and what changed), over MCP, through the director.
+
+- **One layer enforces the permissions.** The director checks every operation against the seat's permissions, in one layer above every backend. Each seat can only read and write the paths its part allows. The backend only stores files: it never sees a seat, so no backend can loosen a permission (D43).
+- **Writes are shared.** A write is on the stage for every seat at once. There are no per-seat copies to merge; when two seats may write the same file, the last write wins (D44).
+- **Three backends:**
+
+  | Backend | Where the files are | What it adds |
+  |---|---|---|
+  | `folder` | a folder on the director's machine | nothing: the simplest stage |
+  | `git` | a clone of a repository, on a branch of the run's own | a commit per write, with the seat as author; the branch pushed at approved gates, and at the end (D46) |
+  | `mcp` | any MCP server offering the five stage tools, such as a document store | whatever the server keeps, such as who wrote each file; the director presents the server's token, seats never see it (D47) |
+
+- **Verifiers see a snapshot.** A verifier runs on a fresh copy of the stage as it is at that moment, never on the stage itself, so a command can't change the work it checks (D45).
 
 ## Limits are enforced where they can't be bypassed
 
@@ -63,9 +75,9 @@ Actors may run on machines the play's owner doesn't control, so no limit depends
 
 | Limit | Enforced by |
 |---|---|
-| What a seat can read and write | The stage |
+| What a seat can read and write | The stage's permission layer, in the director, above every backend |
 | Budget, number of seats, human approvals | The director, under the play's house rules |
-| What counts as done | Verifiers, on the director's side |
+| What counts as done | Verifiers: on the director's side, or on verifier seats its configuration trusts |
 | An actor's own models, spend and credentials, and which directors it joins | The actor, through its configuration |
 
 - **House rules:** the house rules are set when the director starts. No role, script or actor can loosen them.
@@ -76,6 +88,8 @@ Actors may run on machines the play's owner doesn't control, so no limit depends
 ## Work is done when a verifier says so
 
 An actor saying its work is done counts for nothing. Every script brings verifiers that don't depend on any actor's opinion, such as the project's tests on the merged code, or browser tests on the running app.
+
+A verifier runs on the director's machine by default. When it needs tools the director's machine doesn't have, it can run on a **verifier seat**: a zanni playing Zanni's built-in role `zanni:verifier`, listed in the director's configuration. It runs no model and decides nothing: it runs the command the director sends on its own snapshot of the stage, and answers with the exit code (D45).
 
 The director can't see which model an actor really used, so verifiers are also what keeps quality up: a weaker model simply fails more checks.
 

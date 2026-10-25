@@ -28,11 +28,17 @@ Things decided to come later. Each names where it was deferred. Remove an item w
 - [ ] **Version ranges** in package references, and **a command to clean the package cache** (D37). Deferred at milestone 4's ask point E.
 - [ ] **Telling someone a gate is waiting** (a webhook, an email), **per-person approvers**, and **a web page for gates** (D38). Deferred at milestone 4's ask point F.
 - [ ] **Token budgets**, as an alternative to prices, for actors whose models have none (D7, D39).
-- [ ] **Gates per round.** An enforced gate counts once per play: approved in round 1, it isn't asked again, and some directors skip it in later rounds. A gate a script means to be asked each round needs a way to say so (D33, D38). Found in milestone 4's recorded runs.
-- [ ] **Shorter director turns.** Directors played the whole kata in one or two turns of 80k to 180k input tokens, and were two thirds or more of the cloud spend. Trim old tool results, or end a turn after each wait for reports (D33). Found in milestone 4's recorded runs.
-- [ ] **Not restarting a seat refused at join.** A local seat refused for a reason a restart can't change, such as `unpriced`, is restarted twice anyway, and its part then waits for an actor to join with no turn to stop it (D36). Found in milestone 4's recorded runs.
+- [ ] **The director's total input.** Since D49, a turn ends after each long wait, so each turn is small, but each new turn sends the instructions and the summary again: the director still takes about 100k input tokens per kata, two thirds of the cloud spend. Cache the instructions, or send them once per round (D49). Found in milestone 5's recorded runs.
 - [ ] **The cost of an interrupted turn.** A director stopped by hand mid-turn never logs that turn's cost (D39). Found in milestone 4's recorded runs.
 - [ ] **Limiting a cue's overshoot.** The actor checks its cue's budget after each model response, so one expensive response can spend several times a small cue budget. Estimating a request's cost before sending it would bound that (D39). Found in milestone 4's recorded runs.
+
+## Stage
+
+- [ ] **Isolated writes:** a workspace per seat, merged by the director, for scripts whose seats must edit the same files at the same time. Today writes are shared, and the last write wins (D44). Deferred at milestone 5's ask point B.
+- [ ] **Content that isn't text,** such as images, on the stage. Today a backend lists such a file, and refuses to read it with `not-text` (D43). Deferred at milestone 5's ask point A.
+- [ ] **A stage server's own checks,** as a sixth tool such as `stage_verify`, and **model judges** as verifiers (`kind: soft`) (D45, D47). Deferred at milestone 5's ask point C.
+- [ ] **Direct access to a git stage:** a real checkout for a coding engine, pushing its own branch, with tokens per seat. `zanni.cast`'s `stage.direct` is reserved for it (D46). Milestone 6.
+- [ ] **Changes made on a stage server outside the play** don't appear in `changes`, since the director's record holds only the play's own writes (D47).
 
 ## Later milestones
 

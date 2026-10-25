@@ -6,6 +6,7 @@ There is one command, `zanni <file>`. The kind of file comes from its keys, neve
 |---|---|---|---|
 | Actor configuration | `role` and `play` | an actor: a zanni playing the role, joining the play | [spec: actor configuration](spec/actor-configuration.md) |
 | Director configuration | `role: zanni:director` and `play` | the play's director, running its play | [spec: a director's configuration](spec/actor-configuration.md#a-directors-configuration) |
+| Verifier seat configuration | `role: zanni:verifier` and `play` | a verifier seat: runs a play's verifiers, with no model | [spec: verifier seats](spec/actor-configuration.md#verifier-seats) |
 | Play file | `cast` | the play's director, running the play's script | [spec: play](spec/play.md) |
 | Role manifest (`role.yaml`) | `mission` | nothing; it is validated | [spec: role package](spec/role-package.md) |
 | Script (`SCRIPT.md`) | `parts`, in Markdown frontmatter | nothing; it is validated | [spec: script](spec/script.md) |
@@ -69,6 +70,8 @@ house_rules:
 
 - **`script`:** a package reference to the script being performed. It is required.
 - **`stage`:** the play's workspace. A git URL means a `git` stage and a folder path means a `folder` stage, or write `{ backend: …, … }`; see the [stage spec](spec/stage.md#in-the-play-file).
+  - **git:** `{ backend: git, url, branch, push }`. Each run works on a branch of its own. `push: approved`, the default, pushes it at each approved gate and at the end of a finished play; `push: always` also pushes an unfinished one.
+  - **mcp:** `{ backend: mcp, url }`, any MCP server offering the five stage tools. The director presents `ZANNI_STAGE_TOKEN`, from its own configuration.
 - **`cast`:** maps each of the script's parts to a role reference, or to `{ role, seats, host }`. When the script is local, `zanni` checks the cast against it.
 - **`seats`:** a number (`2`) or a range (`1-4`), within the script's seats for the part. Left out, it takes the part's seats. For a range, the director decides how many to cast, within it.
 - **`host: local`:** the director starts these seats itself, on its own machine.
@@ -78,9 +81,15 @@ house_rules:
 - **`house_rules.max_seats_per_host`:** the most seats the director casts onto one machine.
 - **`house_rules.gate_timeout`:** how long a gate, or a pause, may wait for a person, such as `2h`; with none, it waits.
 - **`house_rules.max_director_turns`:** the most model turns the director takes in a round (default 30).
-- **`verifiers`:** the play's own commands for its script's verifiers, such as `tests-pass: { command: [npm, test] }`.
+- **`house_rules.requests_per_turn`:** the most model requests in one director turn (default 25). A turn also ends after each long wait: reports, or a gate (D49).
+- **`house_rules.cast_timeout`:** how long the play waits for a part's minimum seats, or a verifier seat, before stopping as `uncastable` (default `10m`).
+- **`verifiers`:** the play's own commands for its script's verifiers, and where each runs, such as `tests-pass: { command: [npm, test], runs_on: ci-box }`. Without `runs_on`, a verifier runs on the director's machine, on a snapshot of the stage.
 
-Two more examples: `examples/plays/newsroom/play.yaml` uses a local script, a folder stage and a `play.lock`; `examples/plays/slug-kata/` is a whole play you can run, with its director's configuration and its local seats ([getting started](getting-started.md#running-a-play)).
+More examples:
+- `examples/plays/newsroom/play.yaml` uses a local script, a folder stage and a `play.lock`.
+- `examples/plays/slug-kata/` is a whole play you can run, with its director's configuration and its local seats ([getting started](getting-started.md#running-a-play)).
+- `examples/plays/slug-kata-git/` runs the same kata on a git stage ([getting started](getting-started.md#a-play-on-a-git-stage)).
+- `examples/plays/release-notes/` runs on an MCP stage server, with a verifier seat ([getting started](getting-started.md#a-play-on-a-stage-server)).
 
 ## Director configuration
 
@@ -109,6 +118,8 @@ seats:
 
 - **`models`:** the director's own, in order. Nothing picks a model for you: the director runs on what this file lists, and under a budget each must have a price.
 - **`seats`:** the actor configurations the director starts as local seats, one file per seat. It reads only their `name` and `role`, never their credentials.
+- **`verifier_seats`:** the verifier seats the director trusts. `local:` lists configuration files it starts itself; `remote:` lists the names of verifier seats that join from elsewhere, presenting `ZANNI_VERIFIER_TOKEN`. See `examples/plays/release-notes/director.yaml`.
+- **`credentials`:** besides the tokens above, `ZANNI_STAGE_TOKEN` for an `mcp` stage, and `ZANNI_VERIFIER_TOKEN` when remote verifier seats join.
 
 ## Role manifest
 

@@ -52,6 +52,9 @@ credentials:
 
 - **Its keys stay its own:** the director never holds an actor's keys. Local seats resolve their own credentials, from their own configurations (D36).
 - **The owner token:** `ZANNI_OWNER_TOKEN`, one per play, decides gates. The owner sets the same value in the environment where they run `zanni gate`; it is never a flag, and never logged (D38).
+- **The stage server's token:** `ZANNI_STAGE_TOKEN`, for a play on an `mcp` stage. Only the director presents it to the stage server; seats never see it (D47).
+- **The verifier token:** `ZANNI_VERIFIER_TOKEN`, when verifier seats join from other machines. Each of those seats presents the same value instead of the join token (D45). With only local verifier seats, the director makes one for the run itself.
+- **A git stage:** it uses git's own credentials on the director's machine, such as an SSH agent or a credential helper. Zanni stores no git credential (D46).
 
 ## The join token
 

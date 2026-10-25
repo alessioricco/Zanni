@@ -88,6 +88,7 @@ def test_a_wrong_token_starts_nothing(tmp_path):
             server.kill()
         assert calls == []
     assert result.returncode == 2 and "couldn't reach the stage's server" in result.stderr
+    assert "the server refused the token (HTTP 401)" in result.stderr
     assert "not-the-token" not in result.stderr + result.stdout
 
 

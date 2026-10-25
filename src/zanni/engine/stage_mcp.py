@@ -137,13 +137,21 @@ class RemoteStage:
 @contextlib.asynccontextmanager
 async def remote_stage(mcp_url: str, token: str) -> AsyncIterator[RemoteStage]:
     """Connect to a stage's MCP server with a seat's stage token, for the seat's whole life."""
+    refused: list[int] = []
+
+    async def note(response) -> None:  # the MCP client reports a refused token only as "an error response"
+        if response.status_code in (401, 403):
+            refused.append(response.status_code)
+
     async with contextlib.AsyncExitStack() as stack:
         http = await stack.enter_async_context(httpx2.AsyncClient(
-            headers={"Authorization": f"Bearer {token}"}, timeout=httpx2.Timeout(30.0, read=300.0)))
+            headers={"Authorization": f"Bearer {token}"}, timeout=httpx2.Timeout(30.0, read=300.0),
+            event_hooks={"response": [note]}))
         try:
             client = await stack.enter_async_context(Client(streamable_http_client(mcp_url, http_client=http)))
         except Exception as e:  # only connecting is translated; errors in the caller's own block pass through
-            raise StageError("unavailable", f"couldn't connect to the stage at {mcp_url}: {_first(e)}") from None
+            why = f"the server refused the token (HTTP {refused[0]})" if refused else _first(e)
+            raise StageError("unavailable", f"couldn't connect to the stage at {mcp_url}: {why}") from None
         yield RemoteStage(client)
 
 

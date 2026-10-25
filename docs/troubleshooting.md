@@ -143,9 +143,11 @@ A local `script:` is relative to the play file, and may point to `SCRIPT.md` or 
 ```
 play.yaml, line 4, cast.coder.seats: the range 4-1 goes down; write the smaller number first: 1-4
 play.yaml, line 3, stage: a git stage needs a `url`; add the repository, e.g. url: git@github.com:you/app.git
+play.yaml, line 8, stage: an mcp stage needs a `url`, the server's http(s) endpoint, e.g. url: http://docs.internal:8800/mcp
+play.yaml, line 8, stage.push: is "sometimes"; use one of: 'approved' or 'always'
 ```
 
-Seats are a number of at least 1, or a range written smaller number first. A `git` stage takes `url` and `branch`; a `folder` stage takes `path`.
+Seats are a number of at least 1, or a range written smaller number first. A `git` stage takes `url`, `branch` and `push`; a `folder` stage takes `path`; an `mcp` stage takes `url`, an `http` or `https` URL ([stage spec](spec/stage.md#in-the-play-file)).
 
 ## Scripts
 
@@ -314,7 +316,19 @@ Joining the play 'slug-kata' (script ../../scripts/slug-kata) at http://127.0.0.
 Refused: unpriced: this play has a budget, and the actor's models aren't all priced, so its cost would be unknown; add `price:` to each model entry in its configuration (D7)
 ```
 
-Printed by an actor, which exits with code 2. Under a budget, every model an actor may use needs a price: a published one, or `price:` in its configuration; for a local model, `price: { input: 0, output: 0 }` (D39). A local seat refused this way is restarted twice, then its part waits for an actor to join, so fix the configuration and run the play again.
+Printed by an actor, which exits with code 2. Under a budget, every model an actor may use needs a price: a published one, or `price:` in its configuration; for a local model, `price: { input: 0, output: 0 }` (D39). A local seat refused this way isn't restarted, since a restart wouldn't change the answer (D50). Its part waits for an actor to join, until `cast_timeout`. So fix the configuration, and run the play again.
+
+### "Still missing after the cast_timeout"
+
+```
+Waiting for actors to join: coder, tester, the verifier seat ci-box
+Still missing after the cast_timeout (15 s): the verifier seat ci-box; the play stops
+The play stopped: uncastable. Rounds: 1; spent $0.0000; verdicts: none.
+```
+
+Before its first turn, the director waits for every part's minimum seats, and for every verifier seat a verifier `runs_on`. After losing a seat, it waits the same way for a replacement. When `cast_timeout` (default `10m`) passes with one still missing, the play stops with reason `uncastable`, exit code 1 (D50). Check what's missing:
+- **A local seat:** its own output, in the play's `log/<run-id>-seats/` folder. A seat refused at join, such as `unpriced`, isn't restarted.
+- **An actor or a verifier seat from another machine:** start it, with the director's address and the right token. It can start before the director: run it in a loop that retries while it can't connect (exit code 2), as in [docs/runs/milestone-5.md](runs/milestone-5.md).
 
 ### "stopped at its budget", and reports with `over-budget`
 
@@ -356,6 +370,76 @@ Nothing decided: the play is at a gate, not paused; use approve or reject
 ```
 
 `resume` is for a paused play, and `approve` or `reject` for a play waiting at a gate. `zanni gate <play>` with no decision shows which it is. Exit code 1.
+
+## Stages
+
+### "couldn't clone"
+
+```
+plays/slug-kata-git/play.yaml: couldn't clone …/plays/slug-kata-git/remote.git (branch main): repository '…/plays/slug-kata-git/remote.git' does not exist; nothing was started.
+```
+
+The director clones a git stage's `url` before anything starts, using your own git and its credentials. Check that `git clone <url>` works on the director's machine. The example's remote is made by `python3 make-remote.py` in its play folder ([getting started](getting-started.md#a-play-on-a-git-stage)). Git never prompts for a password while the director runs it, so a private repository needs an SSH key or a credential helper that works without asking.
+
+### "couldn't push"
+
+```
+  couldn't push zanni/slug-kata-git/20261025T031931Z (the approved gate plan): '…/nowhere.git' does not appear to be a git repository; the work stays in …/plays/slug-kata-git/log/20261025T031931Z-stage
+```
+
+Not fatal: the play goes on, and every commit stays in the run's clone. Fix git's access to the remote, then push the run's branch yourself: `git -C <the run's clone> push origin <the branch>`.
+
+### "not pushed (push: approved, and the play didn't finish)"
+
+```
+The run's work is on the branch zanni/slug-kata-git/20261025T031756Z, in …/log/20261025T031756Z-stage, not pushed (push: approved, and the play didn't finish). To publish it: git -C …/log/20261025T031756Z-stage push origin zanni/slug-kata-git/20261025T031756Z
+```
+
+Not an error. With `push: approved`, the default, the remote gets only work that passed an approved gate, or a finished play. Run the printed command to publish the rest, or set `push: always` in the play's `stage` to push at the end of every run ([stage spec](spec/stage.md#pushing)).
+
+### "couldn't reach the stage's server"
+
+```
+plays/release-notes/play.yaml: couldn't reach the stage's server at http://127.0.0.1:8800/mcp: couldn't connect to the stage at http://127.0.0.1:8800/mcp: ConnectError: All connection attempts failed; nothing was started.
+plays/release-notes/play.yaml: couldn't reach the stage's server at http://127.0.0.1:8800/mcp: couldn't connect to the stage at http://127.0.0.1:8800/mcp: the server refused the token (HTTP 401); nothing was started.
+```
+
+- **"All connection attempts failed":** nothing answers at the play's `stage.url`. Start the stage server first, or fix the address.
+- **"refused the token":** the director's `ZANNI_STAGE_TOKEN` isn't the server's. Give both the same value.
+
+### "ZANNI_STAGE_TOKEN isn't in the director configuration's `credentials`"
+
+```
+plays/release-notes/play.yaml: this play's stage is an mcp server, and ZANNI_STAGE_TOKEN isn't in the director configuration's `credentials` (or has no value); add ZANNI_STAGE_TOKEN: ${ZANNI_STAGE_TOKEN}, with the server's token in the environment (D47); nothing was started.
+```
+
+Only the director presents the stage server's token; the play file never holds it. Set it in the environment where you start the director.
+
+### "Paused: the stage's server … isn't answering"
+
+```
+  report from editor-1 on r1-c2: failed, cost $0.000206
+Paused: the stage's server at http://127.0.0.1:49174/mcp isn't answering: couldn't connect to the stage at http://127.0.0.1:49174/mcp: ConnectError: All connection attempts failed. Resume with: zanni gate <play> resume
+Resumed.
+```
+
+The stage server stopped answering during the play. The director retried, then paused the play; the cue that met it ended as `failed`. Start the server again, on the same address and storage, then run `zanni gate <play> resume`. The director goes on from where it was. Unanswered, the pause ends the play after `gate_timeout`, if one is set.
+
+### "Refused: not-authorised", from a verifier seat
+
+```
+Refused: not-authorised: a verifier seat joins with the play's verifier token (ZANNI_VERIFIER_TOKEN), never with the join token
+```
+
+A verifier seat presents `ZANNI_VERIFIER_TOKEN`, the director's own, never the join token: the director trusts a verifier seat's exit codes, so actors can't take its place (D45). Its name must also be listed under `verifier_seats` in the director's configuration.
+
+### "the verifier seat … isn't connected"
+
+```
+  verifier notes-structure: FAILED (on checker-remote)
+```
+
+The play's log gives the reason, in the `verdict` event's `detail`: "the verifier seat checker-remote isn't connected, so notes-structure couldn't run". The verifier `runs_on` a verifier seat that isn't cast now. At the start, the director waits for it within `cast_timeout`. If it's lost later, the verifier fails until the seat joins again: restart it, with its verifier token.
 
 ## Role folders
 

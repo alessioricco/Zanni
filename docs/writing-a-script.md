@@ -2,7 +2,7 @@
 
 A script is the reusable work: what must be achieved, which parts are needed, the workspace it expects, and how the work unfolds. You write it once, and any number of plays can perform it with their own actors, director and stage, the way one theatre script is staged by many companies.
 
-> **Status:** `zanni` validates scripts, and runs them: `zanni play.yaml` starts a director that follows a play's script (milestone 4).
+> **Status:** `zanni` validates scripts, and runs them: `zanni play.yaml` starts a director that follows a play's script, on a folder, git or MCP stage.
 
 ## The shape
 
@@ -45,7 +45,7 @@ The **editor** merges the drafts into `final/article.md`, dropping unsupported c
 **Gate: publish.** A human approves before anything is published.
 ```
 
-Three complete examples are in the repository: `examples/scripts/slug-kata/` (small, and runnable: [getting started](getting-started.md#running-a-play)), `examples/scripts/software-team/` and `examples/scripts/newsroom/`.
+Four complete examples are in the repository: `examples/scripts/slug-kata/` and `examples/scripts/release-notes/` (small, and runnable: [getting started](getting-started.md#running-a-play)), `examples/scripts/software-team/` and `examples/scripts/newsroom/`.
 
 ## 1. Name the parts
 
@@ -53,18 +53,28 @@ Three complete examples are in the repository: `examples/scripts/slug-kata/` (sm
 
 - **`seats`:** how many actors may hold it, such as `1-3`. A play can narrow the range but not widen it.
 - **`writes` and `reads`:** the most this part may touch on the stage. They are ceilings: a seat gets what its role asks for, within them, and the stage enforces it. Leave them out to set no ceiling.
+
+  Writes are shared: what a seat writes is on the stage for every seat at once, and when two seats may write the same file, the last write wins (D44). So give parts that work at the same time paths of their own, such as `drafts/<angle>.md` per reporter, or say in the prose who writes a shared file, and when.
 - **`suggested`:** a role a play may cast, such as `github.com/zanni-roles/editor@0.1.0`. A play may cast another.
 - **`optional: true`:** a play may leave this part uncast.
 - **`description`:** a sentence for whoever casts the part.
 
 ## 2. Say what the workspace must hold
 
-`stage.expects` lists what must be on the stage before the play starts, such as `vision.md` or `brief.md`. The script never says what kind of stage it is: a play picks a git repository or a folder.
+`stage.expects` lists what must be on the stage before the play starts, such as `vision.md` or `brief.md`. The script never says what kind of stage it is: a play picks a folder, a git repository, or a stage server. Stage files are text.
 
 ## 3. Mark the gates, the verifiers and the stop rules
 
-- **`gates`:** names the moments a human must approve, such as `plan`, `release` or `publish`. Mark each one in the prose where it happens. A play may enforce any of them, and no others.
-- **`verifiers`:** the checks the director runs on the stage, by name, each with a `description` and, usually, a default `command`. A verifier passes when its command exits 0, run in the stage folder. A play gives its own command when its project needs another, such as `npm test` instead of `pytest`.
+- **`gates`:** names the moments a human must approve, such as `plan`, `release` or `publish`. Mark each one in the prose where it happens. A play may enforce any of them, and no others. A gate is a name, or `{ name, every, before }` (D48):
+  - **`every: round`** asks the gate again each round: an approval counts only in the round it was given, and the round can't end without it. The default, `every: play`, asks it once.
+  - **`before: [parts]`** holds back cues to those parts until the gate is approved, so the code can't start before the plan is.
+
+  ```yaml
+  gates:
+    - { name: plan, every: round, before: [coder] }   # the slug kata: the plan is approved each round, before coding
+    - publish                                          # once per play
+  ```
+- **`verifiers`:** the checks the director runs on the stage, by name, each with a `description` and, usually, a default `command`. A verifier passes when its command exits 0, run in a fresh snapshot of the stage, so it can't change the work it checks (D45). A play gives its own command when its project needs another, such as `npm test` instead of `pytest`.
 
   ```yaml
   verifiers:
@@ -107,7 +117,7 @@ Script: 'newsroom' 0.1.0.
     editor: 1 seat; writes brief.md, final/
     reporter: 1-3 seats; writes drafts/, sources/
     fact-checker: 1 seat; writes checks/
-  gates: publish
+  gates: publish (once)
   stop rules: none in the frontmatter
 Valid.
 ```

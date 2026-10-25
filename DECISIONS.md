@@ -750,7 +750,7 @@ The loop is about 25 lines.
 5. **Authentication:** git's own on the director's machine, with `GIT_TERMINAL_PROMPT=0` and SSH `BatchMode`. Zanni stores no git credential. Seats never touch git.
 6. **What the stage shows:** paths under `.git/` are `invalid-path`; binary files are listed, and refused on `read` with `not-text`; a path `.gitignore` ignores is refused on write, as it would never be committed.
 
-**Why:** Alessio's call at milestone 5's ask point D, after D44. A run's work is reviewable as one branch, with git's own history of who wrote what, and no actor holds repository credentials (D15). Whether a run that didn't finish should be pushed by default is for the recorded runs to show; Alessio decides the default from them.
+**Why:** Alessio's call at milestone 5's ask point D, after D44. A run's work is reviewable as one branch, with git's own history of who wrote what, and no actor holds repository credentials (D15). Whether a run that didn't finish should be pushed by default was left to the recorded runs. In them, a run stopped by hand after its first gate left 2 of its 4 commits on the remote under `approved` (the tests approved at the gate, not the coders' unreviewed code) and all 4 under `always` (docs/runs/milestone-5.md). Alessio kept `approved` as the default (2026-10-25): a remote gets only work that passed a gate or a finished play, and the rest is one printed command away.
 
 **Considered and set aside:** committing to `branch`; one commit per cue (a seat lost mid-cue would leave its writes uncommitted); actors pushing themselves; opening pull requests (ties Zanni to one forge); hiding binary files.
 

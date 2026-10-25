@@ -14,17 +14,18 @@ The full design is in the vision doc ("Zanni: vision"). Decisions and their reas
 
 ## Current state
 
-Milestones 1 (the spec), 2 (the engine adapter), 3 (the actor over A2A) and 4 (the director and casting) are done. An actor runs its role on its models, with fallback, and joins a director over A2A. `zanni play.yaml` starts a director: an agent whose tools check the play's rules in code (D33). It fetches and pins the play's packages (`play.lock`), starts local seats and accepts actors joining, follows the script, runs its verifiers, enforces the budget and gates (decided with `zanni gate`), and recasts a lost seat. Recorded runs: `docs/runs/milestone-2.md`, `docs/runs/milestone-3.md`, `docs/runs/milestone-4.md`. Next is milestone 5: stage backends (git). The PyPI package is still the 0.0.1 placeholder. Don't assume a module, command or file exists; check.
+Milestones 1 (the spec), 2 (the engine adapter), 3 (the actor over A2A), 4 (the director and casting) and 5 (stage backends) are done. An actor runs its role on its models, with fallback, and joins a director over A2A. `zanni play.yaml` starts a director: an agent whose tools check the play's rules in code (D33). It fetches and pins the play's packages (`play.lock`), starts local seats and accepts actors joining, follows the script, runs its verifiers, enforces the budget and gates (decided with `zanni gate`), and recasts a lost seat. A play's stage is a folder, a git repository (a branch per run, a commit per write, pushed at approved gates) or any MCP stage server, with permissions enforced in one layer above every backend (D43); verifiers run on a snapshot, or on verifier seats (D45). Recorded runs: `docs/runs/milestone-2.md` to `docs/runs/milestone-5.md`. Next is milestone 6: the software script, with a coding engine. The PyPI package is still the 0.0.1 placeholder. Don't assume a module, command or file exists; check.
 
 - `src/zanni/cli.py`: the `zanni` command. It detects the kind of file or folder, validates it and prints what it would run (D9).
 - `src/zanni/files/`: the loader (YAML and Markdown frontmatter, with line numbers), the plain-words errors (D10), the schemas for every format, and `check.py` (role folders, a play against its script and lockfile, credential safeguards).
-- `src/zanni/actor/`: running an actor (roles, credential resolution, the folder stage, joining a director, rehearsals), with no engine imports.
-- `src/zanni/director/`: the director, with no engine imports: the casting side (joins, seats, cues, heartbeats, release), serving rehearsals, and running a play (`command.py`, `play.py` with its tools, `rules.py`, `state.py`, gates and the owner's endpoint, verifiers, local seats, packages and `play.lock`). The director's own role is in `role/`.
+- `src/zanni/actor/`: running an actor (roles, credential resolution, joining a director, rehearsals, the built-in verifier seat), with no engine imports.
+- `src/zanni/stage/`: the stage's permission layer and record (`layer.py`), and the `folder` and `git` backends, with no engine imports. The `mcp` backend's client is in `src/zanni/engine/stage_backend.py`.
+- `src/zanni/director/`: the director, with no engine imports: the casting side (joins, seats, cues, heartbeats, release), serving rehearsals, and running a play (`command.py`, `play.py` with its tools, `rules.py`, `state.py`, gates and the owner's endpoint, local seats, packages and `play.lock`). Verifier commands run through `src/zanni/commands.py`. The director's own role is in `role/`.
 - `src/zanni/fetch.py`: fetching remote roles and scripts with git into `~/.zanni/packages` (D37). `src/zanni/gate.py`: `zanni gate`.
 - `src/zanni/engine/`: the engine adapter, the only place that may import Pydantic AI, `mcp` or `a2a-sdk` (enforced by `tests/test_engine_guard.py`).
 - `src/zanni/protocol/`: the casting messages as Pydantic models (no `a2a-sdk` import), and the generator of `docs/spec/schemas/`.
 - `docs/spec/`: the spec. `tests/conformance/`: the conformance suite, which can run against any implementation (`ZANNI_CMD` for files, `ZANNI_PROTOCOL_DIR` for messages).
-- `examples/`: actor configurations, three plays, three scripts and three role folders, all valid. `examples/plays/slug-kata/` is a whole play that runs (D40).
+- `examples/`: actor configurations, five plays, four scripts, five role folders and a stage server, all valid. Three plays run whole: `examples/plays/slug-kata/` (D40), `slug-kata-git/` on a git stage, and `release-notes/` on the example SQLite stage server, `examples/stage-servers/sqlite/` (D51).
 
 ## Vocabulary
 
@@ -85,6 +86,7 @@ uv run zanni --check examples/plays/habit-tracker/play.yaml   # validate a file 
 uv run zanni --check examples/slug-tester.yaml        # validate only, never run
 uv run zanni examples/slug-tester.yaml                # run the smoke rehearsal (needs a model; see docs/models-and-keys.md)
 uv run zanni <copy of examples>/plays/slug-kata/play.yaml  # run a whole play (needs models and two tokens; see docs/getting-started.md)
+uv run zanni <copy of examples>/plays/slug-kata-git/play.yaml  # the same on a git stage, after python3 make-remote.py there
 uv run zanni gate <play.yaml> approve --note "…"            # decide a play's gate, with ZANNI_OWNER_TOKEN set
 uv build                # sdist and wheel into dist/
 ```
