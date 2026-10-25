@@ -267,7 +267,8 @@ class Production:
         self._end_turn = True
 
     def turn_should_end(self) -> bool:
-        return self._end_turn
+        """After a long wait (D49), or once an mcp stage stops answering: the play then pauses (D47)."""
+        return self._end_turn or bool(getattr(self.stage.backend, "down", None))
 
     def take_reports(self) -> str:
         """The reports the model hasn't seen yet, marked as data."""

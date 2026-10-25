@@ -6,7 +6,7 @@ from decimal import Decimal
 from pydantic_ai import Agent
 from pydantic_ai.models import Model
 
-from zanni.actor.contract import AllModelsFailed, CueResult, CueTask, Fallback, ResolvedModel
+from zanni.actor.contract import AllModelsFailed, CueResult, CueTask, Fallback, ResolvedModel, StageError, StageUnavailable
 from zanni.engine.fallback import UnusableReply, classify
 from zanni.engine.mcp import mcp_toolsets
 from zanni.engine.models import build_model
@@ -50,6 +50,13 @@ async def run_cue(task: CueTask, *, build: Callable[[ResolvedModel], Model] = bu
             if not over and rm.entry.tool_format == "text" and BLOCK.search(output):
                 # The model's last reply still holds a tool block it never got right: that is a failed answer.
                 raise UnusableReply("the model's last reply still held a tool block it couldn't write correctly")
+        except StageError as exc:
+            if exc.code != "unavailable":
+                raise
+            if usage is not None and usage.requests:
+                cost = cost_of(usage, rm)[0]
+                spent = None if cost is None else spent + cost
+            raise StageUnavailable(f"the stage stopped answering: {exc}", spent) from exc
         except Exception as exc:
             reason = classify(exc)
             if reason is None:

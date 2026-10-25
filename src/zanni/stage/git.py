@@ -43,8 +43,10 @@ def run_git(*args: str, cwd: Path | None = None, author: str | None = None,
 
 def failure(result: subprocess.CompletedProcess) -> str:
     err = result.stderr if isinstance(result.stderr, str) else result.stderr.decode(errors="replace")
-    lines = [ln for ln in err.strip().splitlines() if ln.strip()]
-    return lines[-1] if lines else f"git exited with {result.returncode}"
+    lines = [ln.strip() for ln in err.strip().splitlines() if ln.strip()]
+    # git's first fatal or error line says what failed; the lines after it are advice ("…and the repository exists.")
+    said = next((ln for ln in lines if ln.startswith(("fatal:", "error:"))), lines[-1] if lines else None)
+    return said.removeprefix("fatal: ").removeprefix("error: ") if said else f"git exited with {result.returncode}"
 
 
 class CannotClone(Exception):

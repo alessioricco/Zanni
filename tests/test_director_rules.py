@@ -130,6 +130,9 @@ def test_a_cues_paths_stay_within_its_seat():
     assert rules.paths_within(["spec/"], ["tests/"], reads=["spec/a.md", "tests/"], writes=["tests/test_a.py"]) is None
     assert "may not write app/x.py" in rules.paths_within(["spec/"], ["tests/"], reads=[], writes=["app/x.py"])
     assert "may not read vision.md" in rules.paths_within(["spec/"], ["tests/"], reads=["vision.md"], writes=[])
+    # a path both read and written is listed once (milestone 5's runs showed "tests/, tests/, tests/")
+    assert rules.paths_within(["spec/", "tests/"], ["tests/"], reads=["vision.md"], writes=[]).endswith(
+        "it may read: spec/, tests/")
 
 
 def test_the_stage_must_hold_what_the_script_expects(tmp_path):

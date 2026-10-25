@@ -4,7 +4,10 @@ that fails without stopping the play, and a repository that can't be cloned. Rem
 tmp_path; nothing touches the network."""
 
 import json
+import signal
 import subprocess
+
+import pytest
 
 import yaml
 
@@ -104,6 +107,29 @@ def test_a_push_that_fails_is_logged_and_the_play_goes_on(tmp_path):
     assert code == 0, out + err
     pushes = [e for e in log_of(folder) if e["event"] == "push"]
     assert [p["ok"] for p in pushes] == [False, False] and "couldn't push" in out and "the work stays in" in out
+    assert "gone.git' does not appear to be a git repository" in pushes[0]["detail"]  # what failed, not git's advice
+
+
+@pytest.mark.parametrize("push", ["approved", "always"])
+def test_a_run_stopped_by_hand_is_published_as_push_says(tmp_path, push):
+    with fake_openai() as (url, _, scripts):
+        scripts["director"] = list(DIRECTOR_DONE)
+        folder = play_folder(tmp_path, url)
+        bare = on_git(folder, tmp_path, push)
+        proc = subprocess.Popen([PY, "-m", "zanni", str(folder / "play.yaml")], stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE, text=True, env=env(tmp_path), stdin=subprocess.DEVNULL)
+        try:
+            wait_until(lambda: "waiting at a gate" in zanni("gate", folder / "play.yaml", tmp_path=tmp_path).stdout, 90)
+            proc.send_signal(signal.SIGINT)  # stopped by hand, at the gate: an unfinished run
+            out, err = proc.communicate(timeout=60)
+        finally:
+            proc.kill()
+    assert proc.returncode == 1, out + err
+    pushes = [e["detail"] for e in log_of(folder) if e["event"] == "push"]
+    if push == "always":
+        assert len(pushes) == 1 and "the end of the run" in pushes[0] and len(branches(bare)) == 2
+    else:
+        assert pushes == [] and branches(bare) == ["main"] and "To publish it: git -C" in out
 
 
 def test_a_repository_that_cant_be_cloned_starts_nothing(tmp_path):

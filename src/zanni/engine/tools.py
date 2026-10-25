@@ -23,7 +23,9 @@ def stage_toolset(stage: Stage) -> FunctionToolset:
     `stage` is a seat's view on the director's side, or a RemoteStage over MCP: the tools are the same.
     """
 
-    def refuse(e: StageError) -> ModelRetry:
+    def refuse(e: StageError) -> Exception:
+        if e.code == "unavailable":  # the model can't fix a stage that went away: the cue ends (D47)
+            return e
         return ModelRetry(f"{e.code}: {e}")
 
     async def done(value):

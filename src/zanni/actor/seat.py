@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from zanni import __version__
-from zanni.actor.contract import AllModelsFailed, CueTask, McpServerSpec, ResolvedModel
+from zanni.actor.contract import AllModelsFailed, CueTask, McpServerSpec, ResolvedModel, StageError, StageUnavailable
 from zanni.actor.roles import Role
 from decimal import Decimal
 
@@ -187,24 +187,36 @@ async def _play(client, task_id, cast, stage, role, models, servers, log, say, r
 async def _answer(cue: Cue, stage, role: Role, models, servers, seat: str, log: Log, say, runner) -> Report:
     say(f"  cue {cue.cue}: {cue.scene}")
     log.event("cue", seat=seat, scene=cue.scene, cue=cue.cue)
-    start = (await stage.changes())[1]
+    async def marker() -> str | None:
+        try:
+            return (await stage.changes())[1]
+        except StageError as e:
+            if e.code != "unavailable":
+                raise
+            return None
+
+    start = await marker()
     budget = Decimal(cue.limits.budget.amount) if cue.limits.budget else None
     task = CueTask(instructions=role.instructions, skills=role.skills, prompt=cue_prompt(cue), stage=stage,
                    models=models, mcp_servers=servers, needs_tools=role.manifest.model.needs.tools, budget=budget)
     try:
+        if start is None:
+            raise StageUnavailable("the stage isn't answering")
         result, failure = await runner(task), None
-    except AllModelsFailed as e:
+    except (AllModelsFailed, StageUnavailable) as e:
         result, failure = None, e
-    attempts = result.fallbacks if result else failure.fallbacks
+    attempts = result.fallbacks if result else getattr(failure, "fallbacks", [])
     for f in attempts:
         log.event("fallback", seat=seat, model=f.model, reason=f.reason, detail=f.detail)
         say(f"    {f.model} failed ({f.reason}); {'trying the next model' if result or f is not attempts[-1] else 'no model left'}")
-    after = (await stage.changes())[1]
-    changes = [str(i) for i in range(int(start) + 1, int(after) + 1)]  # one marker per change since the cue began
+    after = await marker() if start is not None else None
+    # one marker per change since the cue began; none known while the stage is away (the director's record has them)
+    changes = [str(i) for i in range(int(start) + 1, int(after) + 1)] if after is not None else []
     outcome = ("over-budget" if result.over_budget else "done") if result else "failed"
+    spent = result.cost if result else (failure.cost if isinstance(failure, StageUnavailable) else None)
     report = Report(kind="zanni.report", cue=cue.cue, outcome=outcome,
                     summary=result.output if result else str(failure), changes=changes,
-                    cost=money(result.cost) if result and result.cost is not None else None,
+                    cost=money(spent) if spent is not None else None,
                     models=[{"provider": result.provider, "model": result.model_name}] if result else [])
     log.event("report", seat=seat, cue=cue.cue, outcome=report.outcome, summary=report.summary, changes=changes)
     log.event("cost", seat=seat, model=result.model if result else None, amount=report.cost.amount if report.cost else None,
@@ -214,6 +226,8 @@ async def _answer(cue: Cue, stage, role: Role, models, servers, seat: str, log: 
         say(f"    {'stopped at its budget' if result.over_budget else 'done'} on {result.model}: "
             f"{len(result.tool_calls)} tool calls, "
             f"{result.input_tokens} in / {result.output_tokens} out tokens, cost {cost}")
+    elif isinstance(failure, StageUnavailable):
+        say(f"    failed: {failure}")
     else:
         say("    failed: every model failed")
     return report

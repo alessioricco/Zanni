@@ -190,3 +190,53 @@ def test_the_actor_is_done_when_released_even_if_the_director_stops_at_once(setu
 
     outcome = asyncio.run(go())
     assert outcome.exit_code == 0 and outcome.reason == "done"
+
+
+class AwayStage:
+    """A stage that answers `changes` until it goes away, then answers nothing (D47)."""
+
+    def __init__(self, away_after: int):
+        self.calls = away_after
+
+    async def changes(self, since=None):
+        return await self._maybe(([], "3"))
+
+    async def read(self, path):
+        return await self._maybe("text")
+
+    async def _maybe(self, value):
+        from zanni.actor.contract import StageError
+
+        self.calls -= 1
+        if self.calls < 0:
+            raise StageError("unavailable", "the stage's server isn't answering")
+        return value
+
+
+def test_a_stage_that_goes_away_mid_cue_ends_the_cue_as_failed_not_as_a_crash(setup, tmp_path):
+    from zanni.actor.seat import _answer
+    from zanni.log import Log
+    from zanni.protocol.messages import Cue
+
+    _, _, role, _, _, models = setup
+    asked = []
+
+    def respond(messages, info):
+        asked.append(len(messages))
+        return ModelResponse(parts=[ToolCallPart("stage_read", {"path": "vision.md"})])
+
+    model = FunctionModel(respond, model_name="scripted")
+    cue = Cue(kind="zanni.cue", cue="c-1", scene="Specify", instructions="Read vision.md.")
+    lines: list[str] = []
+    report = asyncio.run(_answer(cue, AwayStage(away_after=1), role, models, [], "tester-1",
+                                 Log(tmp_path / "actor.jsonl", "r1"), lines.append,
+                                 lambda t: run_cue(t, build=lambda rm: model)))
+    assert report.outcome == "failed" and "the stage stopped answering" in report.summary
+    assert len(asked) == 1  # the model isn't asked to retry a stage that went away, and no fallback is tried
+    assert report.changes == [] and report.cost is not None  # what it spent still counts, so a budget can't drop it
+    assert any("failed: the stage stopped answering" in line for line in lines)
+
+    gone = asyncio.run(_answer(cue, AwayStage(away_after=0), role, models, [], "tester-1",
+                               Log(tmp_path / "actor.jsonl", "r1"), lines.append,
+                               lambda t: run_cue(t, build=lambda rm: model)))
+    assert gone.outcome == "failed" and "isn't answering" in gone.summary and len(asked) == 1  # no model call at all

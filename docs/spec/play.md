@@ -63,7 +63,7 @@ A cast entry is either a package reference (shorthand for `{ role: … }`) or:
 | `gate_timeout` | duration: whole seconds, or a number with `s`, `m` or `h`, such as `30m` | no | none: a gate waits | the director | How long a gate, or a pause, may wait for a person. When it passes, the run stops with reason `gate` (or `paused`) (D38). |
 | `max_director_turns` | whole number, at least 1 | no | `30` | the director | The most model turns the director takes in one round. When it is reached, the round ends; if the round's work isn't verified, the run stops with reason `director-turns` (D33). |
 | `requests_per_turn` | whole number, at least 1 | no | `25` | the director | The most model requests in one director turn (D49). |
-| `cast_timeout` | duration, as `gate_timeout` | no | `10m` | the director | How long a part below its minimum seats, with no local seat left to start, waits for an actor to join, at the start or after losing a seat. When it passes, the run stops with reason `uncastable` (D50). |
+| `cast_timeout` | duration, as `gate_timeout` | no | `10m` | the director | How long a part below its minimum seats, with no local seat left to start, waits for an actor to join, at the start or after losing a seat; and how long the start waits for each verifier seat a verifier `runs_on`. When it passes, the run stops with reason `uncastable` (D50). |
 
 **Not in the first version:** risk tiers (read, spend, external action, irreversible). The vision keeps high-risk scripts out of the first version.
 
@@ -145,7 +145,7 @@ It is recognised by having `lock_version`.
 3. **The checks:** the play is checked against its script, as `--check` does.
 4. **The stage:** a folder stage must exist; a git stage is cloned into the run's folder, on a new branch (D46); an `mcp` stage's server must answer with the director's token (D47). Then the stage must hold the script's `stage.expects`.
 5. **Serving:** the director serves its A2A card and its stage's MCP server on one address (`--listen host:port`, default `127.0.0.1` on a free port), and writes `log/director.json` with that address and the run's id, never a token, so `zanni gate` can find it. It removes the file when the run ends.
-6. **Casting:** it starts the local seats and local verifier seats its configuration lists, and accepts actors joining with the join token, and remote verifier seats with the verifier token. Before its first turn, every part has at least its minimum seats, within `cast_timeout`. A local seat the director released can be started again by a later `cast`. A local seat refused at join isn't restarted (D50).
+6. **Casting:** it starts the local seats and local verifier seats its configuration lists, and accepts actors joining with the join token, and remote verifier seats with the verifier token. Before its first turn, every part has at least its minimum seats, and every verifier seat a verifier `runs_on` has joined, within `cast_timeout`. A local seat the director released can be started again by a later `cast`. A local seat refused at join isn't restarted (D50).
 7. **The script:** the director's turns follow the script, through its tools ([Script: how the director follows a script](script.md#how-the-director-follows-a-script)).
 8. **The end:** every seat is released, local seats are stopped, and the command exits with:
    - 0 when the director stopped the play as `done`, and the rules accepted it;

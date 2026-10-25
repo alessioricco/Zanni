@@ -761,7 +761,7 @@ The loop is about 25 lines.
 **Decision:** a stage may be any MCP server, reached over Streamable HTTP, that offers the five stage operations as tools, `stage_read`, `stage_write`, `stage_list`, `stage_delete` and `stage_changes`: the same contract the director serves to its seats (D31). The play names it with `stage: { backend: mcp, url }`. The director connects with its own token, `ZANNI_STAGE_TOKEN` in its configuration's `credentials`, sent as a bearer token; seats never see it, and reach the stage only through the director, as on every backend.
 
 - **Who wrote what:** `stage_write` and `stage_delete` take optional `author` and `note` arguments; a server may record them, or ignore them.
-- **Unreachable:** an operation that gets `unavailable` is retried briefly. If the server stays away, the play pauses as when every director model fails (D33), until the owner resumes it with `zanni gate … resume`.
+- **Unreachable:** an operation that gets `unavailable` is retried briefly. If the server stays away, the play pauses as when every director model fails (D33), until the owner resumes it with `zanni gate … resume`. The director's turn ends at once, whether its own call or a seat's found the server away. A cue that meets `unavailable` ends as `failed`, with what it spent, without a retry or a fallback: no model can bring a server back, and an actor that crashed would be recast into the same outage (found by the milestone 5 runs).
 - **The example:** `examples/stage-servers/sqlite/`, a small stage server keeping documents in SQLite.
 
 **Why:** Alessio's call at milestone 5's ask point E. It makes the stage's contract the extension point: a wiki, a ticket system or a bucket can be a stage, in any language, with no change to Zanni, and it reuses MCP (golden rule 3).
@@ -793,7 +793,7 @@ The loop is about 25 lines.
 **Decision:**
 
 - **No restart after a refusal:** a local seat that exits with code 2 (refused at join, or couldn't start) isn't restarted. Crashes are still restarted twice (D36).
-- **`cast_timeout`:** a house rule, default 10 minutes. A part below its minimum seats, with no local seat left to start, waits that long for an actor to join; then the run stops with reason `uncastable`. It also bounds how long a lost seat's part waits to be recast, replacing a fixed 180 s.
+- **`cast_timeout`:** a house rule, default 10 minutes. A part below its minimum seats, with no local seat left to start, waits that long for an actor to join; then the run stops with reason `uncastable`. It also bounds how long a lost seat's part waits to be recast, replacing a fixed 180 s. The start also waits, within it, for every verifier seat a verifier `runs_on`: a play whose verifier seat never joined would otherwise run with verdicts that can't pass (found by the milestone 5 runs, where a remote verifier seat started late).
 
 **Why:** Alessio's call at milestone 5's ask point H. In milestone 4's recorded runs, a seat refused as `unpriced` was restarted twice for nothing, and its part waited until the run was stopped by hand.
 

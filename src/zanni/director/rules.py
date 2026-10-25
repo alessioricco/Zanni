@@ -56,7 +56,8 @@ def paths_within(seat_read: list[str], seat_write: list[str], reads: list[str], 
     for kind, wanted, rules in (("write", writes, seat_write), ("read", reads, seat_read + seat_write)):
         outside = [p for p in wanted if not within(p, rules)]
         if outside:
-            return f"this seat may not {kind} {', '.join(outside)}; it may {kind}: {', '.join(rules) or 'nothing'}"
+            listed = ", ".join(dict.fromkeys(rules)) or "nothing"  # a path may come from both its reads and writes
+            return f"this seat may not {kind} {', '.join(outside)}; it may {kind}: {listed}"
     return None
 
 

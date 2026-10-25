@@ -93,3 +93,12 @@ class AllModelsFailed(Exception):
         self.cost = cost  # what the failed attempts spent before failing; None when unknown (D7)
         self.input_tokens, self.output_tokens = input_tokens, output_tokens
         super().__init__("; ".join(f"{f.model}: {f.reason} ({f.detail})" for f in fallbacks))
+
+
+class StageUnavailable(Exception):
+    """The stage stopped answering during a cue. No model can fix that, so the cue ends as failed, not as a crash or
+    a fallback; the director pauses the play until the stage is back (D47)."""
+
+    def __init__(self, detail: str, cost: Decimal | None = Decimal(0)):
+        self.cost = cost  # what the cue spent before the stage went away; None when unknown (D7)
+        super().__init__(detail)

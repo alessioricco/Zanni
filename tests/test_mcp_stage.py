@@ -103,7 +103,8 @@ def test_the_play_pauses_when_the_server_goes_away_and_resumes_when_its_back(tmp
         p = production(tmp_path, play, script, stage_folder)
         p.stage = p.casting.stage = Stage(backend)
         p.view = p.stage.seat(["/"], [])
-        steps = Steps([[("read", {"path": "backlog/round-1.md"})], "the server is gone; ending this turn",
+        # the turn ends right after the read that found the server gone: no model request follows it
+        steps = Steps([[("read", {"path": "backlog/round-1.md"})],
                        [("read", {"path": "backlog/round-1.md"})], [("stop", {"reason": "checked"})], "ok"])
 
         async def owner():
@@ -120,8 +121,9 @@ def test_the_play_pauses_when_the_server_goes_away_and_resumes_when_its_back(tmp
 
     (reason, completed), seen, p = asyncio.run(go())
     assert (reason, completed) == ("checked", False)
-    assert seen[0].startswith("read: unavailable") and seen[1].startswith("read: ")
-    assert "unavailable" not in seen[1]
+    # the read that found the server gone ended turn 1 at once; turn 2, after the resume, reads it
+    assert seen[0].startswith("read: # Round 1") and not any("unavailable" in s for s in seen)
+    assert p.state.turns == 2
     events = [json.loads(line)["event"] for line in (tmp_path / "log.jsonl").read_text().splitlines()]
     assert events.index("stage-unavailable") < events.index("paused") < events.index("resumed")
 
@@ -192,3 +194,12 @@ def test_a_strict_server_that_rejects_author_and_note_gets_writes_without_them()
     assert backend.labels is False and backend._remote.calls == [
         ("stage_write", ["author", "content", "note", "path"]), ("stage_write", ["content", "path"]),
         ("stage_write", ["content", "path"])]
+
+
+def test_the_directors_turn_ends_once_a_seats_call_finds_the_server_down(tmp_path):
+    play, script, stage_folder = kata(tmp_path, gates=())
+    p = production(tmp_path, play, script, stage_folder)
+    p.stage.backend.down = None
+    assert not p.turn_should_end()
+    p.stage.backend.down = "the stage's server at http://127.0.0.1:9/mcp isn't answering"  # set by any seat's call
+    assert p.turn_should_end()  # so the play pauses before the model's next request, not after a long wait

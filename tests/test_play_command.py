@@ -302,7 +302,30 @@ def test_a_part_nobody_can_take_stops_the_play_at_the_cast_timeout(tmp_path):
         (folder / "coder-1.yaml").write_text(yaml.safe_dump(coder))
         result = zanni(folder / "play.yaml", tmp_path=tmp_path)
         assert "director" not in calls  # the director never took a turn
-    assert result.returncode == 1 and "within the cast_timeout (3 s)" in result.stdout
+    missing = next(line for line in result.stdout.splitlines() if line.startswith("Still missing after the cast_timeout"))
+    assert result.returncode == 1 and "(3 s): " in missing and "coder" in missing  # the tester too, on a slow machine
     log = [json.loads(line) for line in next((folder / "log").glob("*.jsonl")).read_text().splitlines()]
     assert log[-1]["reason"] == "uncastable"
     assert [e["seat"] for e in log if e["event"] == "seat-started"].count("coder-1") == 1
+
+
+def test_the_play_waits_for_the_verifier_seat_its_verifier_runs_on(tmp_path):
+    """Milestone 5's two-machine run: a remote verifier seat that never joined let the play start with verdicts that
+    couldn't pass. The start now waits for it within cast_timeout, then stops as uncastable."""
+    with fake_openai() as (url, calls, _):
+        folder = play_folder(tmp_path, url)
+        play = yaml.safe_load((folder / "play.yaml").read_text())
+        play["verifiers"] = {"tests-pass": {"runs_on": "ci-box"}}
+        play["house_rules"] = {**(play.get("house_rules") or {}), "cast_timeout": 15}  # the local seats join first
+        (folder / "play.yaml").write_text(yaml.safe_dump(play))
+        director = yaml.safe_load((folder / "director.yaml").read_text())
+        director["verifier_seats"] = {"remote": ["ci-box"]}
+        director["credentials"]["ZANNI_VERIFIER_TOKEN"] = "${ZANNI_VERIFIER_TOKEN}"
+        (folder / "director.yaml").write_text(yaml.safe_dump(director))
+        result = zanni(folder / "play.yaml", tmp_path=tmp_path, ZANNI_VERIFIER_TOKEN="verifier-token-fake")
+        assert "director" not in calls  # the director never took a turn
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "Waiting for actors to join: coder, tester, the verifier seat ci-box" in result.stdout
+    assert "Still missing after the cast_timeout (15 s): the verifier seat ci-box;" in result.stdout
+    log = [json.loads(line) for line in next((folder / "log").glob("*.jsonl")).read_text().splitlines()]
+    assert log[-1]["reason"] == "uncastable"
