@@ -187,7 +187,7 @@ What one seat must do now. An actor never receives the whole script.
 | `cue` | text | yes | The cue's id, quoted back in the report. |
 | `scene` | text | yes | The script's scene this cue belongs to. |
 | `instructions` | text | yes | What to do, written by the director from the script. |
-| `reads`, `writes` | lists of paths | no | The stage paths this cue involves, within the seat's permissions. |
+| `reads`, `writes` | lists of paths | no | The stage paths this cue involves, within the seat's permissions. Until the seat reports, it may write only inside `writes`, when the cue names any (D54). |
 | `verifiers` | list of text | no | What will judge the work. |
 | `deadline` | timestamp | no | When the report is due. A missed deadline is treated like a missed heartbeat. |
 | `limits.budget` | money | no | The most this cue may spend. The actor checks its spend after each model response and stops at it, reporting `over-budget` (D39). |

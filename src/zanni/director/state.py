@@ -28,6 +28,7 @@ class Report:
     summary: str
     changes: list[str]
     cost: Decimal | None
+    refused: list[str] = field(default_factory=list)  # writes and deletes the permission layer refused (D52)
 
 
 @dataclass

@@ -177,8 +177,9 @@ class Production:
         cost = Decimal(report.cost.amount) if report.cost else None
         self.state.charge(cost)
         self.state.inbox.append(Report(p.cue.cue, p.seat.id, p.seat.part, p.cue.scene, report.outcome, report.summary,
-                                       report.changes, cost))
-        self.say(f"  report from {p.seat.id} on {p.cue.cue}: {report.outcome}, "
+                                       report.changes, cost, p.seat.refused))
+        refused = f", {len(p.seat.refused)} write(s) refused" if p.seat.refused else ""
+        self.say(f"  report from {p.seat.id} on {p.cue.cue}: {report.outcome}{refused}, "
                  f"cost {'$' + report.cost.amount if report.cost else 'unknown'}")
         if cost is None and self.state.budget is not None:
             if self.local is not None:
@@ -616,7 +617,8 @@ class Production:
 def _report_text(r: Report) -> str:
     cost = "unknown" if r.cost is None else f"${r.cost}"
     changes = ", ".join(r.changes) or "none"
+    refused = f' refused="{"; ".join(r.refused)}"' if r.refused else ""
     # The actor's text is fenced, and its own fence markers are neutralised, so it reads as data (golden rule 5).
     summary = r.summary.replace("</actor-report", "</actor-report-text")
     return (f'<actor-report seat="{r.seat}" part="{r.part}" cue="{r.cue}" scene="{r.scene}" outcome="{r.outcome}" '
-            f'cost="{cost}" changes="{changes}">\n{summary}\n</actor-report>')
+            f'cost="{cost}" changes="{changes}"{refused}>\n{summary}\n</actor-report>')

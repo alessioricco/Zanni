@@ -71,9 +71,11 @@ A role whose `mcp.json` names `zanni:workspace` as a server's `command` gets a w
 
 1. **At the start of each cue,** the actor fills a fresh folder with every stage file the seat may read.
 2. **During the cue,** the role's model works in it, with the workspace's tools: `read_file`, `write_file`, `list_files` and `run`; or a tool the actor brings works in it ([above](#tools-the-actor-brings)).
-3. **At the end of the cue,** before reporting, the actor sends what changed to the stage, as writes and deletes the director checks against the cue's paths. A change outside them is refused, and the director lists the refusals in the report; the stage is unchanged by them.
+3. **At the end of the cue,** before reporting, and only when the cue ends done, the actor sends what changed to the stage, as writes and deletes the director checks against the cue's paths. A change outside them is refused, and the director lists the refusals in the report; the stage is unchanged by them. A cue that fails, or stops at its budget, sends nothing.
 
-- **`run`:** runs a command in the folder, on this machine, within a timeout, and returns its exit code and output. Only commands named in `workspace.commands` may run, such as `[uv, pytest]` or `[npm, node]`; with none listed, `run` refuses every command. What runs on a machine is its owner's decision, not the role's or the director's.
+- **What is sent:** text files only, and none that the `.gitignore` at the workspace's root ignores, such as build output or installed packages: the project's own file decides, as git would. A stage file that isn't text stays on the stage untouched.
+
+- **`run`:** runs a command in the folder, on this machine, within a timeout, and returns its exit code and output. Only commands named in `workspace.commands` may run, by their bare name, such as `[uv, pytest]` or `[npm, node]`; with none listed, `run` refuses every command. What runs on a machine is its owner's decision, not the role's or the director's. The command's environment is the actor's, without any variable whose name looks like a secret, such as `ANTHROPIC_API_KEY` or `ZANNI_JOIN_TOKEN`.
 - **What it decides:** nothing on the director's side. Verifiers decide "done" (D45).
 - **A lost seat:** the work of a cue that never reached its end isn't on the stage; the director resends the cue to the next seat (D36).
 

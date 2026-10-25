@@ -136,13 +136,13 @@ def actor_runner(files: dict[str, str], summary: str = "Done.", cost_per_token=N
     return lambda task: run_cue(task, build=lambda rm: model)
 
 
-async def actor(url, tmp_path, part, runner, *, name=None, models=None, servers=None):
+async def actor(url, tmp_path, part, runner, *, name=None, models=None, servers=None, workspace=None):
     role = load_role(tmp_path / f"roles/{part}")
     config = ActorConfiguration.model_validate({"name": name or f"{part}-actor", "role": f"./roles/{part}",
                                                 "play": url, "models": [{"provider": "ollama", "model": "m"}]})
     return await play_seat(url, config, role, models or [priced("actor")], servers or [], join_token=TOKEN,
                            log_at=lambda play: tmp_path / f"actors/{name or part}.jsonl", run_id="r1",
-                           say=lambda _: None, runner=runner)
+                           say=lambda _: None, runner=runner, workspace=workspace)
 
 
 async def until(condition, timeout=20):

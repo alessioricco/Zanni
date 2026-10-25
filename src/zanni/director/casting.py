@@ -55,6 +55,7 @@ class Seat:
     last_contact: float
     host: str | None = None  # the address it joined from (max_seats_per_host)
     cue_marker: int = 0  # the stage's record length when the pending cue was sent (D41)
+    refused: list[str] = field(default_factory=list)  # the last cue's refused writes and deletes (D52)
     streams: int = 0
     outbox: asyncio.Queue = field(default_factory=asyncio.Queue)
     pending: tuple[Cue | Verify, asyncio.Future] | None = None
@@ -201,8 +202,9 @@ class Director:
         seat.pending, seat.deadline = None, None
         # The seat's own changes, from the stage's record, not the actor's list (D41)
         report = report.model_copy(update={"changes": self.stage.made_by(seat.id, seat.cue_marker)})
+        seat.refused = seat.stage.end_cue()  # from the permission layer, not the actor (D52)
         self.log.event("report", seat=seat.id, scene=cue.scene, cue=report.cue, outcome=report.outcome,
-                       summary=report.summary, changes=report.changes)
+                       summary=report.summary, changes=report.changes, refused=seat.refused)
         self.log.event("cost", seat=seat.id, model=report.models[0].model if report.models else None,
                        amount=report.cost.amount if report.cost else None)  # self-reported (D7)
         if not answer.done():
@@ -272,7 +274,7 @@ class Director:
         answer = asyncio.get_running_loop().create_future()
         seat.pending = (cue, answer)
         seat.cue_marker = self.stage.marker()
-        seat.stage.note = f"{cue.cue}: {cue.scene}"  # written into the backend's history, such as a commit message
+        seat.stage.start_cue(f"{cue.cue}: {cue.scene}", cue.writes)  # the note goes into the backend's history
         seat.deadline = datetime.fromisoformat(cue.deadline.replace("Z", "+00:00")) if cue.deadline else None
         self.log.event("cue", seat=seat.id, scene=cue.scene, cue=cue.cue,
                        budget=cue.limits.budget.amount if cue.limits.budget else None)

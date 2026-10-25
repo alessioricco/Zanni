@@ -9,7 +9,8 @@ from pathlib import Path
 
 from zanni import __version__
 from zanni.actor.join import ready_actor, state_dir
-from zanni.actor.mcp_config import mcp_servers
+from zanni.actor.mcp_config import mcp_servers, uses_workspace
+from zanni.actor.workspace import Workspace
 from zanni.actor.resolve import Unresolved
 from zanni.actor.seat import play_seat
 from zanni.director.contract import DirectorInfo
@@ -37,7 +38,9 @@ def run_rehearsal(config_path: Path, actor: ActorConfiguration, *, say: Callable
     info = DirectorInfo(name=f"zanni rehearsal {rehearsal.rehearsal}",
                         description=rehearsal.description or f"The rehearsal {rehearsal.rehearsal}",
                         version=__version__, play=f"rehearsal:{rehearsal.rehearsal}", script=str(rehearsal_path))
-    servers = mcp_servers(role.folder, actor.credentials, bindings=actor.tools, needs=role.manifest.needs.tools)
+    folder = run_dir / "workspace" if uses_workspace(role.folder) else None  # D52
+    servers = mcp_servers(role.folder, actor.credentials, bindings=actor.tools, needs=role.manifest.needs.tools,
+                          workspace=folder, commands=actor.workspace.commands)
 
     def quiet(line: str) -> None:  # joining a director on loopback is a detail here, not news
         if not line.startswith(("Joining", "Cast as", "Released")):
@@ -48,6 +51,7 @@ def run_rehearsal(config_path: Path, actor: ActorConfiguration, *, say: Callable
             conducting = asyncio.create_task(conduct(director, rehearsal, rehearsal_path, run_dir,
                                                      role.manifest.name, say))
             seat_outcome = await play_seat(server.url, actor, role, models, servers, join_token=token,
+                                           workspace=Workspace(folder) if folder else None,
                                            log_at=lambda play: run_dir / "actor-log.jsonl", run_id=run_id,
                                            say=quiet, runner=runner)
             if seat_outcome.exit_code == 2:  # refused: the conductor is still waiting for a seat

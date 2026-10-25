@@ -95,6 +95,8 @@ class SeatStage:
         self.write_rules = list(write)
         self.who = who
         self.note: str | None = None  # the cue this seat is working on, written into the backend's history
+        self.cue_writes: list[str] | None = None  # the pending cue's `writes`, narrowing the seat's own (D54)
+        self.refused: list[str] = []  # writes and deletes refused since the cue began, for its report (D52)
 
     def _may(self, rules: list[str], path: str) -> bool:
         return any(covers(rule, path) for rule in rules)
@@ -109,11 +111,34 @@ class SeatStage:
     async def read(self, path: str) -> str:
         return await self.stage.backend.read(self._allow(path, self.read_rules, "read"))
 
+    def _allow_change(self, path: str, verb: str) -> str:
+        """A write or delete: within the seat's permissions and, while a cue names its `writes`, within those too.
+        A refusal is recorded for the cue's report."""
+        try:
+            self._allow(path, self.write_rules, verb)
+            if self.cue_writes is not None and not self._may(self.cue_writes, path):
+                raise StageError("not-permitted", f"this cue may not {verb} {path}; it may {verb}: "
+                                                  f"{', '.join(self.cue_writes) or 'nothing'}")
+        except StageError as e:
+            if e.code == "not-permitted":
+                self.refused.append(f"{verb} {path}")
+            raise
+        return path
+
+    def start_cue(self, note: str, writes: list[str]) -> None:
+        """A cue begins: its note goes into the backend's history; its `writes`, if it names any, narrow the seat's."""
+        self.note, self.cue_writes, self.refused = note, (list(writes) or None), []
+
+    def end_cue(self) -> list[str]:
+        """The cue is answered, or lost: the seat's own permissions apply again. Returns what was refused."""
+        refused, self.cue_writes, self.refused = self.refused, None, []
+        return refused
+
     async def write(self, path: str, content: str) -> str:
-        return await self.stage.apply(self._allow(path, self.write_rules, "write"), content, self.who, self.note)
+        return await self.stage.apply(self._allow_change(path, "write"), content, self.who, self.note)
 
     async def delete(self, path: str) -> str:
-        return await self.stage.apply(self._allow(path, self.write_rules, "delete"), None, self.who, self.note)
+        return await self.stage.apply(self._allow_change(path, "delete"), None, self.who, self.note)
 
     async def list(self, path: str = "") -> list[str]:
         folder = path.rstrip("/")

@@ -11,10 +11,11 @@ import httpx
 import yaml
 
 from zanni.actor.contract import ResolvedModel
-from zanni.actor.mcp_config import mcp_servers
+from zanni.actor.mcp_config import mcp_servers, uses_workspace
 from zanni.actor.resolve import Unresolved, expand, resolve_usable_models
 from zanni.actor.roles import Role, load_role, resolve_role_folder
 from zanni.actor.seat import CannotJoin, SeatOutcome, play_seat
+from zanni.actor.workspace import Workspace
 from zanni.engine.capabilities import check_tool_support
 from zanni.engine.models import build_model
 from zanni.engine.run import run_cue
@@ -89,8 +90,10 @@ def join_play(config_path: Path, actor: ActorConfiguration, *, say: Callable[[st
     def log_at(play: str) -> Path:
         return state / "plays" / re.sub(r"[^A-Za-z0-9._-]+", "-", play).strip("-") / run_id / "log.jsonl"
 
-    servers = mcp_servers(role.folder, actor.credentials, bindings=actor.tools, needs=role.manifest.needs.tools)
-    outcome = asyncio.run(play_seat(url, actor, role, models, servers,
+    folder = state / "workspaces" / run_id if uses_workspace(role.folder) else None  # D52
+    servers = mcp_servers(role.folder, actor.credentials, bindings=actor.tools, needs=role.manifest.needs.tools,
+                          workspace=folder, commands=actor.workspace.commands)
+    outcome = asyncio.run(play_seat(url, actor, role, models, servers, workspace=Workspace(folder) if folder else None,
                                     join_token=token, log_at=log_at, run_id=run_id, say=say, runner=runner))
     if outcome.seat:
         say(f"The actor's log: {state / 'plays'}")

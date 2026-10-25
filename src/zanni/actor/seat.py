@@ -13,6 +13,7 @@ from pathlib import Path
 from zanni import __version__
 from zanni.actor.contract import AllModelsFailed, CueTask, McpServerSpec, ResolvedModel, StageError, StageUnavailable
 from zanni.actor.roles import Role
+from zanni.actor.workspace import Workspace
 from decimal import Decimal
 
 from zanni.engine.a2a_client import DirectorClient, DirectorError, NotAuthorised, Status
@@ -97,7 +98,7 @@ def director_params(card: dict) -> DirectorCardParams:
 async def play_seat(url: str, actor: ActorConfiguration, role: Role, models: list[ResolvedModel],
                     servers: list[McpServerSpec], *, join_token: str | None, log_at: Callable[[str], Path],
                     run_id: str, say: Callable[[str], None] = print, runner=run_cue,
-                    part: str | None = None) -> SeatOutcome:
+                    part: str | None = None, workspace: Workspace | None = None) -> SeatOutcome:
     """Join the director at `url`, play the seat until it ends, and return how it ended.
 
     `log_at(play)` gives where the actor's own log goes (D32).
@@ -127,10 +128,10 @@ async def play_seat(url: str, actor: ActorConfiguration, role: Role, models: lis
                   permissions=cast.permissions.model_dump(), expires_at=cast.expires_at)
         say(f"Cast as {cast.seat} (part {cast.part}); stage at {cast.stage.mcp_url}")
         stage = await stack.enter_async_context(remote_stage(cast.stage.mcp_url, cast.stage.token))
-        return await _play(client, task_id, cast, stage, role, models, servers, log, say, runner)
+        return await _play(client, task_id, cast, stage, role, models, servers, log, say, runner, workspace)
 
 
-async def _play(client, task_id, cast, stage, role, models, servers, log, say, runner) -> SeatOutcome:
+async def _play(client, task_id, cast, stage, role, models, servers, log, say, runner, workspace=None) -> SeatOutcome:
     interval = int(cast.heartbeat.interval)
     statuses: asyncio.Queue = asyncio.Queue()
 
@@ -161,7 +162,7 @@ async def _play(client, task_id, cast, stage, role, models, servers, log, say, r
             message = status.message
             if isinstance(message, Cue) and status.state == "input-required" and message.cue not in answered:
                 answered.add(message.cue)
-                report = await _answer(message, stage, role, models, servers, cast.seat, log, say, runner)
+                report = await _answer(message, stage, role, models, servers, cast.seat, log, say, runner, workspace)
                 reports.append(report)
                 await client.send(task_id, cast.seat_token, report)
             elif isinstance(message, Verify) and status.state == "input-required" and message.verify not in answered:
@@ -186,7 +187,18 @@ async def _play(client, task_id, cast, stage, role, models, servers, log, say, r
     return SeatOutcome(0 if reason == "done" else 1, reason, cast.seat, reports)
 
 
-async def _answer(cue: Cue, stage, role: Role, models, servers, seat: str, log: Log, say, runner) -> Report:
+async def _stage_call(operation):
+    """A workspace's fill or sync: a stage that stops answering ends the cue as failed, as in a cue (D47)."""
+    try:
+        return await operation
+    except StageError as e:
+        if e.code != "unavailable":
+            raise
+        raise StageUnavailable(f"the stage stopped answering: {e}") from e
+
+
+async def _answer(cue: Cue, stage, role: Role, models, servers, seat: str, log: Log, say, runner,
+                  workspace: Workspace | None = None) -> Report:
     say(f"  cue {cue.cue}: {cue.scene}")
     log.event("cue", seat=seat, scene=cue.scene, cue=cue.cue)
     async def marker() -> str | None:
@@ -201,10 +213,18 @@ async def _answer(cue: Cue, stage, role: Role, models, servers, seat: str, log: 
     budget = Decimal(cue.limits.budget.amount) if cue.limits.budget else None
     task = CueTask(instructions=role.instructions, skills=role.skills, prompt=cue_prompt(cue), stage=stage,
                    models=models, mcp_servers=servers, needs_tools=role.manifest.model.needs.tools, budget=budget)
+    synced = None
     try:
         if start is None:
             raise StageUnavailable("the stage isn't answering")
+        if workspace is not None:  # a fresh copy of what this seat may read (D52)
+            await _stage_call(workspace.fill(stage))
         result, failure = await runner(task), None
+        if workspace is not None and not result.over_budget:  # only a finished cue's work reaches the stage
+            try:
+                synced = await _stage_call(workspace.sync(stage))
+            except StageUnavailable as e:  # what the model spent still counts
+                result, failure = None, StageUnavailable(str(e), result.cost)
     except (AllModelsFailed, StageUnavailable) as e:
         result, failure = None, e
     attempts = result.fallbacks if result else getattr(failure, "fallbacks", [])
@@ -224,6 +244,10 @@ async def _answer(cue: Cue, stage, role: Role, models, servers, seat: str, log: 
     log.event("cost", seat=seat, model=result.model if result else None, amount=report.cost.amount if report.cost else None,
               input_tokens=result.input_tokens if result else None, output_tokens=result.output_tokens if result else None,
               tool_calls=result.brought_calls if result else None)
+    if synced is not None:
+        say(f"    workspace sent to the stage: {synced}")
+        for refused in synced.refused:
+            say(f"      refused: {refused}")
     if result:
         cost = f"${report.cost.amount}" if report.cost else "unknown"
         say(f"    {'stopped at its budget' if result.over_budget else 'done'} on {result.model}: "

@@ -37,6 +37,7 @@ Each seat gets two lists of path rules: what it may read and what it may write. 
 3. **The play grants it:** by casting that role into that part. In the first version, a play can't widen or narrow the result.
 
 - **Writing implies reading:** a seat may always read the paths it may write.
+- **A cue narrows them:** while a cue that names `writes` is pending, the seat may write only paths inside both its own write rules and the cue's `writes`, so seats working in parallel stay on their own paths (D54). A cue that names no `writes` leaves the seat's rules as they are. The writes and deletes refused during a cue are listed in its report, from the director's own record (D52).
 - **Enforcement:** the director enforces both lists on every operation, in one layer above every backend (D43, golden rule 5). Nothing depends on the actor, or on the backend, respecting them.
 
 ## Transport: how actors reach the stage

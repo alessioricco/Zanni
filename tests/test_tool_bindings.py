@@ -51,9 +51,23 @@ def test_a_binding_replaces_the_roles_server_and_the_others_stay(tmp_path):
 
 
 def test_without_a_binding_the_roles_server_is_used(tmp_path):
+    folder = role_with(tmp_path, docs={"url": "http://d/mcp"})
+    [server] = mcp_servers(folder, {}, env={}, needs=["docs"])
+    assert server.url == "http://d/mcp" and not server.brought and not server.unpriced
+
+
+def test_the_built_in_workspace_runs_with_the_allowed_commands_and_no_secrets(tmp_path):
+    """D52: zanni:workspace becomes a process serving the seat's folder; a command it runs can't read the keys."""
     folder = role_with(tmp_path, workspace={"command": "zanni:workspace"})
-    [server] = mcp_servers(folder, {}, env={}, needs=["workspace"])
-    assert server.command == "zanni:workspace" and not server.brought and not server.unpriced
+    ws = tmp_path / "ws"
+    [server] = mcp_servers(folder, {}, env={"PATH": "/bin", "ANTHROPIC_API_KEY": "sk-x", "ZANNI_JOIN_TOKEN": "t"},
+                           needs=["workspace"], workspace=ws, commands=["uv", "pytest"])
+    assert server.command == sys.executable and not server.brought
+    assert server.args == ["-m", "zanni.engine.workspace_server", "--folder", str(ws),
+                           "--command", "uv", "--command", "pytest"]
+    assert server.env == {"PATH": "/bin"} and server.cwd == str(ws)
+    with pytest.raises(Unresolved, match="needs a workspace"):
+        mcp_servers(folder, {}, env={}, needs=["workspace"])
 
 
 def test_a_binding_for_a_tool_the_role_doesnt_need_is_refused(tmp_path):
