@@ -11,7 +11,7 @@ from zanni.actor.contract import (
 )
 from zanni.engine.fallback import UnusableReply, classify
 from zanni.engine.mcp import mcp_toolsets
-from zanni.engine.models import build_model
+from zanni.engine.models import build_model, model_settings
 from zanni.engine.text_tools import BLOCK
 from zanni.engine.tools import skill_toolset, stage_toolset
 
@@ -63,7 +63,7 @@ async def run_cue(task: CueTask, *, build: Callable[[ResolvedModel], Model] = bu
     spent: Decimal | None = Decimal(0)  # failed attempts' spend counts against the cue's budget too; None: unknown
     charged = 0  # calls to tools the actor brought, across attempts (D53)
     for i, rm in enumerate(task.models):
-        agent = Agent(build(rm), instructions=task.instructions,
+        agent = Agent(build(rm), instructions=task.instructions, model_settings=model_settings(rm),
                       toolsets=[skill_toolset(task.skills), stage_toolset(task.stage), *mcp_toolsets(task.mcp_servers)])
         usage, over, output, messages = None, False, "", []
         try:

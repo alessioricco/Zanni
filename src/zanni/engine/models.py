@@ -13,6 +13,19 @@ from pydantic_ai.providers.openai import OpenAIProvider
 from zanni.actor.contract import ResolvedModel
 
 
+def model_settings(rm: ResolvedModel, *, cache_instructions: bool = False) -> dict | None:
+    """The settings for one model entry's requests: its `max_output` (D61), and, for the director, the provider's
+    prompt caching of its instructions and tool definitions, which every turn sends again (D49, D61). Caching is
+    Anthropic's explicit cache here; OpenAI caches long prompts on its own. Seats don't cache until measured."""
+    settings: dict = {}
+    if rm.entry.max_output:
+        settings["max_tokens"] = rm.entry.max_output
+    if cache_instructions and rm.entry.provider == "anthropic":
+        settings["anthropic_cache_instructions"] = True
+        settings["anthropic_cache_tool_definitions"] = True
+    return settings or None
+
+
 class ModelSetupError(Exception):
     """A model entry that can't be built: a missing package, a missing URL. Plain words for the user."""
 

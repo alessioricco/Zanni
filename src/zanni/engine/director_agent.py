@@ -11,7 +11,7 @@ from pydantic_ai.models import Model
 
 from zanni.actor.contract import AllModelsFailed, Fallback, ResolvedModel
 from zanni.engine.fallback import classify
-from zanni.engine.models import build_model
+from zanni.engine.models import build_model, model_settings
 from zanni.engine.run import cost_of
 
 REQUESTS_PER_TURN = 25  # the default of the house rule `requests_per_turn` (D49)
@@ -48,7 +48,8 @@ async def run_director_turn(models: list[ResolvedModel], instructions: str, prom
     spent: Decimal | None = Decimal(0)
     tokens = [0, 0]  # the failed attempts' input and output tokens
     for i, rm in enumerate(models):
-        agent = Agent(build(rm), instructions=instructions, toolsets=[FunctionToolset(tools, sequential=True)])
+        agent = Agent(build(rm), instructions=instructions, toolsets=[FunctionToolset(tools, sequential=True)],
+                      model_settings=model_settings(rm, cache_instructions=True))
         usage = None
         output = ""
         over = False
