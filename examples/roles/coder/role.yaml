@@ -1,0 +1,12 @@
+# The software team's coder (D57): makes the tests pass in its workstream, through a coding engine, in any stack.
+name: coder
+version: 0.1.0
+mission: Make the failing tests of one workstream pass, in the project's own stack.
+model: { needs: { tools: true, tier: coding } }
+needs:
+  stage_read: [vision.md, backlog/, spec/, tests/, app/, tasks/]
+  stage_write: [app/]
+  tools: [workspace]
+never:
+  - edit the tests
+  - write outside its workstream's paths

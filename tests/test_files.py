@@ -34,7 +34,7 @@ def broken(tmp_path: Path, example: Path, old: str, new: str) -> Path:
 @pytest.mark.parametrize("example, first_line", [
     (ACTOR, "Actor configuration: would start 'tester-1', playing a role in a play."),
     (PLAY, "Play file: would start the director for the play 'habit-tracker'."),
-    (ROLE, "Role manifest: the role 'tester' 1.4.0."),
+    (ROLE, "Role manifest: the role 'tester' 0.1.0."),
     (SCRIPT, "Script: 'software-team' 1.0.0."),
     (NEWSROOM, "Script: 'newsroom' 0.1.0."),
     (NEWSROOM_PLAY, "Play file: would start the director for the play 'city-desk'."),
@@ -85,7 +85,7 @@ def test_play_summary_shows_cast_and_house_rules():
      'line 3, script: "github.com/someone/habit-tracker" has no version'),
     (PLAY, "script: github.com/someone/habit-tracker@1.0.0\n", "",
      "line 2, script: is required but missing; add a `script:` line"),
-    (ROLE, "version: 1.4.0", "version: 1.4", "line 3, version: 1.4 was read as a number"),
+    (ROLE, "version: 0.1.0", "version: 0.1", "line 3, version: 0.1 was read as a number"),
     (ROLE, "mission:", "mision:", "line 4, mision: is not a known field; did you mean `mission`?"),
     (ROLE, "tools: true", "tools: maybe", 'line 5, model.needs.tools: should be true or false, not "maybe"'),
     (SCRIPT, "    seats: 1-8", "    seats: 8-1", "line 20, parts.coder.seats: the range 8-1 goes down"),
@@ -102,7 +102,8 @@ def test_broken_copies_fail_in_plain_words(tmp_path, example, old, new, expected
 def test_role_folder_checks_the_whole_package():
     result = zanni(ROLE.parent)
     assert result.returncode == 0, result.stderr
-    assert "folder: AGENTS.md; skills: explore-app, write-test; mcp.json servers: browser, test-runner" in result.stdout
+    assert ("folder: AGENTS.md; skills: explore-the-app, one-test-per-criterion, review-a-document; "
+            "mcp.json servers: workspace; rehearsals: smoke") in result.stdout
 
 
 def test_role_folder_reports_a_tool_missing_from_mcp_json(tmp_path):
@@ -110,7 +111,7 @@ def test_role_folder_reports_a_tool_missing_from_mcp_json(tmp_path):
     (tmp_path / "tester/mcp.json").write_text('{"mcpServers": {"browser": {"command": "x"}}}')
     result = zanni(tmp_path / "tester")
     assert result.returncode == 2
-    assert 'line 9, needs.tools[1]: "test-runner" is not a server in mcp.json; use one of mcp.json\'s servers (browser)' in result.stderr
+    assert 'line 9, needs.tools[0]: "workspace" is not a server in mcp.json; use one of mcp.json\'s servers (browser)' in result.stderr
 
 
 def test_actor_pointing_at_a_rehearsal_says_it_runs_with_no_director():

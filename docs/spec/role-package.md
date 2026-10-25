@@ -20,18 +20,19 @@ A role manifest is recognised by having `mission` (and no `parts`, which would m
 
 ```yaml
 name: tester
-version: 1.4.0
+version: 0.1.0
 mission: Turn acceptance criteria into tests; explore the running app and report findings.
 model: { needs: { tools: true, tier: coding } }
 needs:
-  stage_read: [vision.md, backlog/, spec/, app/, tests/, findings/, reviews/]
+  stage_read: [vision.md, backlog/, spec/, app/, tests/, findings/, reviews/, tasks/]
   stage_write: [tests/, findings/, reviews/]
   tools: [workspace]
 never:
   - edit application code
   - change priorities
+  - change a test to make it pass
 outputs:
-  findings/<item>.md: one finding per file, each with a failing test
+  findings/<item>.md: one finding per file, each with a failing test under tests/findings/
 ```
 
 A role's needs are **requests, not grants**. The script's part sets a ceiling on them, and the play grants them by casting the role. The enforcement column below says who holds the line.
@@ -112,9 +113,9 @@ The director fetches a play's script and roles, and an actor fetches its role, w
 - **`rehearsals/*.yaml`:** every rehearsal is valid, and its stage folder exists ([Rehearsal](rehearsal.md)).
 
 ```
-Role manifest: the role 'tester' 1.4.0.
+Role manifest: the role 'tester' 0.1.0.
   …
-  folder: AGENTS.md; skills: explore-app, review-a-document, write-test; mcp.json servers: workspace
+  folder: AGENTS.md; skills: explore-the-app, one-test-per-criterion, review-a-document; mcp.json servers: workspace; rehearsals: smoke
 Valid.
 ```
 

@@ -1,14 +1,15 @@
-# A role manifest: Zanni's fields for a role. Character and instructions live in AGENTS.md beside it.
+# The software team's tester (D57): a failing test for every acceptance criterion, and findings from the running app.
 name: tester
-version: 1.4.0
+version: 0.1.0
 mission: Turn acceptance criteria into tests; explore the running app and report findings.
-model: { needs: { tools: true, tier: judgement }, suggested: claude-sonnet-5-5 }
+model: { needs: { tools: true, tier: coding } }
 needs:
-  stage_read: [vision.md, backlog/, spec/]
-  stage_write: [tests/, findings/]
-  tools: [browser, test-runner]
+  stage_read: [vision.md, backlog/, spec/, app/, tests/, findings/, reviews/, tasks/]
+  stage_write: [tests/, findings/, reviews/]
+  tools: [workspace]
 never:
   - edit application code
   - change priorities
+  - change a test to make it pass
 outputs:
-  findings/<item>.md: one finding per file, each with a failing test
+  findings/<item>.md: one finding per file, each with a failing test under tests/findings/

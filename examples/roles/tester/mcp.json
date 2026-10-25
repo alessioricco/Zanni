@@ -1,13 +1,5 @@
 {
   "mcpServers": {
-    "browser": {
-      "command": "uv",
-      "args": ["run", "python", "-m", "browser_mcp"]
-    },
-    "test-runner": {
-      "command": "uv",
-      "args": ["run", "python", "-m", "test_runner_mcp"],
-      "env": { "STAGE": "${ZANNI_STAGE}" }
-    }
+    "workspace": { "command": "zanni:workspace" }
   }
 }

@@ -1,0 +1,16 @@
+# A rehearsal: the tester writes a test per criterion, in a workspace. An actor configuration's `play` points here,
+# and lists in `workspace.commands` what the workspace may run, such as uv or pytest.
+rehearsal: smoke
+description: The tester writes one failing test for each of round 1's criteria.
+stage: ./smoke-stage
+cues:
+  - scene: Tests
+    instructions: >-
+      Write one failing test for each criterion in backlog/round-1.md, under tests/, following
+      spec/architecture/overview.md. Name each criterion's id in its test.
+    reads: [backlog/round-1.md, spec/]
+    writes: [tests/]
+    verifiers: [every criterion has a test]
+verify:
+  - name: tests-name-criteria
+    command: [grep, -rqiE, "r1[-_]1", tests]

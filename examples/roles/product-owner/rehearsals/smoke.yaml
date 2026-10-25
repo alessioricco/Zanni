@@ -1,0 +1,15 @@
+# A rehearsal: the product owner writes round 1's backlog from the vision. An actor configuration's `play` points here.
+rehearsal: smoke
+description: The product owner turns a short vision into round 1's backlog, with criterion ids.
+stage: ./smoke-stage
+cues:
+  - scene: Plan
+    instructions: >-
+      Read vision.md and write backlog/round-1.md: two or three items for a first round, each acceptance criterion
+      with an id such as R1-1.
+    reads: [vision.md, findings/]
+    writes: [backlog/round-1.md]
+    verifiers: [every criterion has an id]
+verify:
+  - name: criteria-have-ids
+    command: [grep, -qE, "R1-[0-9]+", backlog/round-1.md]

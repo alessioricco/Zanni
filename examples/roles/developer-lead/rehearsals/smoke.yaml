@@ -1,0 +1,13 @@
+# A rehearsal: the developer lead splits round 1 into workstreams. An actor configuration's `play` points here.
+rehearsal: smoke
+description: The developer lead writes tasks/round-1.md, with workstreams whose paths don't overlap.
+stage: ./smoke-stage
+cues:
+  - scene: Build
+    instructions: Write tasks/round-1.md, splitting round 1 into workstreams as spec/architecture/overview.md suggests.
+    reads: [backlog/round-1.md, spec/]
+    writes: [tasks/round-1.md]
+    verifiers: [every workstream lists its paths]
+verify:
+  - name: workstreams-have-paths
+    command: [grep, -q, "paths:", tasks/round-1.md]

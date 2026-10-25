@@ -1,0 +1,16 @@
+# A rehearsal: the coder makes one workstream's tests pass, in a workspace. An actor configuration's `play` points here,
+# and lists in `workspace.commands` what the workspace may run, such as uv.
+rehearsal: smoke
+description: The coder writes app/convert.py so that tests/test_convert.py passes.
+stage: ./smoke-stage
+cues:
+  - scene: Build
+    instructions: >-
+      Make tests/test_convert.py pass: your workstream is `convert` in tasks/round-1.md, and its only path is
+      app/convert.py.
+    reads: [tasks/round-1.md, spec/, tests/]
+    writes: [app/convert.py]
+    verifiers: [the workstream's tests pass]
+verify:
+  - name: tests-pass
+    command: [uv, run, --no-project, --with, pytest, python, -m, pytest, -q, tests]

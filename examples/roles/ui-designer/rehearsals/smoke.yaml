@@ -1,0 +1,13 @@
+# A rehearsal: the UI designer describes the screen round 1 needs. An actor configuration's `play` points here.
+rehearsal: smoke
+description: The UI designer writes spec/ui/converter.md for round 1.
+stage: ./smoke-stage
+cues:
+  - scene: Specify
+    instructions: Write spec/ui/converter.md, the screen round 1's backlog needs.
+    reads: [vision.md, backlog/round-1.md]
+    writes: [spec/ui/converter.md]
+    verifiers: [the screen names the criteria it serves]
+verify:
+  - name: screen-written
+    command: [grep, -q, "R1-", spec/ui/converter.md]
