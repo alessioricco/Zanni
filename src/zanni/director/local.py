@@ -77,10 +77,11 @@ class LocalSeats:
         token = (("ZANNI_VERIFIER_TOKEN", self.verifier_token) if seat.part == VERIFIER_PART
                  else ("ZANNI_JOIN_TOKEN", self.join_token))
         env = {**os.environ, token[0]: token[1] or "", "ZANNI_WATCH_STDIN": "1", "PYTHONUNBUFFERED": "1"}
-        seat.expected_exit = False
-        seat.proc = await asyncio.create_subprocess_exec(
+        proc = await asyncio.create_subprocess_exec(
             sys.executable, "-m", "zanni", str(seat.config), "--play", self.url, stdin=asyncio.subprocess.PIPE,
             stdout=out, stderr=asyncio.subprocess.STDOUT, env=env, cwd=seat.config.parent)
+        # Only now: the old process's watcher may wake while this one starts, and must still see its exit as expected.
+        seat.proc, seat.expected_exit = proc, False
         out.close()
         self.log.event("seat-started", seat=seat.name, part=seat.part, pid=seat.proc.pid)
         self.say(f"  started the local seat {seat.name} ({seat.part})")

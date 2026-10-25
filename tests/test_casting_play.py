@@ -115,6 +115,55 @@ def test_a_released_local_seat_can_be_cast_again_for_a_later_scene(home):
     assert len(started) == 2 and not [e for e in events(home) if e["event"] == "seat-not-restarted"]
 
 
+class FakeProc:
+    """A seat's process whose exit is seen in two steps, as asyncio does: its returncode first, its waiters later."""
+
+    def __init__(self, pid):
+        self.pid, self.returncode, self.stdin = pid, None, type("Pipe", (), {"close": lambda self: None})()
+        self.exited = asyncio.Event()
+
+    async def wait(self):
+        await self.exited.wait()
+        return self.returncode
+
+    def kill(self):
+        self.returncode = -9
+        self.exited.set()
+
+
+def test_a_released_seats_late_exit_isnt_taken_for_its_next_process_crashing(tmp_path, monkeypatch):
+    """CI flake: the old process's waiters woke while its next one was being spawned, and the seat was restarted."""
+    from zanni.log import Log
+
+    async def body():
+        procs, exits = [], []
+        local = LocalSeats({"coder": [(tmp_path / "coder-1.yaml", "coder-1")]}, join_token=TOKEN,
+                           log=Log(tmp_path / "log.jsonl", "r1"), out_dir=tmp_path / "seats", say=lambda _: None,
+                           on_exit=lambda name: asyncio.sleep(0, exits.append(name)))
+        local.url = "http://127.0.0.1:1"
+
+        async def spawn(*args, **kwargs):
+            if procs:  # the old process's waiters wake while the next one starts
+                procs[-1].exited.set()
+                for _ in range(5):
+                    await asyncio.sleep(0)
+            procs.append(FakeProc(len(procs) + 1))
+            return procs[-1]
+
+        monkeypatch.setattr(asyncio, "create_subprocess_exec", spawn)
+        await local.start("coder", 1)
+        local.released("coder-1")
+        procs[0].returncode = 0  # it exited after its release; its waiters haven't woken yet
+        await local.start("coder", 1)
+        await asyncio.sleep(0.1)
+        local.stopping = True
+        procs[-1].kill()
+        await asyncio.sleep(0.1)
+        return exits, len(procs)
+
+    assert asyncio.run(body()) == ([], 2)
+
+
 def test_a_local_seat_exits_mid_cue_when_its_directors_pipe_closes(home):
     with fake_openai() as (url, calls, _):
         async def body(p):
