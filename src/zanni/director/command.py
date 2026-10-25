@@ -259,7 +259,7 @@ async def _run(play_path, play, script, prose, director, director_file, packages
                        verifier_seats=frozenset(trusted_verifiers(director, director_file.parent)))
     gates = Gates(state, log, play.house_rules.gate_timeout, say=say)
     production = Production(state=state, casting=casting, stage=casting.stage, log=log,
-                            verifiers=verifier_commands(play, script), gates=gates, say=say)
+                            verifiers=verifier_commands(play, script, packages.script.folder), gates=gates, say=say)
     if director.seats or director.verifier_seats.local:
         production.local = LocalSeats(local_seats(director, director_file.parent), join_token=join_token, log=log,
                                       out_dir=folder / "log" / f"{run_id}-seats", say=say,

@@ -19,7 +19,7 @@ from zanni.director import rules
 from zanni.director.casting import Director, Seat, SeatLost, stamp
 from zanni.director.gates import Gates
 from zanni.director.state import PlayState, Report, Verdict
-from zanni.commands import run_command
+from zanni.commands import run_command, with_script_files
 from zanni.log import Log
 from zanni.protocol.encoding import money
 from zanni.protocol.messages import Cue, Verify
@@ -291,7 +291,8 @@ class Production:
                     marker = await self.stage.snapshot(Path(tmp))
                 except StageError as e:
                     return self._refuse("run_verifier", f"the stage can't be read for a snapshot: {e.code}: {e}")
-                passed, detail = await run_command(run.command, tmp, run.timeout)
+                with with_script_files(run.command, run.files) as command:  # the check files, beside it (D55)
+                    passed, detail = await run_command(command, tmp, run.timeout)
             by = "director"
         self.state.verdicts[name] = Verdict(name, passed, detail, run.source, marker, self.state.round)
         self.log.event("verdict", scene=f"round {self.state.round}", verifier=name, kind="hard", passed=passed,
@@ -311,7 +312,7 @@ class Production:
             return False, f"the verifier seat {run.runs_on} isn't connected, so {name} couldn't run", self.marker()
         self.verifies += 1
         verify = Verify(kind="zanni.verify", verify=f"v{self.verifies}", verifier=name, command=run.command,
-                        timeout=str(run.timeout), marker=str(self.marker()))
+                        timeout=str(run.timeout), marker=str(self.marker()), files=dict(run.files))
         try:
             verdict = await asyncio.wait_for(self.casting.verify(seat, verify), run.timeout + self.casting.interval + 30)
         except TimeoutError:

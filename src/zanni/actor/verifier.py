@@ -8,7 +8,7 @@ import tempfile
 from pathlib import Path
 
 from zanni.actor.contract import Stage, StageError
-from zanni.commands import run_for_exit_code
+from zanni.commands import run_for_exit_code, with_script_files
 from zanni.log import Log
 from zanni.protocol.messages import Verdict, Verify
 
@@ -42,7 +42,8 @@ async def run_verify(verify: Verify, stage: Stage, seat: str, log: Log, say) -> 
         except StageError as e:
             code, output, marker = None, f"couldn't read the stage: {e.code}: {e}", verify.marker
         else:
-            code, output = await run_for_exit_code(verify.command, tmp, int(verify.timeout))
+            with with_script_files(verify.command, verify.files) as command:  # the check files, beside it (D55)
+                code, output = await run_for_exit_code(command, tmp, int(verify.timeout))
             if skipped:
                 output = f"(not text, so not in the snapshot: {', '.join(skipped)})\n{output}"
     verdict = Verdict(kind="zanni.verdict", verify=verify.verify, verifier=verify.verifier, passed=code == 0,

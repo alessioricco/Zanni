@@ -6,10 +6,30 @@ child processes don't outlive it on an unattended machine.
 """
 
 import asyncio
+import contextlib
 import os
 import signal
+import tempfile
+from collections.abc import Iterator, Mapping
+from pathlib import Path
 
 OUTPUT = 2000  # characters of a verifier's output kept for the director's model and the log
+SCRIPT_VAR = "${ZANNI_SCRIPT}"  # where a verifier's command finds its script's check files (D55)
+
+
+@contextlib.contextmanager
+def with_script_files(command: list[str], files: Mapping[str, str]) -> Iterator[list[str]]:
+    """Put a verifier's check files in a fresh folder, never on the stage, and give the command with every
+    ${ZANNI_SCRIPT} replaced by that folder (D55). The folder goes when the command is done."""
+    with tempfile.TemporaryDirectory(prefix="zanni-script-") as tmp:
+        root = Path(tmp).resolve()
+        for path, text in files.items():
+            target = (root / path).resolve()
+            if not target.is_relative_to(root) or target == root:
+                raise ValueError(f"{path!r} isn't a path inside the script's package")
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(text)
+        yield [arg.replace(SCRIPT_VAR, str(root)) for arg in command]
 
 
 async def run_command(command: list[str], cwd, timeout: int) -> tuple[bool, str]:

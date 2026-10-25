@@ -79,16 +79,19 @@ class VerifierRun(NamedTuple):
     timeout: int
     source: str  # where the command came from: "play" or "script" (D35)
     runs_on: str | None = None  # a verifier seat's name; None: the director (D45)
+    files: dict[str, str] = {}  # the script's check files the command runs, by path (D55); never changed
 
 
-def verifier_commands(play: PlayFile, script: Script) -> dict[str, VerifierRun]:
-    """Each script verifier's command, timeout, where the command came from, and where it runs (D35, D45)."""
+def verifier_commands(play: PlayFile, script: Script, script_folder: Path | None = None) -> dict[str, VerifierRun]:
+    """Each script verifier's command, timeout, where the command came from, and where it runs (D35, D45); with the
+    script's folder, the text of the check files each one lists (D55)."""
     out = {}
     for name, v in script.verifiers.items():
         own = play.verifiers.get(name)
         command, source = (own.command, "play") if own and own.command else (v.command, "script")
         timeout = own.timeout if own and own.timeout else v.timeout
-        out[name] = VerifierRun(command, timeout, source, own.runs_on if own else None)
+        files = {path: (script_folder / path).read_text() for path in v.files} if script_folder else {}
+        out[name] = VerifierRun(command, timeout, source, own.runs_on if own else None, files)
     return out
 
 
@@ -155,7 +158,10 @@ def describe_verifiers(play: PlayFile, script: Script) -> list[str]:
     for name, run in verifier_commands(play, script).items():
         if run.command is not None:
             where = f"on the verifier seat {run.runs_on}" if run.runs_on else "here"
-            lines.append(f"    {name}: {' '.join(run.command)} (from the {run.source}; timeout {run.timeout} s; runs {where})")
+            files = script.verifiers[name].files
+            uses = f"; ${{ZANNI_SCRIPT}} holds the script's {', '.join(files)}" if files else ""
+            lines.append(f"    {name}: {' '.join(run.command)} (from the {run.source}; timeout {run.timeout} s; "
+                         f"runs {where}{uses})")
     if not lines:
         return ["  verifiers: none"]
     return ["  verifiers, run on a snapshot of the stage, here with your permissions unless a verifier seat is named:",
