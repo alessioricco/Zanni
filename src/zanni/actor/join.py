@@ -89,7 +89,8 @@ def join_play(config_path: Path, actor: ActorConfiguration, *, say: Callable[[st
     def log_at(play: str) -> Path:
         return state / "plays" / re.sub(r"[^A-Za-z0-9._-]+", "-", play).strip("-") / run_id / "log.jsonl"
 
-    outcome = asyncio.run(play_seat(url, actor, role, models, mcp_servers(role.folder, actor.credentials),
+    servers = mcp_servers(role.folder, actor.credentials, bindings=actor.tools, needs=role.manifest.needs.tools)
+    outcome = asyncio.run(play_seat(url, actor, role, models, servers,
                                     join_token=token, log_at=log_at, run_id=run_id, say=say, runner=runner))
     if outcome.seat:
         say(f"The actor's log: {state / 'plays'}")

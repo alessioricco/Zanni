@@ -37,7 +37,7 @@ def run_rehearsal(config_path: Path, actor: ActorConfiguration, *, say: Callable
     info = DirectorInfo(name=f"zanni rehearsal {rehearsal.rehearsal}",
                         description=rehearsal.description or f"The rehearsal {rehearsal.rehearsal}",
                         version=__version__, play=f"rehearsal:{rehearsal.rehearsal}", script=str(rehearsal_path))
-    servers = mcp_servers(role.folder, actor.credentials)
+    servers = mcp_servers(role.folder, actor.credentials, bindings=actor.tools, needs=role.manifest.needs.tools)
 
     def quiet(line: str) -> None:  # joining a director on loopback is a detail here, not news
         if not line.startswith(("Joining", "Cast as", "Released")):

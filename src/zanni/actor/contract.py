@@ -26,7 +26,7 @@ class Stage(Protocol):
 
 @dataclass(frozen=True)
 class McpServerSpec:
-    """One server from the role's mcp.json, with every ${NAME} already resolved (D20)."""
+    """One server from the role's mcp.json, or one the actor brings for it, with every ${NAME} resolved (D20, D53)."""
 
     name: str
     command: str | None = None
@@ -35,6 +35,13 @@ class McpServerSpec:
     cwd: str | None = None
     url: str | None = None
     headers: dict[str, str] = field(default_factory=dict)
+    brought: bool = False  # the actor's own server for this tool, in place of the role's (D53)
+    price: Decimal | None = None  # what the play is charged per call to a server the actor brought; None: unknown
+
+    @property
+    def unpriced(self) -> bool:
+        """A server the actor brought without a price: its calls cost an unknown amount, never zero (D7)."""
+        return self.brought and self.price is None
 
 
 @dataclass(frozen=True)
@@ -82,6 +89,7 @@ class CueResult:
     cost_source: str  # "genai-prices", "configuration" or "unknown"
     fallbacks: list[Fallback] = field(default_factory=list)
     over_budget: bool = False  # it stopped at the cue's budget (D39)
+    brought_calls: int = 0  # calls to tools the actor brought, each charged at its price (D53)
 
 
 class AllModelsFailed(Exception):
