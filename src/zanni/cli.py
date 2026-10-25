@@ -104,8 +104,9 @@ def direct(path: Path, doc, args) -> int:
 
     if isinstance(doc, PlayFile):
         return run_play(path, director_path=Path(args.director) if args.director else None, update=args.update,
-                        listen=args.listen)
-    return run_play((path.parent / doc.play), director_path=path, update=args.update, listen=args.listen)
+                        listen=args.listen, continues=args.continue_run)
+    return run_play((path.parent / doc.play), director_path=path, update=args.update, listen=args.listen,
+                    continues=args.continue_run)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -128,6 +129,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="for a play file: the director's configuration (default: director.yaml beside it) (D34)")
     parser.add_argument("--update", action="store_true",
                         help="for a play: re-resolve its packages' tags, rewrite play.lock, and say what changed (D37)")
+    parser.add_argument("--continue", metavar="RUN_ID", dest="continue_run",
+                        help="for a play: start a new run from where an earlier run of it left off (D60)")
     parser.add_argument("file", nargs="?",
                         help="an actor or director configuration, a play file, a role manifest, a script (SCRIPT.md), "
                              "a rehearsal, or a folder")
@@ -146,6 +149,7 @@ def main(argv: list[str] | None = None) -> int:
              "a rehearsal (with --serve), a play file or a director configuration"),
             ("--director", args.director, isinstance(doc, PlayFile), "a play file"),
             ("--update", args.update, directs, "a play file or a director configuration"),
+            ("--continue", args.continue_run, directs, "a play file or a director configuration"),
             ("--play", args.play, isinstance(doc, ActorConfiguration) and not doc.is_director, "an actor configuration")):
         if flag and not allowed:
             print(f"{args.file}: {name} works with {what} only; nothing was started.", file=sys.stderr)

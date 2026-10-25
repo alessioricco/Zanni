@@ -61,7 +61,7 @@ A cast entry is either a package reference (shorthand for `{ role: … }`) or:
 | `gates` | list of names | no | none | the director | Which of the script's gates this play enforces, such as `plan` and `release`. Each must be one of the script's `gates`. |
 | `max_seats_per_host` | whole number, at least 1 | no | no cap | the director | The most seats the director casts onto one machine, because actors on one machine share its GPU. A machine is told by the address its actors join from. |
 | `gate_timeout` | duration: whole seconds, or a number with `s`, `m` or `h`, such as `30m` | no | none: a gate waits | the director | How long a gate, or a pause, may wait for a person. When it passes, the run stops with reason `gate` (or `paused`) (D38). |
-| `max_rounds` | whole number, at least 1 | no | the script's `stop.max_rounds` | the director | The most rounds this play may take: at most the script's, when it sets one. The owner may grant one more at a gate ([Gates and pauses](#gates-and-pauses), D60). |
+| `max_rounds` | whole number, at least 1 | no | the script's `stop.max_rounds` | the director | The most rounds one run of this play may take: at most the script's, when it sets one. The owner may grant one more at a gate, and a run that [continues](#continuing-a-play) another counts its own rounds (D60). |
 | `max_director_turns` | whole number, at least 1 | no | `30` | the director | The most model turns the director takes in one round. When it is reached, the round ends; if the round's work isn't verified, the run stops with reason `director-turns` (D33). |
 | `requests_per_turn` | whole number, at least 1 | no | `25` | the director | The most model requests in one director turn (D49). |
 | `cast_timeout` | duration, as `gate_timeout` | no | `10m` | the director | How long a part below its minimum seats, with no local seat left to start, waits for an actor to join, at the start or after losing a seat; and how long the start waits for each verifier seat a verifier `runs_on`. When it passes, the run stops with reason `uncastable` (D50). |
@@ -169,7 +169,7 @@ It is recognised by having `lock_version`.
 `zanni play.yaml --continue <run-id>` starts a new run from where an earlier run of the same play left off (D60):
 
 - **The stage:** a git stage's new run branch starts from the earlier run's branch, `zanni/<play>/<run-id>`, from the earlier run's folder, or else from the remote, instead of `branch`. A folder stage already holds its files, and an `mcp` stage is as its server holds it.
-- **The round:** the count continues from the earlier run's last round, read from its log, so a play that ended after round 1 continues with round 2.
+- **The round:** the count continues from the earlier run's last round, read from its log, so a play that ended in round 1 continues with round 2. The round limit counts the new run's own rounds.
 - **A new run:** with its own run id, budget, cast and log. Its `run-started` event names the run it continues.
 - **What isn't restored:** cues in flight and the director's own conversation. The new director reads the stage, and its state summary says which run it continues.
 - **Refused:** a run id the play's `log/` doesn't have, or a git stage branch that is in neither the run's folder nor the remote, is exit 2, with what to change.
@@ -215,7 +215,7 @@ The play's spend is every report's cost plus the director's own (D39):
 | `tool-refused` | `tool`, `reason` | The rules refused one of the director's tool calls (D33). |
 | `round-ended` | `round`, `reason` | A round ends. |
 | `seat-released` | `seat`, `reason` | The director ends a seat. |
-| `run-stopped` | `reason` (`done`, `budget`, `gate`, `paused`, `director-turns`, `max-rounds`, `uncastable`, or the director's own), `completed` | The run ends. |
+| `run-stopped` | `reason` (`done`, `budget`, `gate`, `paused`, `director-turns`, `max-rounds`, `uncastable`, or the director's own), `completed`, `round` (the round it ended in) | The run ends. |
 
 - **No credentials:** an actor's credentials never appear in the log (D15).
 - **Actor text is data:** text an actor wrote, such as a report's `summary`, is logged as data.

@@ -16,6 +16,7 @@ class Decision:
     action: str  # approve, reject or resume; "timeout" when gate_timeout passed first
     note: str = ""
     by: str = ""
+    another_round: bool = False  # with approve: the owner grants one more round (D60)
 
 
 class Gates:
@@ -58,9 +59,13 @@ class Gates:
             outcome = "approved" if decision.action == "approve" else "rejected"
             self.state.gates[name] = outcome
             self.state.gate_rounds[name] = self.state.round  # an `every: round` gate counts in this round only (D48)
-            self.log.event("gate", gate=name, decision=outcome, by=decision.by, note=decision.note)
+            if decision.another_round:  # only the owner, who sets the house rules, extends them (D60)
+                self.state.extra_rounds += 1
+            self.log.event("gate", gate=name, decision=outcome, by=decision.by, note=decision.note,
+                           another_round=decision.another_round)
             self.say(f"Gate '{name}' {outcome}{' by ' + decision.by if decision.by else ''}"
-                     f"{': ' + decision.note if decision.note else ''}")
+                     f"{': ' + decision.note if decision.note else ''}"
+                     + (f"; one more round granted, {self.state.max_rounds} in all" if decision.another_round else ""))
         return decision
 
     async def pause(self, reason: str) -> Decision:
@@ -77,7 +82,7 @@ class Gates:
             self.say("Resumed.")
         return decision
 
-    def decide(self, action: str, note: str = "", by: str = "owner") -> str | None:
+    def decide(self, action: str, note: str = "", by: str = "owner", another_round: bool = False) -> str | None:
         """A person's decision. None when it was taken; otherwise why it can't be, in plain words."""
         if self._waiting is None or self._waiting.done():
             return "nothing is waiting for a decision: no gate is pending and the play isn't paused"
@@ -89,5 +94,9 @@ class Gates:
             return "a rejection needs a note saying what to change"
         if action not in ("approve", "reject", "resume"):
             return f"{action!r} isn't a decision; use approve, reject or resume"
-        self._waiting.set_result(Decision(action, note, by))
+        if another_round and action != "approve":
+            return "another round can only be granted with approve"
+        if another_round and self.state.max_rounds is None:
+            return "this play has no round limit, so there is no round to add; approve without --another-round"
+        self._waiting.set_result(Decision(action, note, by, another_round))
         return None

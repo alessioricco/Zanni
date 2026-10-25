@@ -30,9 +30,10 @@ def owner_route(owner) -> Route:
         try:
             body = json.loads(await request.body() or b"{}")
             action, note = str(body.get("action", "")), str(body.get("note") or "")
+            another_round = body.get("another_round", False) is True  # D60
         except (ValueError, AttributeError):
             return JSONResponse({"error": 'send JSON such as {"action": "approve", "note": "…"}'}, status_code=400)
-        status, answer = owner.decide(action, note)
+        status, answer = owner.decide(action, note, another_round=another_round)
         return JSONResponse(answer, status_code=status)
 
     return Route(OWNER_PATH, endpoint, methods=["GET", "POST"])

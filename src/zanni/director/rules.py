@@ -159,6 +159,6 @@ def round_gates(state: PlayState) -> str | None:
 def may_end_round(state: PlayState) -> str | None:
     """None when another round may start; otherwise the stop reason."""
     cap = state.max_rounds
-    if cap is not None and state.round >= cap:
+    if cap is not None and state.rounds_in_run >= cap:
         return "max-rounds"
     return None

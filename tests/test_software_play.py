@@ -176,7 +176,10 @@ def test_one_round_of_the_software_script_runs_end_to_end(tmp_path):
     run = log[0]["run"]
     branch = f"zanni/software-mini-python/{run}"
     authors = set(run_git("log", "--format=%an", f"main..{branch}", cwd=play / "remote.git").stdout.split())
-    assert authors == set(SEATS)  # every part's work, as commits by its own seat, on the run's branch
+    parts = {seat.rsplit("-", 1)[0] for seat in SEATS}
+    # every part's work, as commits by its own seat, on the run's branch; a seat lost on a busy machine is recast,
+    # such as tester-2 for tester-1 (D36), and is still that part
+    assert {author.rsplit("-", 1)[0] for author in authors} == parts
     files = run_git("ls-tree", "-r", "--name-only", branch, cwd=play / "remote.git").stdout.split()
     for path in ("backlog/round-1.md", "reviews/round-1/backlog-answers.md", "reviews/round-1/spec-answers.md",
                  "spec/ui/converter.md", "tests/test_convert.py", "tasks/round-1.md", "app/convert.py",

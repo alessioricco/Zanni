@@ -9,6 +9,9 @@ from zanni.actor.contract import McpServerSpec
 # A tool's refusal (a command not allowed, a path outside the workspace) is feedback for the model. It may fail this
 # many times in a row before the cue ends; a success resets the count.
 TOOL_RETRIES = 3
+# Seconds a tool server has to start and answer MCP's handshake: a server started with Python, such as
+# zanni:workspace, can take several seconds on a busy machine (found by the suite, under load).
+TOOL_START = 30
 
 
 def mcp_toolsets(servers: list[McpServerSpec]) -> list[AbstractToolset]:
@@ -17,8 +20,9 @@ def mcp_toolsets(servers: list[McpServerSpec]) -> list[AbstractToolset]:
     for s in servers:
         if s.command:
             client = StdioTransport(command=s.command, args=list(s.args), env=dict(s.env) or None, cwd=s.cwd)
-            toolset = MCPToolset(client, id=s.name, max_retries=TOOL_RETRIES)
+            toolset = MCPToolset(client, id=s.name, max_retries=TOOL_RETRIES, init_timeout=TOOL_START)
         else:
-            toolset = MCPToolset(s.url, id=s.name, headers=dict(s.headers) or None, max_retries=TOOL_RETRIES)
+            toolset = MCPToolset(s.url, id=s.name, headers=dict(s.headers) or None, max_retries=TOOL_RETRIES,
+                                 init_timeout=TOOL_START)
         toolsets.append(toolset.prefixed(s.name))
     return toolsets

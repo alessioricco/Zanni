@@ -343,6 +343,9 @@ class Production:
         if decision.action == "approve":
             await self.push(f"the approved gate {name}")
             answer = f"{name}: approved{': ' + decision.note if decision.note else ''}"
+            if decision.another_round:
+                answer += (f". The owner granted one more round: this run may now take {self.state.max_rounds}; end "
+                           "this round when it is done, and start the next with the owner's note as its input")
         else:
             answer = f"{name}: rejected: {decision.note}. Revise the work as the note says, then ask again."
         self._long_wait_ended(f"ask_gate answered: {answer}")
@@ -454,7 +457,9 @@ class Production:
     def summary(self) -> str:
         """The play's state, as code keeps it, for the start of every turn (D33)."""
         s = self.state
-        rounds = f" of {s.max_rounds}" if s.max_rounds else ""
+        rounds = (f" of {s.max_rounds}" if s.max_rounds else "") if s.first_round == 1 else (
+            f" (round {s.rounds_in_run}{' of at most ' + str(s.max_rounds) if s.max_rounds else ''} of this run, "
+            f"which continues run {s.continues}: the stage holds that run's work)")
         budget = (f" of a ${s.budget:.2f} budget ({sum(s.reservations.values(), Decimal(0)):.4f} reserved by pending cues)"
                   if s.budget is not None else " (no budget)")
         lines = [f"Round {s.round}{rounds}; turn {s.turns} of {s.play.house_rules.max_director_turns} in this round.",

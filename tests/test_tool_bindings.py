@@ -162,3 +162,30 @@ def test_a_call_the_budget_stopped_before_it_ran_is_never_charged():
     result = asyncio.run(run_cue(task, build=lambda rm: model))
     tokens = result.input_tokens + result.output_tokens
     assert result.over_budget and result.brought_calls == 0 and result.cost == Decimal(tokens)  # the model's alone
+
+
+def test_a_tool_server_that_wont_start_fails_the_cue_and_the_seat_goes_on(tmp_path):
+    """Found by the suite under load: a server that didn't start crashed the whole actor; now its cue fails."""
+    from zanni.actor.seat import _answer
+    from zanni.log import Log
+    from zanni.protocol.messages import Cue
+    from zanni.stage import folder_stage
+
+    broken = McpServerSpec(name="engine", command=sys.executable, args=["-c", "raise SystemExit(3)"], brought=True,
+                           price=Decimal(0))
+
+    class Role:
+        instructions, skills = "i", {}
+        manifest = type("M", (), {"model": type("N", (), {"needs": type("T", (), {"tools": False})})})
+
+    async def go():
+        (tmp_path / "stage").mkdir()
+        seat = folder_stage(tmp_path / "stage").seat(read=["/"], write=["/"], who="coder-1")
+        cue = Cue(kind="zanni.cue", cue="r1-c1", scene="Build", instructions="Build.")
+        model = scripted("never asked")
+        return await _answer(cue, seat, Role, [free()], [broken], "coder-1", Log(tmp_path / "a.jsonl", "r1"),
+                             lambda _: None, lambda task: run_cue(task, build=lambda rm: model))
+
+    report = asyncio.run(go())
+    assert report.outcome == "failed" and report.summary.startswith("the cue couldn't run: ")
+    assert '"event": "cue-error"' in (tmp_path / "a.jsonl").read_text()

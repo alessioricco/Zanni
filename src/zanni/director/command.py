@@ -39,6 +39,22 @@ JOIN_TOKEN, OWNER_TOKEN, VERIFIER_TOKEN = "ZANNI_JOIN_TOKEN", "ZANNI_OWNER_TOKEN
 STAGE_TOKEN = "ZANNI_STAGE_TOKEN"  # the director's token for an mcp stage (D47)
 
 
+def earlier_run(play_path: Path, run_id: str) -> int:
+    """The last round of an earlier run of this play, from its log, for a run that continues it (D60)."""
+    logs = play_path.parent / "log"
+    path = logs / f"{run_id}.jsonl"
+    if not run_id or "/" in run_id or not path.is_file():
+        runs = sorted(p.stem for p in logs.glob("*.jsonl")) if logs.is_dir() else []
+        raise CannotStart(f"there is no run {run_id!r} in {logs}; the play's runs are: {', '.join(runs) or 'none'}")
+    rounds = [1]
+    for line in path.read_text().splitlines():
+        with contextlib.suppress(ValueError):
+            event = json.loads(line)
+            if event.get("event") in ("run-started", "round-ended", "run-stopped") and isinstance(event.get("round"), int):
+                rounds.append(event["round"])
+    return max(rounds)
+
+
 class CannotStart(Exception):
     """Something to fix before the play can start, in plain words (exit 2)."""
 
@@ -112,9 +128,11 @@ def local_seats(director: ActorConfiguration, base: Path) -> dict[str, list[tupl
     return out
 
 
-def open_stage(play: PlayFile, play_path: Path, run_id: str, stage_token: str | None = None) -> Stage:
+def open_stage(play: PlayFile, play_path: Path, run_id: str, stage_token: str | None = None,
+               continues: str | None = None) -> Stage:
     """The play's stage: a folder that exists, a git repository cloned onto the run's branch, or an mcp server
-    (connected when the run starts, in _run)."""
+    (connected when the run starts, in _run). A run that continues an earlier one starts a git stage from that run's
+    branch, from its run folder, or else from the remote (D60); a folder or an mcp stage already holds its work."""
     spec = play.stage
     if spec.backend == "folder":
         root = (play_path.parent / spec.path).resolve()
@@ -128,10 +146,28 @@ def open_stage(play: PlayFile, play_path: Path, run_id: str, stage_token: str | 
         if not re.match(r"^([a-z][a-z0-9+.-]*://|[^/\s]+@[^:\s]+:)", url):  # a local path, relative to the play file
             url = str((play_path.parent / url).resolve())
         clone = play_path.parent / "log" / f"{run_id}-stage"
+        branch, source = spec.branch, url
+        if continues:
+            from zanni.stage.git import run_git
+
+            branch = f"zanni/{play.name}/{continues}"
+            earlier = play_path.parent / "log" / f"{continues}-stage"
+            found = [s for s in ([str(earlier)] if earlier.is_dir() else []) + [url]
+                     if run_git("ls-remote", "--exit-code", "--heads", s, branch).returncode == 0]
+            if not found:
+                raise CannotStart(f"the run {continues}'s branch {branch} is neither in its run folder ({earlier}) "
+                                  f"nor on the remote {url}; push it there, or continue another run")
+            source = found[0]
         try:
-            return Stage(GitBackend.open(url, spec.branch, clone, f"zanni/{play.name}/{run_id}"))
+            backend = GitBackend.open(source, branch, clone, f"zanni/{play.name}/{run_id}")
         except CannotClone as e:
             raise CannotStart(str(e)) from None
+        if source != url:  # cloned from the earlier run's folder: pushes still go to the play's remote
+            from zanni.stage.git import run_git
+
+            run_git("remote", "set-url", "origin", url, cwd=clone)
+            backend.url = url
+        return Stage(backend)
     if not stage_token:
         raise CannotStart(f"this play's stage is an mcp server, and {STAGE_TOKEN} isn't in the director "
                           f"configuration's `credentials` (or has no value); add {STAGE_TOKEN}: ${{{STAGE_TOKEN}}}, "
@@ -148,7 +184,8 @@ def trusted_verifiers(director: ActorConfiguration, base: Path) -> list[str]:
 
 
 def run_play(play_path: Path, *, director_path: Path | None = None, update: bool = False, listen: str | None = None,
-             say: Callable[[str], None] = print, build=None, interactive: bool | None = None) -> int:
+             say: Callable[[str], None] = print, build=None, interactive: bool | None = None,
+             continues: str | None = None) -> int:
     """Run the play; returns the exit code (D33): 0 done, 1 stopped otherwise, 2 couldn't start."""
     from zanni.actor.resolve import resolve_usable_models
     from zanni.director.packages import load_script, resolve_packages
@@ -193,8 +230,10 @@ def run_play(play_path: Path, *, director_path: Path | None = None, update: bool
         if director.verifier_seats.local and not verifier_token:
             verifier_token = secrets.token_urlsafe(32)  # for local verifier seats only: made for this run
         host, port = parse_listen(listen)
+        last_round = earlier_run(play_path, continues) if continues else None  # D60
         run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-        stage = open_stage(play, play_path, run_id, credential(director, STAGE_TOKEN))  # last: clone only when ready
+        stage = open_stage(play, play_path, run_id, credential(director, STAGE_TOKEN),  # last: clone only when ready
+                           continues=continues)
         if stage.kind != "mcp" and (missing := stage_missing(stage.backend.root, script.stage.expects)):
             raise CannotStart(f"the stage doesn't hold what the script expects (stage.expects): {', '.join(missing)}")
     except FileErrors as e:
@@ -219,7 +258,8 @@ def run_play(play_path: Path, *, director_path: Path | None = None, update: bool
     try:
         return asyncio.run(_run(play_path, play, script, prose, director, director_file, packages, stage, run_id, models,
                                 join_token, owner_token, verifier_token, host, port, say, build or build_model,
-                                sys.stdin.isatty() if interactive is None else interactive))
+                                sys.stdin.isatty() if interactive is None else interactive,
+                                (continues, last_round) if continues else None))
     except KeyboardInterrupt:
         print("Stopped before the play finished; every seat was released and every local seat stopped.",
               file=sys.stderr)
@@ -227,7 +267,7 @@ def run_play(play_path: Path, *, director_path: Path | None = None, update: bool
 
 
 async def _run(play_path, play, script, prose, director, director_file, packages, stage, run_id, models, join_token,
-               owner_token, verifier_token, host, port, say, build, interactive) -> int:
+               owner_token, verifier_token, host, port, say, build, interactive, continued=None) -> int:
     from zanni import __version__
     from zanni.director.console import console, stdin_lines
     from zanni.director.contract import DirectorInfo
@@ -252,6 +292,9 @@ async def _run(play_path, play, script, prose, director, director_file, packages
             return 2
     log = Log(folder / "log" / f"{run_id}.jsonl", run_id)
     state = PlayState(play, script)
+    if continued:  # D60: a new run, from where the earlier one left the stage, with the next round
+        state.continues, state.first_round = continued[0], continued[1] + 1
+        state.round = state.first_round
     casting = Director(join_token=join_token, parts=part_slots(play, folder, script, packages),
                        stage=stage, log=log, say=say,
                        max_per_host=play.house_rules.max_seats_per_host,
@@ -277,7 +320,10 @@ async def _run(play_path, play, script, prose, director, director_file, packages
                            result.output_tokens)
 
     log.event("run-started", play=play.name, script={"ref": play.script, "commit": packages.script.pin.commit,
-                                                     "hash": packages.script.pin.hash})
+                                                     "hash": packages.script.pin.hash},
+              continues=state.continues, round=state.round)
+    if state.continues:
+        say(f"Continuing run {state.continues}: this run starts with round {state.round}")
     running = folder / "log" / "director.json"
     background = []
     reason, completed = "interrupted", False
@@ -313,7 +359,8 @@ async def _run(play_path, play, script, prose, director, director_file, packages
             with contextlib.suppress(Exception):
                 await _publish(production, play, False, say)
         await stage.close()
-        log.event("run-stopped", reason=reason, completed=completed, spend=state.spend_text().replace("$", ""))
+        log.event("run-stopped", reason=reason, completed=completed, spend=state.spend_text().replace("$", ""),
+                  round=state.round)
     verdicts = ", ".join(f"{v.name} {'passed' if v.passed else 'failed'}" for v in state.verdicts.values())
     say(f"The play {'is done' if completed else 'stopped: ' + reason}. Rounds: {state.round}; spent "
         f"{state.spend_text()}; verdicts: {verdicts or 'none'}."

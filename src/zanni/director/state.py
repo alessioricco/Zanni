@@ -36,6 +36,9 @@ class PlayState:
     play: PlayFile
     script: Script
     round: int = 1
+    first_round: int = 1  # this run's first round: later than 1 when it continues an earlier run (D60)
+    continues: str | None = None  # the run this one continues, if any (D60)
+    extra_rounds: int = 0  # rounds the owner granted at a gate, beyond the round limit (D60)
     turns: int = 0  # the director's model turns in this round
     spend: Decimal = Decimal(0)
     round_spend: Decimal = Decimal(0)
@@ -56,8 +59,15 @@ class PlayState:
 
     @property
     def max_rounds(self) -> int | None:
-        """The play's limit, else the script's: a play may lower the script's, never raise it (D58)."""
-        return self.play.house_rules.max_rounds or self.script.stop.max_rounds
+        """The rounds this run may take: the play's limit, else the script's (a play may lower the script's, never
+        raise it, D58), plus any the owner granted at a gate (D60)."""
+        base = self.play.house_rules.max_rounds or self.script.stop.max_rounds
+        return None if base is None else base + self.extra_rounds
+
+    @property
+    def rounds_in_run(self) -> int:
+        """How many rounds this run has begun, counting the current one."""
+        return self.round - self.first_round + 1
 
     def seats_for(self, part: str) -> Seats:
         """The seats the play may cast for a part: its cast entry's, else the script's."""

@@ -1,4 +1,4 @@
-"""`zanni gate <play file or director URL> [approve | reject | resume] [--note …]` (D38).
+"""`zanni gate <play file or director URL> [approve | reject | resume] [--note …] [--another-round]` (D38, D60).
 
 Shows the play's state, or decides a pending gate, or resumes a paused play, from any machine that can reach the
 director, with the owner token from the environment (ZANNI_OWNER_TOKEN), never a flag.
@@ -59,6 +59,8 @@ def main(argv: list[str]) -> int:
     parser.add_argument("target", help="the play file (or its folder), or the director's URL")
     parser.add_argument("action", nargs="?", choices=["approve", "reject", "resume"])
     parser.add_argument("--note", default="", help="a note for the director; required to reject")
+    parser.add_argument("--another-round", action="store_true",
+                        help="with approve: grant the run one more round, with the note as its input (D60)")
     args = parser.parse_args(argv)
     token = os.environ.get(OWNER_TOKEN)
     if not token:
@@ -68,13 +70,17 @@ def main(argv: list[str]) -> int:
     if args.action == "reject" and not args.note.strip():
         print("A rejection needs --note, saying what to change.", file=sys.stderr)
         return 2
+    if args.another_round and args.action != "approve":
+        print("--another-round goes with approve: it approves the gate and grants one more round.", file=sys.stderr)
+        return 2
     try:
         url = director_url(args.target) + OWNER_PATH
         headers = {"Authorization": f"Bearer {token}"}
         if args.action is None:
             response = httpx.get(url, headers=headers, timeout=30)
         else:
-            response = httpx.post(url, headers=headers, json={"action": args.action, "note": args.note}, timeout=30)
+            decision = {"action": args.action, "note": args.note} | ({"another_round": True} if args.another_round else {})
+            response = httpx.post(url, headers=headers, json=decision, timeout=30)
     except CannotReach as e:
         print(str(e), file=sys.stderr)
         return 2
@@ -94,6 +100,7 @@ def main(argv: list[str]) -> int:
         print("\n".join(show(body)) if "play" in body else "", file=sys.stderr)
         return 1
     if args.action:
-        print({"approve": "Approved.", "reject": "Rejected.", "resume": "Resumed."}[args.action])
+        print({"approve": "Approved.", "reject": "Rejected.", "resume": "Resumed."}[args.action]
+              + (" One more round granted." if args.another_round else ""))
     print("\n".join(show(body)))
     return 0

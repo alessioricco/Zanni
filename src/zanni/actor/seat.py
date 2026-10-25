@@ -187,6 +187,10 @@ async def _play(client, task_id, cast, stage, role, models, servers, log, say, r
     return SeatOutcome(0 if reason == "done" else 1, reason, cast.seat, reports)
 
 
+class CueError(Exception):
+    """A cue that couldn't run for a reason no model caused, such as a tool server that didn't start."""
+
+
 async def _stage_call(operation):
     """A workspace's fill or sync: a stage that stops answering ends the cue as failed, as in a cue (D47)."""
     try:
@@ -227,6 +231,10 @@ async def _answer(cue: Cue, stage, role: Role, models, servers, seat: str, log: 
                 result, failure = None, StageUnavailable(str(e), result.cost)
     except (AllModelsFailed, StageUnavailable) as e:
         result, failure = None, e
+    except Exception as e:  # anything else, such as a tool server that couldn't start: the cue fails, the seat goes on
+        first = (str(e).splitlines() or [""])[0][:300]
+        log.event("cue-error", seat=seat, cue=cue.cue, error=type(e).__name__, detail=first)
+        result, failure = None, CueError(f"the cue couldn't run: {type(e).__name__}: {first}")
     attempts = result.fallbacks if result else getattr(failure, "fallbacks", [])
     for f in attempts:
         log.event("fallback", seat=seat, model=f.model, reason=f.reason, detail=f.detail)
@@ -253,7 +261,7 @@ async def _answer(cue: Cue, stage, role: Role, models, servers, seat: str, log: 
         say(f"    {'stopped at its budget' if result.over_budget else 'done'} on {result.model}: "
             f"{len(result.tool_calls)} tool calls, "
             f"{result.input_tokens} in / {result.output_tokens} out tokens, cost {cost}")
-    elif isinstance(failure, StageUnavailable):
+    elif isinstance(failure, (StageUnavailable, CueError)):
         say(f"    failed: {failure}")
     else:
         say("    failed: every model failed")

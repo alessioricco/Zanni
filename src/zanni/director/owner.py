@@ -27,9 +27,9 @@ class Owner:
                 "paused": {"reason": s.paused} if s.paused else None,
                 "round": s.round, "spend": s.spend_text().replace("$", "")}
 
-    def decide(self, action: str, note: str = "", by: str = "owner") -> tuple[int, dict]:
+    def decide(self, action: str, note: str = "", by: str = "owner", another_round: bool = False) -> tuple[int, dict]:
         """(HTTP status, body): 200 with the new state, or 409 when there is nothing to decide, in plain words."""
-        problem = self.production.gates.decide(action, note, by)
+        problem = self.production.gates.decide(action, note, by, another_round)
         if problem:
             return 409, {"error": problem, **self.status()}
         # The play moves on as soon as the decision is taken: it no longer waits.
