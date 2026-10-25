@@ -407,7 +407,7 @@ class Production:
         self.log.event("round-ended", round=self.state.round, reason=reason)
         if stop := rules.may_end_round(self.state):
             self.stop_run(stop)
-            return f"round {self.state.round} was the last one the script allows (stop.max_rounds); the play stopped"
+            return f"round {self.state.round} was the last one this play allows (max_rounds); the play stopped"
         self.state.round += 1
         self.state.turns, self.state.round_spend = 0, Decimal(0)
         self.say(f"Round {self.state.round}")
@@ -452,7 +452,7 @@ class Production:
     def summary(self) -> str:
         """The play's state, as code keeps it, for the start of every turn (D33)."""
         s = self.state
-        rounds = f" of {s.script.stop.max_rounds}" if s.script.stop.max_rounds else ""
+        rounds = f" of {s.max_rounds}" if s.max_rounds else ""
         budget = (f" of a ${s.budget:.2f} budget ({sum(s.reservations.values(), Decimal(0)):.4f} reserved by pending cues)"
                   if s.budget is not None else " (no budget)")
         lines = [f"Round {s.round}{rounds}; turn {s.turns} of {s.play.house_rules.max_director_turns} in this round.",

@@ -1,0 +1,10 @@
+# A play may lower its script's stop.max_rounds (2 here), never raise it (D58).
+name: p
+script: ../fixtures/scripts/with-verifiers
+stage: ./s
+cast:
+  coder: roles/coder
+house_rules:
+  max_rounds: 1
+verifiers:
+  lint: { command: [ruff, check] }

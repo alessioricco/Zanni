@@ -6,7 +6,7 @@ The director is an agent, and it reads the script. So a script is mostly prose, 
 
 ## The file
 
-A script is a Markdown file named `SCRIPT.md`. It may sit in a folder with files it refers to, such as templates. It has two parts:
+A script is a Markdown file named `SCRIPT.md`. It may sit in a folder with files it refers to, such as templates, or the check files its verifiers run ([A verifier](#a-verifier)). It has two parts:
 
 1. **Frontmatter:** YAML between `---` lines at the top, holding only what must be checked: the parts, their limits, the workspace the script expects, its gates, its verifiers and its stop rules.
 2. **Prose:** everything else, for the director: acts, scenes, cues, hand-offs and verifiers.
@@ -36,7 +36,7 @@ gates: [publish]
 The **editor** splits `brief.md` into angles and assigns one to each **reporter**. …
 ```
 
-The repository has two examples: `examples/scripts/software-team/SCRIPT.md`, the first version's script, and `examples/scripts/newsroom/SCRIPT.md`.
+The repository has two examples: `examples/scripts/software-team/SCRIPT.md`, the first version's script, with review loops and check files (D58, D59), and `examples/scripts/newsroom/SCRIPT.md`.
 
 ## Frontmatter fields
 
@@ -49,7 +49,7 @@ The repository has two examples: `examples/scripts/software-team/SCRIPT.md`, the
 | `stage.expects` | list of paths | no | none | the director, before the first cue | Paths the stage must hold before the play starts, such as `vision.md`. |
 | `gates` | list of names, or of [gates](#a-gate) | no | none | the director | The moments that need a human's approval. A play's `house_rules.gates` must name only these. |
 | `verifiers` | map of name → [verifier](#a-verifier) | no | none | the director | The checks the director runs on the stage, by name (D35). |
-| `stop.max_rounds` | whole number, at least 1 | no | none | the director | The most rounds the work may take. |
+| `stop.max_rounds` | whole number, at least 1 | no | none | the director | The most rounds the work may take. A play may lower it with `house_rules.max_rounds`, and its owner may grant one more round at a gate ([Play: gates and pauses](play.md#gates-and-pauses), D60). |
 | `stop.budget_per_round` | number, at least 0, in USD | no | none | the director | The most one round may spend. The play's budget still applies on top. |
 | `stop.done_when` | list of verifier names | no | none | the director | The verifiers that must pass, after the stage's last change, before the director may stop the play as done (D33, D35). Each must be one of `verifiers`. |
 
@@ -91,6 +91,7 @@ A verifier is a check the director runs on a snapshot of the stage: a fresh fold
 | `description` | text | yes | — | — (for the director and the log) | What it checks, in plain words. |
 | `command` | list of text, at least one | no | none | the director | The command to run, as a default. A play gives its own command for its project ([Play: verifiers](play.md#verifiers)); a verifier with no command after the play's is refused before anything runs. |
 | `timeout` | whole number of seconds, at least 1 | no | `300` | the director | How long the command may run before it fails. |
+| `files` | list of paths in the script's package | no | none | the director | Check files the command runs, such as `checks/criteria.py` (D55). |
 
 ```yaml
 verifiers:
@@ -104,6 +105,15 @@ stop:
   done_when: [tests-pass]
 ```
 
+- **Check files:** a check longer than one line belongs in a file in the script's package, listed in `files`. Before the command runs, the director copies the listed files into a fresh folder beside the snapshot, never onto the stage, and the command finds that folder as `${ZANNI_SCRIPT}`, in any of its arguments. No seat can change them, and `play.lock`'s content hash pins them with the rest of the package. A verifier seat receives them with the command (D55). Each path is relative to the script's folder, uses `/`, and must exist; a play's own command may use them too.
+
+  ```yaml
+  verifiers:
+    tests-cover-criteria:
+      description: every acceptance criterion in the round's backlog has a test that names its id
+      command: [python3, "${ZANNI_SCRIPT}/checks/criteria.py", backlog, tests]
+      files: [checks/criteria.py]
+  ```
 - **Not every verifier must pass at the end:** "every new test fails" checks one scene's work, and is meant to fail once the code exists. Only `stop.done_when` names what "done" means.
 - **Stale verdicts:** a verdict counts for "done" only if no change was made on the stage after it.
 - **No verdict while work is in flight:** the director runs no verifier while a cue that writes to the stage is pending.
@@ -147,6 +157,7 @@ Each turn of the director is a fresh model run, given a summary of the play's st
 
 - the frontmatter, strictly, under D10: unknown keys and secrets are rejected;
 - that every `stop.done_when` names one of `verifiers`, and every gate's `before` names one of `parts`;
+- that every verifier's `files` exist in the script's folder;
 - that the prose is present.
 
 ```

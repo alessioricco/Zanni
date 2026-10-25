@@ -69,9 +69,11 @@ The server, as served by Zanni's director (D31):
 
 - **Errors:** a refused operation is a tool result with `isError` set, whose text ends with `<code>: <message>`, using the errors of the [operations](#operations), such as `not-permitted: this seat may not write app/x.py; it may write: tests/`. An MCP server library may put its own words before it.
 
-### Direct access, for a checkout
+### A workspace, for an engine that works on files
 
-Coding engines work on a real checkout. Giving a seat direct access to a git stage, a clone it pushes from, is planned with the coding engine in milestone 6 (D46): `zanni.cast`'s `stage.direct` is reserved for it, and no director sends it yet. Every seat uses MCP only.
+An engine that works on real files, such as a coding engine, gets a **workspace** on the actor's side (D52): at the start of each cue, the actor copies every file the seat may read into a fresh local folder; the engine works there; at the end of the cue, the actor sends what changed back as ordinary `stage_write` and `stage_delete` calls. The workspace is a client of these five operations, with the seat's own token, so every change it sends is checked, committed and recorded like any other write, and the stage never sees half-done work. See [Actor configuration: the workspace](actor-configuration.md#the-workspace).
+
+**Direct access**, a git checkout per seat that it pushes from, isn't needed for that, and is deferred to after the first version (D52). `zanni.cast`'s `stage.direct` stays reserved for it, and no director sends it. Every seat uses MCP only.
 
 ## Backends
 
@@ -168,6 +170,6 @@ stage: { backend: mcp, url: http://docs.internal:8800/mcp }      # no shorthand:
 
 ## Not in this spec yet
 
-- **Direct access** to a git stage, for coding engines: milestone 6 (D46).
+- **Direct access** to a git stage, a checkout per seat: after the first version (D52). A [workspace](#a-workspace-for-an-engine-that-works-on-files) covers engines that work on files.
 - **Isolated writes,** a workspace per seat merged by the director (D44), and **binary content** (D43): `TODO.md`.
 - **Narrowing:** narrowing a seat's permissions from the play is not in the first version.

@@ -23,11 +23,18 @@ def summarise(doc: ActorConfiguration | PlayFile | RoleManifest | Script | Lockf
                 bits.append("text tool format")
             if m.price:
                 bits.append(f"${m.price.input}/${m.price.output} per million tokens")
+            if m.max_output:
+                bits.append(f"at most {m.max_output} tokens per response")
             lines.append(f"    {i}. {', '.join(bits)}")
         stored = set(doc.stored_credentials())
         # Credential values are never shown (D15): only their names, and where each one comes from.
         creds = [f"{k} ({'stored, hidden' if k in stored else 'from the environment'})" for k in doc.credentials]
         lines.append(f"  credentials: {', '.join(creds) or 'none; models use their usual environment variables'}")
+        for name, tool in doc.tools.items():
+            price = f"${tool.price.per_call} per call" if tool.price else "price unknown"
+            lines.append(f"  tool it brings: {name}, {tool.command or tool.url} ({price})")
+        if doc.workspace.commands:
+            lines.append(f"  workspace may run: {', '.join(doc.workspace.commands)}")
         state = doc.state_dir or f"~/.zanni/actors/{doc.name or '<name>'}"
         lines.append(f"  state: {state}")
         return lines
@@ -43,7 +50,8 @@ def summarise(doc: ActorConfiguration | PlayFile | RoleManifest | Script | Lockf
         budget = f"${rules.budget:.2f}" if rules.budget is not None else "none set"
         cap = f"; at most {rules.max_seats_per_host} seats per host" if rules.max_seats_per_host else ""
         wait = f"; gates wait at most {rules.gate_timeout} s" if rules.gate_timeout else ""
-        lines.append(f"  house rules: budget {budget}; human gates: {', '.join(rules.gates) or 'none'}{wait}{cap}; "
+        rounds = (f"; at most {rules.max_rounds} round{'s' if rules.max_rounds > 1 else ''}" if rules.max_rounds else "")
+        lines.append(f"  house rules: budget {budget}; human gates: {', '.join(rules.gates) or 'none'}{wait}{cap}{rounds}; "
                      f"at most {rules.max_director_turns} director turns per round")
         if doc.verifiers:
             lines.append(f"  verifier commands: {', '.join(doc.verifiers)}")
@@ -77,7 +85,8 @@ def summarise(doc: ActorConfiguration | PlayFile | RoleManifest | Script | Lockf
             lines.append("  verifiers:")
             for name, v in doc.verifiers.items():
                 command = " ".join(v.command) if v.command else "no default command: the play gives it"
-                lines.append(f"    {name}: {v.description} ({command})")
+                files = f"; runs {', '.join(v.files)} from the script" if v.files else ""
+                lines.append(f"    {name}: {v.description} ({command}{files})")
         rules = [f"at most {doc.stop.max_rounds} rounds"] if doc.stop.max_rounds else []
         if doc.stop.budget_per_round is not None:
             rules.append(f"${doc.stop.budget_per_round:.2f} per round")

@@ -1,0 +1,6 @@
+role: zanni:director
+play: ../fixtures/director/play.yaml
+models:
+  - { provider: anthropic, model: claude-haiku-5-5 }
+tools:
+  coding-engine: { command: some-engine }

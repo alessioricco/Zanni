@@ -41,8 +41,8 @@ def check_body(loaded: Loaded) -> None:
 
 
 def check_script(loaded: Loaded, script: Script) -> None:
-    """The prose is present, `stop.done_when` names only the script's verifiers (D35), and a gate's `before` only
-    its parts (D48)."""
+    """The prose is present, `stop.done_when` names only the script's verifiers (D35), a gate's `before` only
+    its parts (D48), and every verifier's check files are in the script's folder (D55)."""
     check_body(loaded)
     errors = []
     seen = set()
@@ -57,6 +57,14 @@ def check_script(loaded: Loaded, script: Script) -> None:
                 where = ("gates", i, "before", j)
                 errors.append(FileError(loaded.file, loaded.line(where), where, f'"{part}" is not one of the script\'s parts',
                                         f"use one of: {', '.join(script.parts)}"))
+    folder = Path(loaded.file).parent
+    for name, verifier in script.verifiers.items():
+        for i, path in enumerate(verifier.files):
+            if not (folder / path).is_file():
+                where = ("verifiers", name, "files", i)
+                errors.append(FileError(loaded.file, loaded.line(where), where,
+                                        f'"{path}" is not a file in the script\'s folder',
+                                        f"add it to {folder}, or fix the path, relative to the script's folder"))
     for i, name in enumerate(script.stop.done_when):
         if name not in script.verifiers:
             where = ("stop", "done_when", i)
@@ -115,6 +123,12 @@ def against_script(loaded: Loaded, play: PlayFile, script: Script) -> list[FileE
         if part not in play.cast and not spec.optional:
             errors.append(FileError(loaded.file, loaded.line(("cast",)), ("cast",),
                                     f"doesn't cast the script's part `{part}`", f"add `{part}:` with a role to cast"))
+    most = script.stop.max_rounds
+    if play.house_rules.max_rounds and most and play.house_rules.max_rounds > most:
+        where = ("house_rules", "max_rounds")
+        errors.append(FileError(loaded.file, loaded.line(where), where,
+                                f"{play.house_rules.max_rounds} is more than the script's stop.max_rounds, {most}",
+                                f"use {most} or fewer; a play may lower the script's limit, never raise it"))
     for i, gate in enumerate(play.house_rules.gates):
         if gate not in script.gate_names:
             where = ("house_rules", "gates", i)
@@ -327,6 +341,25 @@ def check_director(loaded: Loaded, director: ActorConfiguration) -> list[str]:
     return check_director_seats(loaded, director, Path(where).resolve(), play) + notes
 
 
+def check_bindings(loaded: Loaded, actor: ActorConfiguration) -> list[str]:
+    """The tools an actor brings must be tools its role needs (D53); a remote role is checked when it is fetched."""
+    if not actor.tools:
+        return []
+    if REMOTE_REF.match(actor.role):
+        return ["  tools: checked against the role when the actor fetches it (D37)"]
+    manifest = Path(loaded.file).parent / actor.role / "role.yaml"
+    if not manifest.is_file():
+        return []  # a missing role folder is reported when the actor starts
+    needs = validate(load_file(manifest), RoleManifest).needs.tools
+    errors = [FileError(loaded.file, loaded.line(("tools", name)), ("tools", name),
+                        f'"{name}" is not a tool the role needs', "bind only tools in the role's needs.tools: "
+                        f"{', '.join(needs) or 'none (this role needs no tools)'}")
+              for name in actor.tools if name not in needs]
+    if errors:
+        raise FileErrors(errors)
+    return ["  tools: each is one the role needs"]
+
+
 def check_actor_play(loaded: Loaded, actor: ActorConfiguration) -> list[str]:
     """An actor configuration's `play`: a director, a play file, or a local rehearsal (D26, D30)."""
     if actor.is_director:
@@ -450,7 +483,7 @@ def check(path: str | Path) -> tuple[BaseModel, list[str]]:
         notes = check_play(loaded, doc)
     if isinstance(doc, ActorConfiguration):
         check_credentials(loaded, doc)
-        notes = check_actor_play(loaded, doc)
+        notes = check_bindings(loaded, doc) + check_actor_play(loaded, doc)
     if isinstance(doc, Rehearsal):
         check_rehearsal(loaded, doc)
     return doc, notes

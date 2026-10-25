@@ -13,6 +13,7 @@ from zanni.files.loader import Loaded
 M = TypeVar("M", bound=BaseModel)
 
 SECRET_WORDS = {"key", "apikey", "token", "secret", "password", "passwd"}
+ENV_REF = re.compile(r"^\$\{[A-Za-z_][A-Za-z0-9_]*(:-[^}]*)?\}$")
 
 _TYPE_NAMES = {
     "string_type": "text", "int_type": "a whole number", "int_parsing": "a whole number",
@@ -97,14 +98,26 @@ def is_secret_name(name: str) -> bool:
     return bool(words & SECRET_WORDS) or "apikey" in name.lower().replace("_", "").replace("-", "")
 
 
-def find_secrets(loaded: Loaded, allowed: tuple[str, ...] = ()) -> list[FileError]:
-    """Secret-looking keys anywhere, except under the top-level sections in `allowed`."""
+def _matches(path: Path, pattern: tuple[str, ...]) -> bool:
+    return len(path) == len(pattern) and all(p == "*" or p == part for p, part in zip(pattern, path))
+
+
+def find_secrets(loaded: Loaded, allowed: tuple[str, ...] = (),
+                 references: tuple[tuple[str, ...], ...] = ()) -> list[FileError]:
+    """Secret-looking keys anywhere, except under the top-level sections in `allowed`; under a section matching one
+    of `references` (`*` matches any key), a secret-looking key may hold a ${VAR} reference, never a value."""
     found: list[FileError] = []
 
     def walk(value: Any, path: Path) -> None:
         if isinstance(value, dict):
             for k, v in value.items():
                 if not path and k in allowed:
+                    continue
+                if isinstance(k, str) and is_secret_name(k) and any(_matches(path, r) for r in references):
+                    if not (isinstance(v, str) and ENV_REF.match(v)):
+                        found.append(FileError(loaded.file, loaded.line((*path, k)), (*path, k),
+                                               "holds a secret's value, which belongs only in `credentials`",
+                                               f"write ${{{k}}} here, and put the value under `credentials`"))
                     continue
                 if isinstance(k, str) and is_secret_name(k):
                     fix = ("move it to this file's `credentials` section" if "credentials" in allowed
@@ -124,7 +137,8 @@ def find_secrets(loaded: Loaded, allowed: tuple[str, ...] = ()) -> list[FileErro
 
 def validate(loaded: Loaded, model: type[M], *, reject_secrets: bool = True) -> M:
     secret_sections = getattr(model, "SECRET_SECTIONS", ())  # top-level sections allowed to hold secrets (D15)
-    errors = find_secrets(loaded, secret_sections) if reject_secrets else []
+    references = getattr(model, "REFERENCE_SECTIONS", ())  # sections whose secrets must be ${VAR} references (D53)
+    errors = find_secrets(loaded, secret_sections, references) if reject_secrets else []
     try:
         result = model.model_validate(loaded.data)
     except ValidationError as e:

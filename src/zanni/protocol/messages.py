@@ -158,6 +158,9 @@ class Verify(Wire):
     command: list[Text] = Field(min_length=1, description="The command to run, exactly as given.")
     timeout: Seconds
     marker: Text = Field(description="The stage's change marker when the director sent it.")
+    files: dict[Text, str] = Field(default_factory=dict, description=(
+        "The script's check files the command runs, by their path in the script's package (D55); the seat writes "
+        "them into a fresh folder, which the command finds as ${ZANNI_SCRIPT}."))
 
 
 class Verdict(Wire):

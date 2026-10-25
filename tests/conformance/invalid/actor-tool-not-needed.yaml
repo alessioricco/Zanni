@@ -1,0 +1,6 @@
+role: ../fixtures/roles/worker
+play: http://director.example.com:8765
+models:
+  - { provider: ollama, model: qwen3.8:27b }
+tools:
+  browser: { command: some-browser }

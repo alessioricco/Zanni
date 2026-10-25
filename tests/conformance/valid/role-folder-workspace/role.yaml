@@ -1,0 +1,8 @@
+name: coder
+version: 0.1.0
+mission: Make the tests pass, in whatever stack the project names.
+model: { needs: { tools: true, tier: coding } }
+needs:
+  stage_read: [spec/, tests/, app/]
+  stage_write: [app/]
+  tools: [workspace]

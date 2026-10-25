@@ -53,7 +53,7 @@ This touches four places, all in one commit:
 
 1. Change the model in `src/zanni/protocol/`.
 2. Regenerate the schemas: `uv run python -m zanni.protocol.schemas`.
-3. Update `docs/spec/casting-extension.md`, and bump the extension's version (now `#v3`) if any field changed (D22).
+3. Update `docs/spec/casting-extension.md`, and bump the extension's version (now `#v4`) if any field changed (D22).
 4. Add valid and invalid examples under `tests/conformance/protocol/`.
 
 ### Version updates of the engine's dependencies

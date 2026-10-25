@@ -1,0 +1,9 @@
+{
+  "kind": "zanni.verify",
+  "verify": "v7",
+  "verifier": "tests-cover-criteria",
+  "command": ["python3", "${ZANNI_SCRIPT}/checks/criteria.py", "backlog", "tests"],
+  "timeout": "60",
+  "marker": "12",
+  "files": { "checks/criteria.py": "import sys\nsys.exit(0)\n" }
+}

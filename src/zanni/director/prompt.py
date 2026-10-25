@@ -25,8 +25,8 @@ def instructions(script: Script, prose: str, play: PlayFile) -> str:
         parts.append(f"- **{name}**: {'; '.join(bits)}")
     verifiers = [f"- `{n}`: {v.description}" for n, v in script.verifiers.items()] or ["- none"]
     stop = []
-    if script.stop.max_rounds:
-        stop.append(f"at most {script.stop.max_rounds} round(s)")
+    if rounds := play.house_rules.max_rounds or script.stop.max_rounds:
+        stop.append(f"at most {rounds} round(s)")
     if script.stop.budget_per_round is not None:
         stop.append(f"at most ${script.stop.budget_per_round:.2f} per round")
     if script.stop.done_when:

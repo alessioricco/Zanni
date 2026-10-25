@@ -1,0 +1,7 @@
+# A fixture role that needs two tools, for actor configurations that bind them (D53).
+name: worker
+version: 0.1.0
+mission: Change files in a workspace, with a coding engine.
+needs:
+  stage_write: [app/]
+  tools: [workspace, coding-engine]

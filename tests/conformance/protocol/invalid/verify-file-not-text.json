@@ -1,0 +1,9 @@
+{
+  "kind": "zanni.verify",
+  "verify": "v7",
+  "verifier": "tests-cover-criteria",
+  "command": ["python3", "${ZANNI_SCRIPT}/criteria.py"],
+  "timeout": "60",
+  "marker": "12",
+  "files": { "criteria.py": 42 }
+}

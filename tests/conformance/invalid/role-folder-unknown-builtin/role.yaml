@@ -1,0 +1,5 @@
+name: coder
+version: 0.1.0
+mission: Make the tests pass.
+needs:
+  tools: [shell]

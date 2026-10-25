@@ -101,6 +101,7 @@ class ModelEntry(Strict):
     price: Price | None = None  # for models published prices don't cover, such as local ones (D7)
     fall_back_on: list[Literal["error", "timeout", "rate-limit", "context", "refusal"]] = \
         ["error", "timeout", "rate-limit", "context"]
+    max_output: int | None = Field(default=None, ge=1)  # the most tokens in one response; none: the provider's (D61)
 
     @model_validator(mode="after")
     def _endpoint(self) -> "ModelEntry":
@@ -123,6 +124,39 @@ def _role_ref(value: object) -> object:
     return _package_ref(value)
 
 
+class ToolPrice(Strict):
+    per_call: Decimal = Field(ge=0)  # USD the play is charged for each call to the tool (D53)
+
+
+class ToolBinding(Strict):
+    """A server the actor brings for one of its role's tools, in mcp.json's shape, with what it charges (D53)."""
+
+    command: str | None = Field(default=None, min_length=1)
+    args: list[str] = []
+    env: dict[str, str] = {}
+    url: str | None = Field(default=None, min_length=1)
+    headers: dict[str, str] = {}
+    price: ToolPrice | None = None  # none: the tool's cost is unknown, never zero (D7)
+
+    @model_validator(mode="after")
+    def _command_or_url(self) -> "ToolBinding":
+        if bool(self.command) == bool(self.url):
+            raise ValueError("a tool needs exactly one of `command` (a server the actor starts) or `url` "
+                             "(a server it reaches); give one")
+        if self.command and self.command.startswith("zanni:"):
+            raise ValueError(f'"{self.command}" is a server Zanni ships; a role names it in its mcp.json, and a '
+                             "binding brings a server of the actor's own")
+        if self.url and (self.args or self.env):
+            raise ValueError("`args` and `env` are for a server the actor starts; a `url` server takes `headers`")
+        if self.command and self.headers:
+            raise ValueError("`headers` are for a server reached by `url`; a `command` server takes `args` and `env`")
+        return self
+
+
+class Workspace(Strict):
+    commands: list[Annotated[str, Field(min_length=1)]] = []  # what `run` may start on this machine; none: nothing (D52)
+
+
 class VerifierSeats(Strict):
     """Where a director lets its play's verifiers run, besides its own machine (D45)."""
 
@@ -139,6 +173,7 @@ class ActorConfiguration(Strict):
     """
 
     SECRET_SECTIONS: ClassVar[tuple[str, ...]] = ("credentials",)
+    REFERENCE_SECTIONS: ClassVar[tuple[tuple[str, ...], ...]] = (("tools", "*", "env"), ("tools", "*", "headers"))
 
     name: str | None = Field(default=None, min_length=1)
     role: Annotated[str, BeforeValidator(_role_ref)]
@@ -148,6 +183,8 @@ class ActorConfiguration(Strict):
     state_dir: str | None = None  # default: ~/.zanni/actors/<name>
     seats: dict[str, list[Annotated[str, Field(min_length=1)]]] = {}  # director only: part -> actor configurations
     verifier_seats: VerifierSeats = VerifierSeats()  # director only: verifier seats it trusts (D45)
+    tools: dict[str, ToolBinding] = {}  # servers this actor brings for its role's tools (D53)
+    workspace: Workspace = Workspace()  # what a workspace may run on this machine (D52)
 
     @field_validator("models")
     @classmethod
@@ -183,6 +220,15 @@ class ActorConfiguration(Strict):
             raise ValueError(f"`verifier_seats` lists the verifier seats a director trusts; only a configuration with "
                              f"role: {DIRECTOR_ROLE} may have it")
         return seats
+
+    @field_validator("tools", "workspace")
+    @classmethod
+    def _not_for_built_in_roles(cls, value, info):
+        role = info.data.get("role")
+        if role in BUILT_IN_ROLES and value not in ({}, Workspace()):
+            raise ValueError(f"the built-in role {role} has no tools to bind and runs no workspace; "
+                             f"remove `{info.field_name}`")
+        return value
 
     @property
     def is_director(self) -> bool:
@@ -235,6 +281,7 @@ class HouseRules(Strict):
     max_director_turns: int = Field(default=30, ge=1)  # the director's model turns in one round (D33)
     requests_per_turn: int = Field(default=25, ge=1)  # model requests in one director turn (D49)
     cast_timeout: Duration = 600  # seconds a part may wait below its minimum seats for an actor to join (D50)
+    max_rounds: int | None = Field(default=None, ge=1)  # at most the script's stop.max_rounds; none: the script's (D58)
 
 
 GIT_URL = re.compile(r"^(git@[^:\s]+:\S+|(ssh|git|https?)://\S+\.git/?|\S+\.git/?)$")
@@ -408,12 +455,22 @@ class StopRules(Strict):
 VERIFIER_TIMEOUT = 300  # seconds
 
 
+def _package_path(value: object) -> object:
+    """A path inside a package: relative, with `/`, no `..` and no empty segment."""
+    if isinstance(value, str) and (value.startswith("/") or "\\" in value
+                                   or any(seg in ("", ".", "..") for seg in value.split("/"))):
+        raise ValueError(f'"{value}" is not a path inside the script\'s package; write it relative to the script\'s '
+                         "folder, with /, e.g. checks/criteria.py")
+    return value
+
+
 class ScriptVerifier(Strict):
-    """A check the director runs in the stage, by name: it passes when its command exits 0 (D35)."""
+    """A check the director runs on a snapshot of the stage, by name: it passes when its command exits 0 (D35, D45)."""
 
     description: str = Field(min_length=1)  # what it checks, in plain words; the prose refers to it by name
     command: list[str] | None = Field(default=None, min_length=1)  # a default; a play may give its own
     timeout: int = Field(default=VERIFIER_TIMEOUT, ge=1)  # seconds
+    files: list[Annotated[str, BeforeValidator(_package_path)]] = []  # check files, found as ${ZANNI_SCRIPT} (D55)
 
 
 class Gate(Strict):
@@ -510,6 +567,10 @@ class SkillFrontmatter(BaseModel):
 # mcp.json, the standard `mcpServers` format shared with Claude Desktop, Claude Code and Cursor.
 # Server entries may carry keys other clients use (type, disabled, ...); those are left alone.
 
+WORKSPACE_SERVER = "zanni:workspace"  # the only server Zanni ships for roles: a local copy of the stage (D52)
+BUILT_IN_SERVERS = (WORKSPACE_SERVER,)
+
+
 class McpServer(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
@@ -524,6 +585,11 @@ class McpServer(BaseModel):
     def _command_or_url(self) -> "McpServer":
         if bool(self.command) == bool(self.url):
             raise ValueError("a server needs exactly one of `command` (a local process) or `url` (a remote server)")
+        if self.command and self.command.startswith("zanni:"):
+            if self.command not in BUILT_IN_SERVERS:
+                raise ValueError(f'"{self.command}" is not a server Zanni ships; use {" or ".join(BUILT_IN_SERVERS)}')
+            if self.args or self.env or self.cwd:
+                raise ValueError(f"{self.command} is built in, and takes no `args`, `env` or `cwd`; remove them")
         return self
 
 

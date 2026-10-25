@@ -12,7 +12,7 @@ roles/tester/
   rehearsals/     # the role's own tests: rehearsals and their stage folders (optional)
 ```
 
-Only `role.yaml` is Zanni's own format. `AGENTS.md`, `skills/` and `mcp.json` follow their standards unchanged, and none of them may name a model vendor or an engine (golden rule 4). The repository's example is `examples/roles/tester/`.
+Only `role.yaml` is Zanni's own format. `AGENTS.md`, `skills/` and `mcp.json` follow their standards unchanged, and none of them may name a model vendor or an engine (golden rule 4). The repository's example is `examples/roles/tester/`, one of the software team's six roles (D57).
 
 ## role.yaml
 
@@ -22,11 +22,11 @@ A role manifest is recognised by having `mission` (and no `parts`, which would m
 name: tester
 version: 1.4.0
 mission: Turn acceptance criteria into tests; explore the running app and report findings.
-model: { needs: { tools: true, tier: judgement }, suggested: claude-sonnet-5-5 }
+model: { needs: { tools: true, tier: coding } }
 needs:
-  stage_read: [vision.md, backlog/, spec/]
-  stage_write: [tests/, findings/]
-  tools: [browser, test-runner]
+  stage_read: [vision.md, backlog/, spec/, app/, tests/, findings/, reviews/]
+  stage_write: [tests/, findings/, reviews/]
+  tools: [workspace]
 never:
   - edit application code
   - change priorities
@@ -49,7 +49,7 @@ A role's needs are **requests, not grants**. The script's part sets a ceiling on
 | `model.suggested` | text | no | none | — (a hint) | A model the actor configuration may use. Roles never require a model (D11). |
 | `needs.stage_read` | list of paths | no | none | the stage | Stage paths the role asks to read. A path ending in `/` is a folder ([Stage: paths](stage.md#paths)). |
 | `needs.stage_write` | list of paths | no | none | the stage | Stage paths the role asks to write. |
-| `needs.tools` | list of names | no | none | `zanni`, when validating the folder; the actor, at run time | The MCP servers the role needs. Each must be a server in the role's `mcp.json`. |
+| `needs.tools` | list of names | no | none | `zanni`, when validating the folder; the actor, at run time | The tools the role needs, by name. Each must be a server in the role's `mcp.json`, its default; an actor's configuration may bring its own server for any of them ([Actor configuration: tools the actor brings](actor-configuration.md#tools-the-actor-brings), D53). |
 | `never` | list of text | no | none | — (guidance) | Things the role must never do. These are instructions to the model, **not limits**: the real limits are the stage's permissions and the verifiers. |
 | `outputs` | map of path → description | no | none | `zanni`; verifiers, on the director's side | What the role produces. Each path must be inside `needs.stage_write`, and may hold a placeholder such as `<item>`. |
 
@@ -60,7 +60,8 @@ A role's needs are **requests, not grants**. The script's part sets a ceiling on
 | Tier | For |
 |---|---|
 | `judgement` | Deciding, designing and reviewing: the product owner, architect, designer and reviewers. |
-| `coding` | Changing code through a coding engine: coders. |
+| `coding` | Changing code through a coding engine: coders and testers. |
+| `planning` | Breaking work into tasks and following it through: a developer lead. |
 | `basic` | Simple, repetitive steps where speed matters more than depth. |
 
 ## Versions
@@ -106,13 +107,14 @@ The director fetches a play's script and roles, and an actor fetches its role, w
   - every server has exactly one of `command` or `url`;
   - any `env` or `headers` value whose name looks like a secret must be a `${VAR}` reference, since a role is shared. The value comes from the actor's configuration (see [Actor configuration: credentials](actor-configuration.md#credentials)) or its environment.
   - Keys other MCP clients use, such as `type` or `disabled`, are left alone.
+  - **Built-in servers:** a `command` starting with `zanni:` names a server Zanni ships, with no `args`. The only one is `zanni:workspace`, a local copy of the stage to work in ([Actor configuration: the workspace](actor-configuration.md#the-workspace), D52); any other `zanni:` command is refused.
 - **`needs.tools`:** every name is a server in `mcp.json`.
 - **`rehearsals/*.yaml`:** every rehearsal is valid, and its stage folder exists ([Rehearsal](rehearsal.md)).
 
 ```
 Role manifest: the role 'tester' 1.4.0.
   …
-  folder: AGENTS.md; skills: explore-app, write-test; mcp.json servers: browser, test-runner
+  folder: AGENTS.md; skills: explore-app, review-a-document, write-test; mcp.json servers: workspace
 Valid.
 ```
 

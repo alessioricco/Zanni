@@ -1,0 +1,9 @@
+name: p
+script: ../fixtures/scripts/with-verifiers
+stage: ./s
+cast:
+  coder: roles/coder
+house_rules:
+  max_rounds: 3
+verifiers:
+  lint: { command: [ruff, check] }

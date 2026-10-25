@@ -19,7 +19,7 @@
               "contains": {
                 "properties": {
                   "uri": {
-                    "const": "https://github.com/alessioricco/Zanni/blob/master/docs/spec/casting-extension.md#v3"
+                    "const": "https://github.com/alessioricco/Zanni/blob/master/docs/spec/casting-extension.md#v4"
                   }
                 },
                 "required": [

@@ -15,7 +15,8 @@ from zanni.log import Log
 from zanni.protocol.messages import Cue, Refused, Report
 
 
-def state(budget=None, gates=(), house_gates=(), done_when=(), max_rounds=None, per_round=None, seats="1-2"):
+def state(budget=None, gates=(), house_gates=(), done_when=(), max_rounds=None, per_round=None, seats="1-2",
+          play_rounds=None):
     script = Script.model_validate({
         "name": "kata", "version": "1.0.0", "mission": "m", "parts": {"coder": {"seats": seats}, "tester": {}},
         "gates": list(gates),
@@ -24,7 +25,8 @@ def state(budget=None, gates=(), house_gates=(), done_when=(), max_rounds=None, 
         "stop": {"done_when": list(done_when), "max_rounds": max_rounds, "budget_per_round": per_round}})
     play = PlayFile.model_validate({"name": "p", "script": "./kata", "stage": "./stage",
                                     "cast": {"coder": {"role": "./coder", "host": "local"}, "tester": "./tester"},
-                                    "house_rules": {"budget": budget, "gates": list(house_gates)}})
+                                    "house_rules": {"budget": budget, "gates": list(house_gates),
+                                                    "max_rounds": play_rounds}})
     return PlayState(play, script)
 
 
@@ -154,6 +156,13 @@ def test_rounds_stop_at_max_rounds():
     assert rules.may_end_round(s) is None
     s.round = 2
     assert rules.may_end_round(s) == "max-rounds"
+
+
+def test_a_play_may_lower_the_scripts_max_rounds():
+    """D58: the software plays run one round of a script that allows several."""
+    s = state(max_rounds=5, play_rounds=1)
+    assert s.max_rounds == 1 and rules.may_end_round(s) == "max-rounds"
+    assert state(play_rounds=2).max_rounds == 2 and state(max_rounds=3).max_rounds == 3
 
 
 # The host cap, and changes per seat (D41)

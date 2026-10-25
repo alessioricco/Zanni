@@ -804,3 +804,116 @@ The loop is about 25 lines.
 **Decision:** `examples/plays/slug-kata-git/` runs the slug kata's script and roles on a git stage, whose remote is a bare repository that a small setup script makes from the stage folder (a repository can't ship inside this one). `examples/plays/release-notes/` is a play whose work isn't code: a writer turns a changelog into release notes, an editor revises them, and a verifier checks their structure on a verifier seat. Its stage is `examples/stage-servers/sqlite/`.
 
 **Why:** Alessio's call at milestone 5's ask point I. Each example needs no account and no network, and together they run every new piece: the git backend, the `mcp` backend, a verifier seat, gates per round and shorter turns.
+
+## D52. A coding engine works in a workspace, a local copy of the stage synced at the end of each cue (2026-10-25)
+
+**Decision:** Zanni ships an MCP server, `zanni:workspace`, that an actor runs for itself. It isn't for code only: it gives any role that works on files, a coder or a novelist, a real folder.
+
+1. **At the start of a cue,** it fills a fresh local folder with every stage file the seat may read, over the seat's own stage connection.
+2. **During the cue,** the actor's engine works in that folder: the workspace's own tools (`read_file`, `write_file`, `list_files`, `run`), or a tool the actor brings, given the folder (D53).
+3. **At the end of the cue,** before the actor reports, the workspace sends what changed to the stage as ordinary `stage_write` and `stage_delete` calls. The director's permission layer checks each one (D43), a git stage commits it with the seat as author (D46), and the record keeps it (D41). A change outside the cue's paths is refused, and the director adds the refusals to the report from its own record, as it adds the changes; the stage is unchanged by them.
+4. **`run`** runs a command in the folder, on the actor's machine, within a timeout, and returns its exit code and output. Only the commands the actor's configuration lists in `workspace.commands` may run, and none by default: running commands on a machine is its owner's decision, not the role's or the director's. Its exit codes count for nothing on the director's side; verifiers decide "done" (D45).
+
+- **Only at the end of a cue:** the stage never receives half-done work that another seat would trip on. A seat lost mid-cue loses its unsynced work, and its cue is resent to the next seat (D36).
+- **Direct access deferred again:** a git checkout per seat, pushed back (`zanni.cast`'s `stage.direct`, D46), moves to after the first version.
+
+**Why:** Alessio's call at milestone 6's ask point A, with the end-of-cue sync agreed after ask point C. A coding engine needs a real folder; this gives one without any seat holding git credentials or a route around the permission layer, on every backend and every model.
+
+**Considered and set aside:** direct access, as `TODO.md` planned it (git only, tokens per seat for git, merges, and permissions checked on a branch's diff after the fact); only the five stage tools and a test runner (no folder, so no engine an actor brings could work); no Zanni server, only engines actors bring (nothing would run on a local model, and the tests would need a third-party engine); syncing whenever the engine asks (another seat could see half-done work).
+
+**Amends:** D46 and `stage.md`, which planned direct access for milestone 6.
+
+## D53. An actor brings its own tools, as it brings its own models (2026-10-25)
+
+**Decision:** an actor configuration may bind a name in its role's `needs.tools` to a server of its own, in `mcp.json`'s shape, under `tools`: `{ command, args, env }` or `{ url, headers }`, with a `price`.
+
+- **Only what the role asks for:** a binding replaces the role's server of that name; a name the role doesn't need is an error, so an actor can't add tools its role didn't ask for. Without a binding, the role's `mcp.json` is the default.
+- **Built-in servers:** a role's `mcp.json` may name `zanni:workspace` as a server's `command` (D52), as a configuration may name the built-in roles `zanni:director` and `zanni:verifier`. Any other `zanni:` command is refused. A tool an actor brings gets the workspace's folder as `${ZANNI_WORKSPACE}`, and its changes reach the stage only through the workspace's sync.
+- **What a tool charges:** `price: { per_call }`, in USD, what the play is charged for each call, which may be 0. The actor adds it to each cue's reported cost, beside its models' (D39). Under a budget, every tool an actor binds needs a price, as every model does, or the actor is refused at join (`unpriced`). Unknown cost is never counted as zero (D7).
+- **Credentials:** a binding's `${VAR}` values come from the configuration's `credentials`, then the environment (D20), under D15's safeguards; a secret-looking `env` or `headers` value must be a reference. They never reach the director.
+- **Trust:** the spend an actor declares, for its models and its tools, is an act of trust for now; the director believes it, as it believes reported costs (D39). Checking it is deferred (`TODO.md`).
+
+**Why:** Alessio's call at milestone 6's ask point B. An actor is like a professional: it brings its own models and its favourite tools, and pays for them. One actor may run on a model the play's owner pays for, another on a friend's laptop with a model and a coding engine the friend pays for; the play's owner sees only what each charges. A role names what it needs, never which product provides it (golden rule 4).
+
+**Considered and set aside:** roles naming their servers, with no binding (an actor can't bring its own engine); deferring tools actors bring to the Connectors milestone (against the paradigm); the full Connectors design now (capability names shared across roles, connector packages, risk tiers: more than one round needs).
+
+**Amends:** D19 and D20: a role's `needs.tools` are served by its `mcp.json`, unless the actor's configuration binds them.
+
+## D54. Nobody merges: parallel seats work on paths that don't overlap (2026-10-25)
+
+**Decision:** a script whose seats work in parallel gives each its own paths, and each cue's `writes` says them, which the permission layer enforces on every write (D43). There is no merge. Files several seats need are written before they start, by one part, or assigned to one seat. A workspace (D52) is a local copy, not a branch: a seat sees others' work as it lands on the stage, at its next cue. When the combined work fails its verifiers, the failure becomes a new cue for one seat.
+
+**Why:** Alessio's call at milestone 6's ask point C, answering the vision's open question "who merges the coders' worktrees". With shared writes (D44), there are no worktrees to merge, and no model has to resolve merge conflicts. Alessio's condition: if seats keep needing the same files, branches and merges come back as a decision, from what the recorded runs count.
+
+**Considered and set aside, for now:** isolated writes, a branch per seat merged by the director (git only, and a model resolving conflicts); the coding engine merging (a correctness rule in an engine's goodwill).
+
+## D55. A script package may ship check files for its verifiers (2026-10-25)
+
+**Decision:** a script verifier may list `files`, paths in the script's package, such as `checks/criteria.py`, that its command runs. The director puts them in a fresh folder beside each snapshot, and the command finds that folder as `${ZANNI_SCRIPT}`; the files are never written to the stage, so no seat can change them. They are part of the script's package, so `play.lock`'s content hash pins them (D37). A verifier seat receives them with `zanni.verify`, as text, beside the command; the casting extension moves to `#v4`.
+
+The software script's verifiers, named by meaning (D56): `tests-cover-criteria` (every acceptance criterion has a test that names its id), `new-tests-fail`, `tests-pass` and `app-starts`; `done_when: [tests-pass, app-starts]`.
+
+**Why:** Alessio's call at milestone 6's ask point D. A check longer than one line belongs in a file that people can read and the lockfile pins, not in an inline `python -c` command.
+
+**Considered and set aside:** inline commands only; dropping the criteria check (nothing would check that every criterion has a test); verifier seats fetching the script themselves (a local script path means nothing on another machine).
+
+**Amends:** D45: `zanni.verify` gains `files`, so the casting extension's URI moves to `#v4`.
+
+## D56. A project's stack belongs to the play, never to the script or a role (2026-10-25)
+
+**Decision:** a script names its verifiers by meaning; the play gives their commands for its project's stack (D35). A role is generic: a coder writes code in whatever stack the project's own files name; knowledge of a stack may come as optional skills (D4). Each actor's `workspace.commands` lists the toolchains its machine has. The example plays prove it: the same script, roles and actors on two plays with different stacks. Browser tests are deferred to milestone 7.
+
+**Why:** Alessio's call at milestone 6's ask point E: "the coders must be agnostic; the actor's capability is defined by its package." A zanni is a general-purpose shell that becomes whatever its role makes it, a coder, a killer, a priest or a jester; nothing in the engine is specific to software, code or a language. Software lives in the examples.
+
+**Considered and set aside:** a stack in the script or the roles; one stack only (nothing would prove the script is agnostic); a browser in this milestone (an install on some machine, testing the front end rather than how the parts work together).
+
+## D57. The software team's six roles (2026-10-25)
+
+**Decision:** six example packages in `examples/roles/`: `product-owner`, `architect`, `ui-designer`, `tester`, `developer-lead` and `coder`. What each writes is a permission the stage enforces, not prose: the product owner writes `backlog/`, the architect `spec/architecture/`, the UI designer `spec/ui/`, the tester `tests/` and `findings/`, the developer lead `tasks/`, the coder `app/` through the workspace; reviewers also write their own files under `reviews/` (D59). The tester and the coder use `zanni:workspace`. Their tiers are hints: `judgement`, `coding` and `planning`. The new `tester` replaces milestone 1's spec example, whose servers didn't exist.
+
+**Why:** Alessio's call at milestone 6's ask point F. The roadmap names all six parts.
+
+**Considered and set aside:** keeping the old tester beside a new one; merging the UI designer into the architect.
+
+## D58. The software script, its example plays and recorded runs (2026-10-25)
+
+**Decision:** `examples/scripts/software-team/` becomes a script that runs, in nine scenes: plan, backlog review, specify, spec review, tests, build, integrate and check, explore, review. Its gates are `plan`, every round, before every part but the product owner's, and `release`, every round (D48). Scene 8's findings are failing tests under `tests/findings/`, which `tests-pass` doesn't run, so a round can end done with findings open; the next round's product owner takes them in (D60). A play may lower the script's `stop.max_rounds` with `house_rules.max_rounds`.
+
+Two example plays, `examples/plays/software-mini-python/` and `software-mini-node/`, perform it on the same vision, "a unit converter web page", each on a git stage with a local remote, with one coder and `max_rounds: 1`. The recorded runs, in `docs/runs/milestone-6.md`, run them on cloud, mixed and local models and across two machines, within $10 in all and $2 a run.
+
+**Why:** Alessio's calls at milestone 6's ask points G and I. One round, recorded, makes milestone 7's three unattended rounds a run, not a build. Alessio's focus: the parts that define the product, the tests and the architecture, and how they work together; several coders in parallel aren't needed yet.
+
+**Considered and set aside:** dropping the explore scene; findings breaking `tests-pass` (a one-round play could never end done).
+
+## D59. The planning parts review each other's work (2026-10-25)
+
+**Decision:** the software script writes review loops into its scenes. After the product owner writes the backlog, the architect and the tester each write a review under `reviews/`: questions, risks, criteria that can't be tested; the product owner revises the backlog once and writes what changed and why. After the spec is written, the tester and the developer lead review it the same way, and the architect revises once. A reviewer writes only its own review files, never the document it reviews; the permissions say so, and the stage enforces them (D43). The loops are scenes and paths: no engine change.
+
+**Why:** Alessio's call at milestone 6's ask point J, raised by his focus on how the parts work together. Until now parts only handed files on, so a vague item or an untestable criterion surfaced only at the verifiers. The recorded runs report what the reviews raised and what changed because of them.
+
+**Considered and set aside:** hand-offs only; direct questions between actors mid-cue (a new message between actors; a later milestone if the loops prove too slow).
+
+## D60. A play can continue: another round at a gate, or a new run from where one ended (2026-10-25)
+
+**Decision:**
+
+1. **Another round, at a gate:** the owner may approve a gate and grant one more round in the same decision: `zanni gate <play> approve --another-round`, `"another_round": true` on the owner's endpoint. It raises the run's round limit by one. Only the owner, who sets the house rules, can extend them; no actor or director tool can. The note reaches the director's state summary, as the owner's input. The budget is unchanged.
+2. **Continuing a run that ended:** `zanni <play> --continue <run-id>` starts a new run from where that one left off. A git stage branches from the earlier run's branch instead of `branch`; a folder stage already holds its files; an `mcp` stage is as its server holds it. The round count continues from the earlier run's last round, read from its log. The new run has its own id, budget, cast and log, and its `run-started` event names the run it continues. A run id the play's log doesn't have is exit 2.
+3. **Not restored:** cues in flight and the director's own conversation. Surviving a crash of the director stays deferred (`TODO.md`); continuing a run that ended needs only the stage, the round and the log, which are all saved.
+
+**Why:** Alessio's call at milestone 6's ask point K, raised at G: "in a one round play, how can I ask the cast to continue and iterate again?" Before, a run that stopped was over, and a rerun started from round 1, without the earlier run's work on a git stage.
+
+**Considered and set aside:** only `--continue` (stopping and restarting to keep going); raising `max_rounds` in advance (deciding before seeing the round).
+
+**Amends:** D38 (the owner's decisions) and D46 (a run's branch starts from `branch`).
+
+## D61. Caching the director's instructions, and a cap on output tokens (2026-10-25)
+
+**Decision:**
+
+- **Caching:** the engine adapter asks the provider to cache the director's instructions and tool definitions, which every turn sends again (D49), where the provider supports it. No role, script, play or configuration names it (golden rule 4). Seats don't cache until a measurement shows it doesn't cost them more: a cache write costs more than a plain request, and a seat with one short cue could pay for a cache it never reads. Cached tokens are priced at their own prices.
+- **`max_output`:** an optional field of a model entry, the most tokens one model response may hold, so a model stuck repeating itself stops early. Without it, nothing changes.
+
+**Why:** Alessio's call at milestone 6's ask point H. In milestone 5's recorded runs, the director took about 100k input tokens per kata, two thirds of the cloud spend; a software round has many more cues. A recorded local run looped for 280 s (docs/runs/milestone-2.md). The saving is measured, not claimed, in `docs/runs/milestone-6.md`.
+
+**Considered and set aside:** leaving both to milestone 7; caching for every seat without measuring ("cloud never worse").

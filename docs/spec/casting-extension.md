@@ -4,13 +4,15 @@ Casting is how an actor joins a play, is cast into a part, receives cues and rep
 
 ## Extension URI
 
-`https://github.com/alessioricco/Zanni/blob/master/docs/spec/casting-extension.md#v3` (D22)
+`https://github.com/alessioricco/Zanni/blob/master/docs/spec/casting-extension.md#v4` (D22)
 
 The fragment is the version. A change to any message makes a new version, and a side that speaks several versions lists one `AgentExtension` per version.
 
 **`v2`** (D39) changed four messages from `v1`: `zanni.join` gained `pricing`, `zanni.refused` the reason `unpriced`, `zanni.cue` a `limits.budget`, and `zanni.report` the outcome `over-budget`.
 
-**`v3`** (D45) adds two messages for verifier seats, `zanni.verify` and `zanni.verdict`. Zanni speaks `v3` only.
+**`v3`** (D45) adds two messages for verifier seats, `zanni.verify` and `zanni.verdict`.
+
+**`v4`** (D55) adds `files` to `zanni.verify`: the script's check files a verifier's command runs. Zanni speaks `v4` only.
 
 ## Encoding
 
@@ -147,7 +149,7 @@ The actor asks to join. It sends the play's join token as `Authorization: Bearer
 |---|---|---|---|
 | `card` | the actor's Agent Card, in A2A's JSON form | yes | Must carry the casting extension with valid actor-card params ([The actor's card](#the-actors-card)). |
 | `part` | text | no | The part to join, when the role is cast for more than one. |
-| `pricing` | `known` or `unknown` | no, default `unknown` | `known` when every model the actor may use has a price: a published one, or `price:` in its configuration. Under a budget, `unknown` is refused with `unpriced` (D7, D39). Self-reported, like `models`: what the director enforces is each cue's budget, which the actor stops at. |
+| `pricing` | `known` or `unknown` | no, default `unknown` | `known` when every model the actor may use has a price, a published one or `price:` in its configuration, and so does every tool its configuration binds (D53). Under a budget, `unknown` is refused with `unpriced` (D7, D39). Self-reported, like `models`: what the director enforces is each cue's budget, which the actor stops at. |
 
 ### `zanni.cast`
 
@@ -160,7 +162,7 @@ The director accepts the actor into a seat. From now on the actor calls the seat
 | `permissions` | `{ read, write }`: lists of path rules | yes | The seat's effective stage permissions: the role's needs within the part's ceilings (D12). |
 | `stage.mcp_url` | URL | yes | The stage's MCP server (D16). |
 | `stage.token` | text | yes | The seat's bearer token for the stage. |
-| `stage.direct` | `{ clone_url, branch }` | no | Reserved for direct access to a git stage, planned for milestone 6 (D46); no director sends it yet. |
+| `stage.direct` | `{ clone_url, branch }` | no | Reserved for direct access to a git stage, deferred to after the first version (D52); no director sends it. |
 | `seat_token` | text | yes | The seat's bearer token for the director. |
 | `expires_at` | timestamp | yes | When both tokens expire, unless the director renews them with a new cast message. |
 | `heartbeat.interval` | duration | no, default `"30"` | The longest the actor may go without contacting the task. |
@@ -216,8 +218,9 @@ The director then sends `zanni.verify` when a verifier runs on it:
 | `command` | list of text, at least one | yes | The command to run, as the script or the play gives it. The seat runs exactly this. |
 | `timeout` | duration | yes | How long the command may run. |
 | `marker` | text | yes | The stage's change marker when the director sent it. |
+| `files` | map of path → text | no | The script's check files the command runs (D55), by their path in the script's package. |
 
-The seat reads every file of the stage over MCP into a fresh folder, runs the command there within the timeout, and answers on the task:
+The seat reads every file of the stage over MCP into a fresh folder, writes `files` into another fresh folder, which the command finds as `${ZANNI_SCRIPT}`, runs the command in the stage's folder within the timeout, and answers on the task:
 
 | Field | Type | Required | Meaning |
 |---|---|---|---|
@@ -266,7 +269,7 @@ A person decides a gate, or resumes a paused play, through a small HTTP endpoint
   | `paused` | `{ reason }` while paused; otherwise `null`. |
   | `round`, `spend` | The current round, and the spend so far as a decimal string in USD (`"at least …"` once a cost was unknown). |
 
-- **`POST /zanni/owner`:** a decision, as JSON `{ "action": "approve" | "reject" | "resume", "note": "…" }`. `approve` and `reject` need a pending gate, and `reject` needs a note; `resume` needs a pause. The answer is the play's state, as `GET` gives it, with `decided` set to the action; a decision with nothing to decide gets HTTP 409, with a plain-words `error`.
+- **`POST /zanni/owner`:** a decision, as JSON `{ "action": "approve" | "reject" | "resume", "note": "…", "another_round": true }`. `approve` and `reject` need a pending gate, and `reject` needs a note; `resume` needs a pause. `another_round`, only with `approve`, raises the run's round limit by one (D60). The answer is the play's state, as `GET` gives it, with `decided` set to the action; a decision with nothing to decide gets HTTP 409, with a plain-words `error`.
 
 Zanni's `zanni gate` command is a client of this endpoint ([Play: gates and pauses](play.md#gates-and-pauses)).
 

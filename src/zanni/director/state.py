@@ -53,6 +53,11 @@ class PlayState:
     def budget(self) -> Decimal | None:
         return self.play.house_rules.budget
 
+    @property
+    def max_rounds(self) -> int | None:
+        """The play's limit, else the script's: a play may lower the script's, never raise it (D58)."""
+        return self.play.house_rules.max_rounds or self.script.stop.max_rounds
+
     def seats_for(self, part: str) -> Seats:
         """The seats the play may cast for a part: its cast entry's, else the script's."""
         entry = self.play.cast[part]

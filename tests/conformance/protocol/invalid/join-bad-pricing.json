@@ -17,7 +17,7 @@
     "capabilities": {
       "extensions": [
         {
-          "uri": "https://github.com/alessioricco/Zanni/blob/master/docs/spec/casting-extension.md#v3",
+          "uri": "https://github.com/alessioricco/Zanni/blob/master/docs/spec/casting-extension.md#v4",
           "required": true,
           "params": {
             "kind": "zanni.actor-card",

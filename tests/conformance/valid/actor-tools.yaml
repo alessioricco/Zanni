@@ -1,0 +1,15 @@
+# D52, D53: an actor brings its own coding engine for a tool its role needs, and lists what its workspace may run.
+role: ../fixtures/roles/worker
+play: http://director.example.com:8765
+models:
+  - { provider: ollama, model: qwen3.8:27b, max_output: 4000, price: { input: 0, output: 0 } }
+tools:
+  coding-engine:
+    command: some-engine
+    args: [mcp, --folder, "${ZANNI_WORKSPACE}"]
+    env: { ENGINE_API_KEY: "${ENGINE_API_KEY}" }
+    price: { per_call: 0 }
+workspace:
+  commands: [uv, pytest]
+credentials:
+  ENGINE_API_KEY: ${ENGINE_API_KEY}

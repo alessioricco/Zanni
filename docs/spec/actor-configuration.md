@@ -33,8 +33,49 @@ It is recognised by having both `role` and `play`, and it is the file passed to 
 | `models` | list of model entries, at least one | yes, except for a [verifier seat](#verifier-seats) | — | the actor | The models this actor runs, in order (D11). A verifier seat runs no model, and has none. |
 | `credentials` | map of name → value | no | none | the actor, and `zanni` | This instance's credentials ([below](#credentials)). |
 | `state_dir` | path | no | `~/.zanni/actors/<name>` | the actor | Where the actor keeps its working memory and state. It is discarded or kept by the actor; the play's shared state lives on the stage. |
+| `tools` | map of a tool's name → [binding](#tools-the-actor-brings) | no | the role's `mcp.json` | the actor, and `zanni` | Servers this actor brings for tools its role needs, such as its own coding engine (D53). |
+| `workspace.commands` | list of command names | no | none | the actor | The commands a [workspace](#the-workspace) may run on this machine (D52). |
 | `seats` | map of part → list of actor configuration files | no | none | the director | Only in a [director's configuration](#a-directors-configuration): the local seats it starts. |
 | `verifier_seats` | `{ local, remote }` | no | none | the director | Only in a director's configuration: the [verifier seats](#verifier-seats) it trusts. |
+
+## Tools the actor brings
+
+An actor brings its own tools as it brings its own models (D53). A role names the tools it needs in `needs.tools`, and its `mcp.json` gives a default server for each; the actor's configuration may replace any of them with a server of its own, such as its favourite coding engine, run on its own key:
+
+```yaml
+tools:
+  coding-engine:
+    command: some-engine            # stands for any MCP server that works in a folder
+    args: [mcp, --folder, "${ZANNI_WORKSPACE}"]
+    env: { ENGINE_API_KEY: "${ENGINE_API_KEY}" }
+    price: { per_call: 0 }          # what the play is charged per call: here, nothing
+credentials:
+  ENGINE_API_KEY: ${ENGINE_API_KEY}
+```
+
+| Field | Type | Required | Default | Meaning |
+|---|---|---|---|---|
+| `command`, `args`, `env` | as in `mcp.json` | `command` or `url` | — | A server the actor starts. |
+| `url`, `headers` | as in `mcp.json` | `command` or `url` | — | A server the actor reaches over HTTP. |
+| `price.per_call` | number, at least 0, in USD | no | none | What the play is charged for each call to this tool. Without it, the tool's cost is unknown, never zero (D7). |
+
+- **Only what the role asks for:** each name must be one of the role's `needs.tools`; an actor can't add a tool its role didn't ask for. `zanni` checks it when the role is a local folder, and the actor before it starts.
+- **Credentials:** every `${NAME}` is looked up first in `credentials`, then in the environment. A secret-looking `env` or `headers` value must be such a reference, never a value.
+- **`${ZANNI_WORKSPACE}`:** the folder of the seat's [workspace](#the-workspace) for the current cue. A tool that works on files works there; its changes reach the stage only through the workspace.
+- **Cost:** each cue's reported cost adds `price.per_call` for each call to the tool, beside its models' cost (D39). Under a budget, every bound tool needs a price, or the actor is refused at join (`unpriced`).
+- **Trust:** the director believes the cost an actor reports, as it believes a model's (D39). The real cap on a key is its owner's, such as a provider's spending limit.
+
+## The workspace
+
+A role whose `mcp.json` names `zanni:workspace` as a server's `command` gets a workspace: a local folder holding a copy of the stage, for an engine that works on real files (D52).
+
+1. **At the start of each cue,** the actor fills a fresh folder with every stage file the seat may read.
+2. **During the cue,** the role's model works in it, with the workspace's tools: `read_file`, `write_file`, `list_files` and `run`; or a tool the actor brings works in it ([above](#tools-the-actor-brings)).
+3. **At the end of the cue,** before reporting, the actor sends what changed to the stage, as writes and deletes the director checks against the cue's paths. A change outside them is refused, and the director lists the refusals in the report; the stage is unchanged by them.
+
+- **`run`:** runs a command in the folder, on this machine, within a timeout, and returns its exit code and output. Only commands named in `workspace.commands` may run, such as `[uv, pytest]` or `[npm, node]`; with none listed, `run` refuses every command. What runs on a machine is its owner's decision, not the role's or the director's.
+- **What it decides:** nothing on the director's side. Verifiers decide "done" (D45).
+- **A lost seat:** the work of a cue that never reached its end isn't on the stage; the director resends the cue to the next seat (D36).
 
 ## Where the actor joins
 
@@ -120,7 +161,7 @@ Every actor keeps its own log, on its own machine, whether its director is local
 | `cue` | `seat`, `scene`, `cue` | A cue arrives. |
 | `fallback` | `seat`, `model`, `reason`, `detail` | A model failed, and the actor moved on (D20). |
 | `report` | `seat`, `cue`, `outcome`, `summary`, `changes` | The actor sends its report. |
-| `cost` | `seat`, `model`, `amount`, `input_tokens`, `output_tokens` | The cue's spend, `null` when unknown (D7), and its tokens. |
+| `cost` | `seat`, `model`, `amount`, `input_tokens`, `output_tokens`, `tool_calls` | The cue's spend, `null` when unknown (D7), its tokens, and the calls to tools the actor brings (D53). |
 | `released` | `seat`, `reason` | The seat ends. |
 
 The director keeps the play's log; neither log depends on the other.
@@ -145,6 +186,7 @@ The actor uses the first model in `models`. It moves to the next one when the cu
 | `tool_format` | `native` or `text` | no | `native` | `text` turns on the opt-in text tool format, for models without native tool calling (D5). |
 | `price` | `{ input, output }`, USD per million tokens, at least 0 | no | published prices, if any | The model's price, for models published prices don't cover, such as local ones. Without a price, a model's cost is unknown, never zero (D7). |
 | `fall_back_on` | list of reasons | no | `[error, timeout, rate-limit, context]` | When to move to the next model. |
+| `max_output` | whole number, at least 1 | no | the provider's own | The most tokens one model response may hold, so a model stuck repeating itself stops early (D61). |
 
 ### Reasons to fall back
 
@@ -164,7 +206,7 @@ The actor uses the first model in `models`. It moves to the next one when the cu
 - **Values:** a value is either stored in the file, or a reference `${VAR}` (or `${VAR:-default}`) read from the environment when the actor starts.
 - **Who uses them:**
   - a model entry's `credential` names the one it uses;
-  - every `${NAME}` in the role's `mcp.json` is looked up first in `credentials`, then in the environment. The same role can thus run as two actors on one machine, one with a GitHub token and one with an SSH key, without either seeing the other's.
+  - every `${NAME}` in the role's `mcp.json`, and in the configuration's own `tools`, is looked up first in `credentials`, then in the environment. The same role can thus run as two actors on one machine, one with a GitHub token and one with an SSH key, without either seeing the other's.
 - **Elsewhere in the file:** secret-looking keys anywhere else in the file are rejected, with a pointer to `credentials`.
 
 ### Safeguards

@@ -1,0 +1,5 @@
+{
+  "mcpServers": {
+    "shell": { "command": "zanni:shell" }
+  }
+}
