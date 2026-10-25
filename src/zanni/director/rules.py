@@ -8,6 +8,7 @@ from decimal import ROUND_DOWN, Decimal
 from pathlib import Path
 
 from zanni.director.state import PlayState
+from zanni.files.schemas import covers
 from zanni.protocol.fit import within
 
 CENT = Decimal("0.0001")
@@ -121,13 +122,28 @@ def _this_round(state: PlayState, gates: list[str]) -> str:
     return " in this round" if any(state.script.gate(g) and state.script.gate(g).every == "round" for g in gates) else ""
 
 
-def gates_before(state: PlayState, part: str) -> str | None:
-    """A cue to `part` waits for every enforced gate that names it in `before` (D48)."""
-    waiting = [g.name for g in state.script.gates
-               if part in g.before and g.name in state.enforced_gates() and not state.gate_open(g.name)]
+def overlap(a: str, b: str) -> bool:
+    """Whether two path rules can name the same file: one covers the other."""
+    return covers(a, b) or covers(b, a)
+
+
+def gates_before(state: PlayState, part: str, writes: list[str] | None = None) -> str | None:
+    """A cue to `part` waits for every enforced gate that names it in `before` (D48), and a cue that may write under
+    a gate's `before_writes` waits for that gate whoever it is for (D62). `writes` is what the cue may write: its own
+    `writes`, or the seat's whole write permissions when it names none."""
+    enforced = [g for g in state.script.gates if g.name in state.enforced_gates() and not state.gate_open(g.name)]
+    waiting = [g.name for g in enforced if part in g.before]
     if waiting:
         return (f"the gate(s) {', '.join(waiting)} must be approved{_this_round(state, waiting)} before {part} gets a "
                 "cue; ask for them with ask_gate first")
+    held = {g.name: sorted({rule for rule in g.before_writes for w in writes or [] if overlap(rule, w)})
+            for g in enforced}
+    held = {name: paths for name, paths in held.items() if paths}
+    if held:
+        names = list(held)
+        paths = sorted({p for ps in held.values() for p in ps})
+        return (f"the gate(s) {', '.join(names)} must be approved{_this_round(state, names)} before any cue writes "
+                f"{', '.join(paths)}; narrow this cue's writes to other paths, or ask for the gate with ask_gate first")
     return None
 
 

@@ -76,3 +76,43 @@ def test_the_cue_tool_refuses_a_coder_before_the_rounds_plan(tmp_path):
     assert refusal.startswith("refused: the gate(s) plan must be approved in this round before coder")
     summary = p.summary()
     assert "plan (every round, before coder: not asked yet)" in summary
+
+
+# Gates before writes (D62): a gate holds back paths, whoever the cue is for
+
+def held_state() -> PlayState:
+    script = Script.model_validate({
+        "name": "k", "version": "1.0.0", "mission": "m",
+        "gates": [{"name": "plan", "every": "round", "before_writes": ["spec/", "tests/", "app/"]}],
+        "parts": {"architect": {"writes": ["spec/architecture/", "reviews/"]}, "coder": {"writes": ["app/"]}}})
+    play = PlayFile.model_validate({"name": "p", "script": "./k", "stage": "./s",
+                                    "cast": {"architect": "./a", "coder": "./c"}, "house_rules": {"gates": ["plan"]}})
+    return PlayState(play, script)
+
+
+def test_a_cue_writing_under_a_gates_paths_waits_and_one_writing_elsewhere_doesnt():
+    s = held_state()
+    assert rules.gates_before(s, "architect", ["reviews/round-1/backlog-architect.md"]) is None
+    refusal = rules.gates_before(s, "architect", ["spec/architecture/overview.md"])
+    assert refusal.startswith("the gate(s) plan must be approved in this round before any cue writes spec/")
+    assert rules.gates_before(s, "coder", ["app/"]) is not None
+    assert rules.gates_before(s, "architect", ["spec/architecture/", "reviews/"]) is not None  # the seat's whole rules
+    approve(s, "plan")
+    assert rules.gates_before(s, "architect", ["spec/architecture/overview.md"]) is None
+
+
+def test_the_cue_tool_holds_back_a_cue_that_names_no_writes_when_its_seat_may_write_a_held_path(tmp_path):
+    play, script, stage = kata(tmp_path, gates=("plan",))
+    script = script.model_copy(update={"gates": Script.model_validate({
+        "name": "k", "version": "1.0.0", "mission": "m", "parts": {"coder": {}},
+        "gates": [{"name": "plan", "every": "round", "before_writes": ["app/"]}]}).gates})
+    p = production(tmp_path, play, script, stage)
+
+    class Seat:
+        id, part, active, verifier, actor = "coder-1", "coder", True, False, "coder-1"
+        stage = p.stage.seat(["/"], ["app/"], "coder-1")
+
+    p.casting.seats["t1"] = Seat()
+    refusal = asyncio.run(p.cue("coder", "Build", "Make the tests pass."))  # no writes: the seat's own rules
+    assert "before any cue writes app/" in refusal
+    assert "plan (every round, before any cue writes app/: not asked yet)" in p.summary()

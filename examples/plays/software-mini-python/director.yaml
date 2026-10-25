@@ -1,0 +1,25 @@
+# The director's own configuration (D34): its models, its credentials, and the local seats it starts (D36).
+# Credentials are ${VAR} references, so this example can live in git. Model names are examples: the first stands
+# for a cloud model with tool calling, the second for a local model with tool calling on any OpenAI-compatible
+# server. Under the play's budget every model needs a price: a published one, or `price:`.
+name: director
+role: zanni:director
+play: ./play.yaml
+models:
+  - provider: anthropic
+    model: claude-haiku-5-5
+  - provider: ollama
+    model: qwen3.8:27b
+    base_url: ${OLLAMA_BASE_URL}
+    price: { input: 0, output: 0 }
+credentials:
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+  ZANNI_JOIN_TOKEN: ${ZANNI_JOIN_TOKEN}     # the play's join token: actors present it
+  ZANNI_OWNER_TOKEN: ${ZANNI_OWNER_TOKEN}   # the play's owner token: zanni gate presents it
+seats:
+  product-owner: [./product-owner-1.yaml]
+  architect: [./architect-1.yaml]
+  ui-designer: [./ui-designer-1.yaml]
+  tester: [./tester-1.yaml]
+  developer-lead: [./developer-lead-1.yaml]
+  coder: [./coder-1.yaml]

@@ -35,7 +35,9 @@ def instructions(script: Script, prose: str, play: PlayFile) -> str:
     for gate in script.gates:
         if gate.name in rules.gates:
             when = "every round" if gate.every == "round" else "once"
-            enforced.append(f"{gate.name} ({when}{', before any cue to ' + ', '.join(gate.before) if gate.before else ''})")
+            held = (["before any cue to " + ", ".join(gate.before)] if gate.before else []) + \
+                (["before any cue writes " + ", ".join(gate.before_writes)] if gate.before_writes else [])
+            enforced.append(f"{gate.name} ({'; '.join([when, *held])})")
     house = [f"budget: {'$' + format(rules.budget, '.2f') if rules.budget is not None else 'none'}",
              f"gates this play enforces: {', '.join(enforced) or 'none'} (the others are skipped)",
              f"at most {rules.max_director_turns} of your turns per round"]

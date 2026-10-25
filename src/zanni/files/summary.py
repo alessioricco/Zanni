@@ -79,7 +79,7 @@ def summarise(doc: ActorConfiguration | PlayFile | RoleManifest | Script | Lockf
                 bits.append(f"suggested role {part.suggested}")
             lines.append(f"    {name}: {'; '.join(bits)}")
         gates = [f"{g.name} ({'every round' if g.every == 'round' else 'once'}"
-                 + (f", before {', '.join(g.before)})" if g.before else ")") for g in doc.gates]
+                 + (f", {g.holds()})" if g.holds() else ")") for g in doc.gates]
         lines.append(f"  gates: {', '.join(gates) or 'none'}")
         if doc.verifiers:
             lines.append("  verifiers:")

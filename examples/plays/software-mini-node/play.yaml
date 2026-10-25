@@ -1,0 +1,29 @@
+# The software script, one round, on a Node project (D58): the six parts, on this machine, with a git stage.
+# Its twin, ../software-mini-python, plays the same script with the same roles on a Python project: only this file's
+# verifier commands, the stage's starter files and the workspaces' commands differ (D56).
+# Make the remote first, then run it from a copy of examples/:
+#   python3 make-remote.py && zanni play.yaml
+name: software-mini-node
+script: ../../scripts/software-team
+stage: { backend: git, url: ./remote.git, branch: main, push: approved }
+cast:
+  product-owner: { role: ../../roles/product-owner, host: local }
+  architect: { role: ../../roles/architect, host: local }
+  ui-designer: { role: ../../roles/ui-designer, host: local }
+  tester: { role: ../../roles/tester, host: local }
+  developer-lead: { role: ../../roles/developer-lead, host: local }
+  coder: { role: ../../roles/coder, seats: 1, host: local }
+house_rules:
+  budget: 2.00
+  gates: [plan, release]
+  gate_timeout: 2h
+  max_rounds: 1                 # one round; the owner may grant another at the release gate (D60)
+  max_director_turns: 60
+verifiers:                      # this project's commands for the script's verifiers (D35)
+  new-tests-fail:
+    command: [uv, run, --no-project, python, "${ZANNI_SCRIPT}/checks/expect_failure.py", --, npm, test, --silent]
+  tests-pass:
+    command: [npm, test, --silent]
+  app-starts:
+    command: [uv, run, --no-project, python, "${ZANNI_SCRIPT}/checks/app_starts.py", --port, "8711", --,
+              node, app/server.js]

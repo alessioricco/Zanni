@@ -1,0 +1,16 @@
+# A local seat (D36): the director starts it with --play pointed at itself, and the join token in its environment.
+# Works in a workspace (D52), which may run only npm and node here. Bring your own coding engine under tools: (D53).
+name: coder-1
+role: ../../roles/coder
+play: ./play.yaml
+models:
+  - provider: ollama
+    model: qwen3.8:27b            # stands for a local model with tool calling
+    base_url: ${OLLAMA_BASE_URL}
+    price: { input: 0, output: 0 }
+  - provider: anthropic
+    model: claude-haiku-5-5
+credentials:
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+workspace:
+  commands: [npm, node]

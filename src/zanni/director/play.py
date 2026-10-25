@@ -119,7 +119,7 @@ class Production:
         seat = self._seat_for(target)
         if isinstance(seat, str):
             return self._refuse("cue", seat)
-        if refusal := rules.gates_before(self.state, seat.part):
+        if refusal := rules.gates_before(self.state, seat.part, writes or seat.stage.write_rules):
             return self._refuse("cue", refusal)
         if refusal := rules.paths_within(seat.stage.read_rules, seat.stage.write_rules, reads, writes):
             return self._refuse("cue", refusal)
@@ -490,8 +490,7 @@ class Production:
 
     def _gate_state(self, name: str) -> str:
         s, gate = self.state, self.state.script.gate(name)
-        rhythm = (f"every round, before {', '.join(gate.before)}" if gate.before else "every round") \
-            if gate.every == "round" else (f"once, before {', '.join(gate.before)}" if gate.before else "once")
+        rhythm = ("every round" if gate.every == "round" else "once") + (f", {gate.holds()}" if gate.holds() else "")
         decision = s.gates.get(name)
         if decision is None:
             now = "not asked yet"

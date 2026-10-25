@@ -479,6 +479,14 @@ class Gate(Strict):
     name: Name
     every: Literal["play", "round"] = "play"
     before: list[Name] = []  # parts whose cues wait for this gate's approval
+    before_writes: list[Annotated[str, Field(min_length=1)]] = []  # stage paths no cue may write until approved (D62)
+
+    def holds(self) -> str:
+        """What the gate holds back, in words: the parts it comes before, and the paths no cue writes until then."""
+        bits = [f"before {', '.join(self.before)}"] if self.before else []
+        if self.before_writes:
+            bits.append(f"before any cue writes {', '.join(self.before_writes)}")
+        return "; ".join(bits)
 
 
 def _gate(value: object) -> object:

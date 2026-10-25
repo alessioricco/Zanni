@@ -35,7 +35,7 @@ def broken(tmp_path: Path, example: Path, old: str, new: str) -> Path:
     (ACTOR, "Actor configuration: would start 'tester-1', playing a role in a play."),
     (PLAY, "Play file: would start the director for the play 'habit-tracker'."),
     (ROLE, "Role manifest: the role 'tester' 0.1.0."),
-    (SCRIPT, "Script: 'software-team' 1.0.0."),
+    (SCRIPT, "Script: 'software-team' 2.0.0."),
     (NEWSROOM, "Script: 'newsroom' 0.1.0."),
     (NEWSROOM_PLAY, "Play file: would start the director for the play 'city-desk'."),
     (REHEARSAL, "Rehearsal: 'smoke', run when an actor configuration's `play` points here, or served with --serve."),
@@ -88,8 +88,8 @@ def test_play_summary_shows_cast_and_house_rules():
     (ROLE, "version: 0.1.0", "version: 0.1", "line 3, version: 0.1 was read as a number"),
     (ROLE, "mission:", "mision:", "line 4, mision: is not a known field; did you mean `mission`?"),
     (ROLE, "tools: true", "tools: maybe", 'line 5, model.needs.tools: should be true or false, not "maybe"'),
-    (SCRIPT, "    seats: 1-8", "    seats: 8-1", "line 20, parts.coder.seats: the range 8-1 goes down"),
-    (SCRIPT, "  max_rounds: 5", "  max_rounds: many", 'line 26, stop.max_rounds: should be a whole number, not "many"'),
+    (SCRIPT, "    seats: 1-8", "    seats: 8-1", "line 30, parts.coder.seats: the range 8-1 goes down"),
+    (SCRIPT, "  max_rounds: 5", "  max_rounds: many", 'line 51, stop.max_rounds: should be a whole number, not "many"'),
 ])
 def test_broken_copies_fail_in_plain_words(tmp_path, example, old, new, expected):
     result = zanni(broken(tmp_path, example, old, new))

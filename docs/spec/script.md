@@ -73,11 +73,19 @@ A gate is a name, such as `release`, or a map that says when it applies (D48):
 | `name` | name | yes | — | the director | The gate's name. |
 | `every` | `play` or `round` | no | `play` | the director | `round`: an approval counts only in the round it was given, so the gate is asked again each round. `end_round` and "done" are refused while the round's gate is unapproved. |
 | `before` | list of part names | no | none | the director | A cue to any of these parts is refused until the gate is approved (in this round, for `every: round`). Each must be one of `parts`. |
+| `before_writes` | list of paths | no | none | the director | A cue that may write under any of these paths is refused until the gate is approved, whatever part it is for: a cue whose `writes` overlap them, or, when it names no `writes`, one whose seat may write there (D62). |
 
 ```yaml
 gates:
   - { name: plan, every: round, before: [coder] }   # the plan, approved each round before anyone builds
   - release                                          # once per play
+```
+
+`before_writes` holds back work rather than people, for a part that has work to do on both sides of a gate. In the software script, the architect reviews the backlog before the plan gate, and writes the spec after it:
+
+```yaml
+gates:
+  - { name: plan, every: round, before_writes: [spec/, tests/, tasks/, app/] }
 ```
 
 A rejection stands until the gate is asked again and approved. A gate the play doesn't enforce is skipped, and never blocks a cue.
@@ -140,7 +148,7 @@ The director is an agent (D33). Its instructions are the script's prose and fron
 
 | Tool | What it does | What code checks first |
 |---|---|---|
-| `cue` | Gives a seat (or an idle seat of a part) a cue, with a budget | The part and seat exist; the cue's `reads` and `writes` are within the seat's permissions; the budget left (D39); the stage holds `stage.expects` before the first cue; every gate with the part in its `before` is approved (D48) |
+| `cue` | Gives a seat (or an idle seat of a part) a cue, with a budget | The part and seat exist; the cue's `reads` and `writes` are within the seat's permissions; the budget left (D39); the stage holds `stage.expects` before the first cue; every gate with the part in its `before`, or with a `before_writes` path the cue may write, is approved (D48, D62) |
 | `wait_for_reports` | Waits for the pending cues' reports | — |
 | `run_verifier` | Runs one of the script's verifiers on a snapshot, on the director or on the verifier seat the play names (D45) | The name is in `verifiers`; no writing cue is pending |
 | `ask_gate` | Pauses the play at a gate, until a person decides (D38) | The gate is in the play's `house_rules.gates`, or it is skipped |

@@ -917,3 +917,13 @@ Two example plays, `examples/plays/software-mini-python/` and `software-mini-nod
 **Why:** Alessio's call at milestone 6's ask point H. In milestone 5's recorded runs, the director took about 100k input tokens per kata, two thirds of the cloud spend; a software round has many more cues. A recorded local run looped for 280 s (docs/runs/milestone-2.md). The saving is measured, not claimed, in `docs/runs/milestone-6.md`.
 
 **Considered and set aside:** leaving both to milestone 7; caching for every seat without measuring ("cloud never worse").
+
+## D62. A gate may hold back paths, whoever the cue is for (2026-10-25)
+
+**Decision:** a script's gate may list `before_writes`, stage paths. Until the gate is approved (in this round, for `every: round`), the director refuses any cue that may write under them: a cue whose `writes` overlap them, or, for a cue that names no `writes`, one whose seat may write there. A cue writing elsewhere goes ahead, whatever part it is for. `before` still holds back whole parts.
+
+**Why:** Alessio's call while milestone 6's script was written. The software script's plan gate comes after the backlog review (D59), and the architect and the tester take part in that review; `before: [architect, tester, …]` would refuse their reviews too. Holding back `spec/`, `tests/`, `tasks/` and `app/` lets them review before the gate, while nothing is specified, tested or built until the backlog is approved, in code rather than in the script's prose.
+
+**Considered and set aside:** `before` on the later parts only (the architect and the tester could be cued for the spec or the tests early, with only the prose to stop it); approving the first draft of the backlog, before its reviews (what is approved isn't the reviewed backlog).
+
+**Amends:** D48.

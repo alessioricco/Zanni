@@ -1,0 +1,14 @@
+# A local seat (D36): the director starts it with --play pointed at itself, and the join token in its environment.
+# Planning: a local model first, a cloud model when it fails.
+name: developer-lead-1
+role: ../../roles/developer-lead
+play: ./play.yaml
+models:
+  - provider: ollama
+    model: qwen3.8:27b            # stands for a local model with tool calling
+    base_url: ${OLLAMA_BASE_URL}
+    price: { input: 0, output: 0 }
+  - provider: anthropic
+    model: claude-haiku-5-5
+credentials:
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}

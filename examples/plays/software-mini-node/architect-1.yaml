@@ -1,0 +1,12 @@
+# A local seat (D36): the director starts it with --play pointed at itself, and the join token in its environment.
+# A judgement role: a stronger cloud model first.
+name: architect-1
+role: ../../roles/architect
+play: ./play.yaml
+models:
+  - provider: anthropic
+    model: claude-sonnet-5-5      # stands for a stronger cloud model, for judgement
+  - provider: anthropic
+    model: claude-haiku-5-5
+credentials:
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}

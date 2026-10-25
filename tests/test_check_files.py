@@ -67,6 +67,9 @@ def test_tests_that_fail_pass_the_check_and_tests_that_pass_or_break_fail_it():
     assert check("expect_failure.py", "--", *exits(0)).returncode == 1
     assert check("expect_failure.py", "--", *exits(2)).returncode == 1  # a broken runner isn't a failing test
     assert check("expect_failure.py", "--code", 3, "--", *exits(3)).returncode == 0
+    both = ["--code", 1, "--code", 2, "--"]  # pytest: tests that fail, or can't import code that isn't there yet
+    assert check("expect_failure.py", *both, *exits(2)).returncode == 0
+    assert check("expect_failure.py", *both, *exits(4)).returncode == 1
 
 
 # app_starts.py
