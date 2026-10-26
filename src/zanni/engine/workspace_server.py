@@ -13,6 +13,7 @@ import asyncio
 import contextlib
 import os
 import signal
+import sys
 from pathlib import Path
 
 from mcp.server.mcpserver import MCPServer
@@ -31,8 +32,10 @@ def inside(folder: Path, path: str) -> Path:
     return target
 
 
-def workspace_server(folder: Path, commands: list[str], timeout: int) -> MCPServer:
+def workspace_server(folder: Path, commands: list[str], timeout: int, groups: set[int] | None = None) -> MCPServer:
+    """`groups` collects the process group of every command `run` starts, for `main` to stop when the server ends."""
     folder = folder.resolve()
+    groups = set() if groups is None else groups
     server = MCPServer("zanni-workspace", log_level="WARNING", instructions=(
         "Your workspace: a local copy of the stage, for this cue. Edit files here, and run the project's commands "
         "here. What you change is sent to the stage when the cue ends, within the cue's paths."))
@@ -82,17 +85,26 @@ def workspace_server(folder: Path, commands: list[str], timeout: int) -> MCPServ
                                                         stderr=asyncio.subprocess.STDOUT, start_new_session=True)
         except OSError as e:
             return {"exit_code": None, "output": f"couldn't start {name}: {e}"}
+        groups.add(proc.pid)  # what it leaves running, such as an app for the next call, lives until the cue ends
         try:
             out, _ = await asyncio.wait_for(proc.communicate(), limit)
         except TimeoutError:
-            with contextlib.suppress(ProcessLookupError):
-                os.killpg(proc.pid, signal.SIGKILL)  # the command and anything it started
+            stop_group(proc.pid)
             out, _ = await proc.communicate()
             return {"exit_code": None, "output": f"stopped after {limit} s\n"
                                                  + out.decode(errors="replace")[-OUTPUT_TAIL:]}
+        finally:  # a call cancelled, or the server stopping, must not leave the command running (found by milestone 6)
+            if proc.returncode is None:
+                stop_group(proc.pid)
         return {"exit_code": proc.returncode, "output": out.decode(errors="replace")[-OUTPUT_TAIL:]}
 
     return server
+
+
+def stop_group(pid: int) -> None:
+    """Kill a command and everything it started: it runs in a session of its own."""
+    with contextlib.suppress(ProcessLookupError, PermissionError):
+        os.killpg(pid, signal.SIGKILL)
 
 
 def main() -> None:
@@ -102,7 +114,13 @@ def main() -> None:
     parser.add_argument("--timeout", type=int, default=600)
     args = parser.parse_args()
     args.folder.mkdir(parents=True, exist_ok=True)
-    workspace_server(args.folder, args.commands, args.timeout).run("stdio")
+    groups: set[int] = set()
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))  # the client's stop: still run the finally below
+    try:
+        workspace_server(args.folder, args.commands, args.timeout, groups).run("stdio")
+    finally:  # the cue is over: nothing a command started outlives it (found by milestone 6's runs)
+        for group in groups:
+            stop_group(group)
 
 
 if __name__ == "__main__":

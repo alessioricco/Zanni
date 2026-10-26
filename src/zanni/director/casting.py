@@ -277,7 +277,7 @@ class Director:
         seat.stage.start_cue(f"{cue.cue}: {cue.scene}", cue.writes)  # the note goes into the backend's history
         seat.deadline = datetime.fromisoformat(cue.deadline.replace("Z", "+00:00")) if cue.deadline else None
         self.log.event("cue", seat=seat.id, scene=cue.scene, cue=cue.cue,
-                       budget=cue.limits.budget.amount if cue.limits.budget else None)
+                       budget=cue.limits.budget.amount if cue.limits.budget else None, deadline=cue.deadline)
         await seat.outbox.put(Outgoing("input-required", cue))
         return await answer
 

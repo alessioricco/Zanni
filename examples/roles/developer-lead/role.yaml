@@ -4,7 +4,7 @@ version: 0.1.0
 mission: Split the round's work into workstreams whose paths don't overlap, and turn failures into fix tasks.
 model: { needs: { tools: true, tier: planning } }
 needs:
-  stage_read: [vision.md, backlog/, spec/, tests/, app/, reviews/, findings/, tasks/]
+  stage_read: ["/"]          # the whole stage: the project's own files, such as its .gitignore
   stage_write: [tasks/, reviews/]
 never:
   - edit tests to make them pass

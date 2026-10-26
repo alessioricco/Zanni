@@ -33,6 +33,7 @@ class Pending:
     cue: Cue
     seat: Seat
     writes: bool
+    allowed: timedelta | None = None  # how long the cue has, so a resent cue gets as long again
     task: asyncio.Task | None = None
 
 
@@ -136,7 +137,7 @@ class Production:
                   reads=reads, writes=writes, deadline=stamp(self.casting.utcnow() + timedelta(minutes=minutes)),
                   verifiers=[f"{n}: {v.description}" for n, v in self.state.script.verifiers.items()],
                   limits={"budget": money(amount)} if amount is not None else {})
-        self._send(cue, seat, amount)
+        self._send(cue, seat, amount, timedelta(minutes=minutes))
         self.say(f"  cue {cue.cue} to {seat.id}: {scene}{f' (budget ${amount})' if amount is not None else ''}")
         return (f"cue {cue.cue} sent to {seat.id} (part {seat.part}), due within {minutes} minutes"
                 + (f", with a budget of ${amount}" if amount is not None else ""))
@@ -156,10 +157,10 @@ class Production:
                     else f"no seat of {target} is cast right now; cast it, or wait_for_reports while it is recast")
         return idle[0]
 
-    def _send(self, cue: Cue, seat: Seat, amount: Decimal | None) -> None:
+    def _send(self, cue: Cue, seat: Seat, amount: Decimal | None, allowed: timedelta | None = None) -> None:
         if amount is not None:
             self.state.reservations[cue.cue] = amount
-        pending = Pending(cue, seat, writes=bool(cue.writes))
+        pending = Pending(cue, seat, writes=bool(cue.writes), allowed=allowed)
         self.pending[cue.cue] = pending
         pending.task = asyncio.create_task(self._follow(pending))
 
@@ -197,10 +198,14 @@ class Production:
                                            f"the seat ended before it answered ({reason}), and no seat of "
                                            f"{p.seat.part} took its place in time", [], None))
             return
-        cue = p.cue.model_copy(update={"cue": p.cue.cue + "-again", "instructions": p.cue.instructions + RESENT})
+        # The new seat gets as long as the first one had: the old deadline may have passed, which is often why it was lost
+        update = {"cue": p.cue.cue + "-again", "instructions": p.cue.instructions + RESENT}
+        if p.allowed is not None:
+            update["deadline"] = stamp(self.casting.utcnow() + p.allowed)
+        cue = p.cue.model_copy(update=update)
         self.log.event("cue-resent", cue=p.cue.cue, seat=new.id, was=p.seat.id)
         self.say(f"  resending {p.cue.cue} to {new.id}")
-        self._send(cue, new, amount)
+        self._send(cue, new, amount, p.allowed)
 
     async def _recast(self, seat: Seat, reason: str) -> Seat | None:
         """Reopen the seat's part: a local seat is restarted, within its limit (D36); others are waited for.

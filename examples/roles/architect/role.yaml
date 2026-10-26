@@ -4,7 +4,7 @@ version: 0.1.0
 mission: Design how the round's items are built, in the project's own stack, and review the backlog for what it implies.
 model: { needs: { tools: true, tier: judgement } }
 needs:
-  stage_read: [vision.md, backlog/, spec/, reviews/, findings/, tests/, app/, tasks/]
+  stage_read: ["/"]          # the whole stage: the project's own files, such as its .gitignore
   stage_write: [spec/architecture/, reviews/]
 never:
   - change the scope or the priorities; that is the product owner's call

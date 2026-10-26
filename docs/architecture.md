@@ -10,7 +10,8 @@ src/zanni/
   __main__.py       # python -m zanni
   cli.py            # the `zanni` command
   gate.py           # `zanni gate`: the owner's client for a running director (D38)
-  commands.py       # running a verifier's command in a snapshot, its process group killed on a timeout (D35, D45)
+  commands.py       # running a verifier's command in a snapshot, beside its check files (${ZANNI_SCRIPT}), its
+                    #   process group killed on a timeout (D35, D45, D55)
   fetch.py          # remote packages: a tag, fetched with git into ~/.zanni/packages (D37)
   files/            # loading and validating Zanni files
     check.py        # what `zanni <path>` checks: one file, a role folder, a play against its script and lockfile
@@ -25,7 +26,9 @@ src/zanni/
     contract.py     # CueTask in, CueResult out: what Zanni hands the engine, and gets back
     roles.py        # a role folder -> instructions and skills (D4)
     resolve.py      # ${NAME} from the actor's credentials, then the environment (D20); models resolved
-    mcp_config.py   # a role's mcp.json, with every ${NAME} resolved
+    mcp_config.py   # a role's mcp.json, replaced where the actor brings its own tools (D53), every ${NAME} resolved;
+                    #   zanni:workspace as a process with no secrets in its environment
+    workspace.py    # a seat's workspace: filled from the stage at a cue's start, sent back when it ends done (D52)
     seat.py         # an actor in a play: the director's card, its own card, join, cues, reports, release (D30)
     join.py         # where to join (a URL or a play file's director), and the set-up rehearsals share
     rehearsal.py    # an actor on a rehearsal, with a director started for it on loopback (D26, D29)
@@ -61,14 +64,17 @@ src/zanni/
     fit.py          # does an actor's card fit a part: role (or a local role's name), hash, needs within ceilings
     schemas.py      # generates docs/spec/schemas/*.schema.json
   engine/           # the engine adapter: the only code that imports Pydantic AI, mcp or a2a-sdk (D1)
-    run.py          # run_cue: one cue on the actor's models, in order, with fallback, cost, and the cue's budget
+    run.py          # run_cue: one cue on the actor's models, in order, with fallback, cost (brought tools'
+                    #   calls included, D53), and the cue's budget
     director_agent.py # one director turn on its models, with its tools and fallback (D33)
     pricing.py      # whether a model has a price, published or declared (D39)
-    models.py       # a resolved model entry -> a Pydantic AI model
+    models.py       # a resolved model entry -> a Pydantic AI model; its settings: max_output, and the director's
+                    #   prompt caching (D61)
     fallback.py     # a failure -> one of D20's reasons
     text_tools.py   # the opt-in text tool format (D5)
     tools.py        # load_skill and the stage_* tools
-    mcp.py          # a role's MCP servers as toolsets
+    mcp.py          # a role's MCP servers as toolsets, with time to start and room for a refusal or two
+    workspace_server.py # zanni:workspace: read, write, list and run in one folder, over stdio (D52)
     capabilities.py # asks Ollama whether a model can call tools
     a2a_wire.py     # casting messages in and out of A2A messages, validated both ways
     a2a_server.py   # the director's card, a task per seat, the token on every call (D21, D31)
@@ -76,7 +82,7 @@ src/zanni/
     stage_mcp.py    # the stage's MCP server (Streamable HTTP, a token per seat), and RemoteStage
     stage_backend.py # the mcp backend: any MCP server with the five stage tools, retried and reconnected (D47)
     serve.py        # serves a Director: A2A, the stage's MCP server and the owner's endpoint, plus the heartbeat watch
-examples/           # one valid file of each kind
+examples/           # one valid file of each kind; whole plays: the slug kata, release notes, the software team
 tests/              # unit tests, CLI tests
 tests/conformance/  # data-driven tests that any implementation can run
 docs/               # user and contributor docs; docs/spec/ is the spec
@@ -137,6 +143,7 @@ zanni actor.yaml                                   zanni smoke.yaml --serve     
 ```
 
 - **Two logs:** the director keeps the play's log (`log.jsonl`); the actor keeps its own, on its own machine (D32).
+- **A workspace:** for a role whose `mcp.json` names `zanni:workspace`, `seat._answer` fills `actor.workspace.Workspace` from the seat's stage before the cue and, when the cue ends done, sends what changed through the same stage: every change meets the director's permission layer as an ordinary write (D52). The engine runs the workspace's server as a stdio subprocess, like any other MCP server.
 - **Contact:** the director's heartbeat watch ends a seat that has had no contact for `misses × interval`, with an open stream counting as contact (D31), and revokes its tokens.
 
 ## A play
@@ -163,9 +170,11 @@ zanni play.yaml   (or zanni director.yaml)
        └─ a git stage: push the run's branch, or print how to publish it                     (D46)
 ```
 
-- **A cue's life:** `cue` reserves its budget and sends it through the casting side; a follower waits for the report, charges its cost, and takes its changes from the stage's record (D41). A seat lost mid-cue is recast, and the cue resent (D36).
+- **A cue's life:** `cue` reserves its budget and sends it through the casting side; a follower waits for the report, charges its cost, and takes its changes from the stage's record (D41). A seat lost mid-cue is recast, and the cue resent with a new deadline as long as the first (D36).
 - **The director's own spend:** `run_director_turn` tells `Production.director_spending` the turn's spend after each model response, before its tool calls run; it counts in the play's spend at once, and the turn ends when the budget is reached (D39).
-- **Gates:** `ask_gate` waits on `director.gates`, which only the owner's endpoint or the console resolves; actors have no way to it (D38). A gate may be asked every round, and its `before` parts can't be cued until it is approved in that round (D48).
+- **Gates:** `ask_gate` waits on `director.gates`, which only the owner's endpoint or the console resolves; actors have no way to it (D38). A gate may be asked every round, and its `before` parts, or any cue that may write its `before_writes` paths, can't be cued until it is approved in that round (D48, D62). An approval with `another_round` raises the run's round limit (D60).
+- **A cue's paths:** `SeatStage.start_cue` narrows a seat's writes to the cue's `writes` until `end_cue`, and records what it refused for the report (D52, D54).
+- **Continuing:** `zanni play.yaml --continue <run-id>` reads the earlier run's last round from its log (`command.earlier_run`), and `open_stage` branches a git stage from that run's branch (D60).
 - **Verifiers:** `run_verifier` takes a snapshot of the stage into a fresh folder and runs the command there (`zanni.commands`), or sends it to the verifier seat the verifier `runs_on` as `zanni.verify`, and takes the exit code from `zanni.verdict` (D45).
 
 ## Dependencies

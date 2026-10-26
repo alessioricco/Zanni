@@ -36,7 +36,7 @@ def workspace_server(name: str, workspace: Path | None, commands: list[str], env
     for command in commands:
         args += ["--command", command]
     return McpServerSpec(name=name, command=sys.executable, args=args, cwd=str(workspace),
-                         env={k: v for k, v in env.items() if not is_secret_name(k)})
+                         env={k: v for k, v in env.items() if not is_secret_name(k) and k != "VIRTUAL_ENV"})
 
 
 def mcp_servers(role_folder: Path, credentials: Mapping[str, str], env: Mapping[str, str] | None = None, *,

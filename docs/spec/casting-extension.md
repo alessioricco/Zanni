@@ -240,7 +240,7 @@ There is no heartbeat message: A2A's own calls are enough. The actor follows its
 1. ends the task as `canceled`, with a `zanni.release` whose reason is `no-heartbeat`;
 2. revokes the seat's tokens;
 3. recasts the part: a local seat is restarted, up to twice per play (D36), or the next actor that fits joins. The work survives on the stage.
-4. resends the lost seat's pending cue, if any, to the new seat, with the same instructions and a note that it continues from what is on the stage.
+4. resends the lost seat's pending cue, if any, to the new seat, with the same instructions and a note that it continues from what is on the stage, and a new `deadline` as far off as the first one was when it was sent: a seat lost to a missed deadline must not pass it on to the next.
 
 ### `zanni.release` and `zanni.released`
 

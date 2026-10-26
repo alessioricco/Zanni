@@ -62,7 +62,7 @@ class Permissions(Wire):
 
 
 class DirectAccess(Wire):
-    """Reserved: direct access to a git stage, for a coding engine, planned for milestone 6 (D46)."""
+    """Reserved: direct access to a git stage, deferred to after the first version (D46, D52)."""
 
     clone_url: Text
     branch: Text = Field(description="The branch the seat may push.")

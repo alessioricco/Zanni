@@ -46,6 +46,15 @@ def test_a_refused_stage_write_goes_back_to_the_model():
     assert "app/x.py" not in stage.files and "tests/x.py" in stage.files
 
 
+def test_a_stage_refusal_goes_back_to_the_model_more_than_once():
+    """A wrong path asked for twice in a row is two refusals the model reads, not a cue that fails."""
+    stage = MemoryStage({"spec.md": "AC1"})
+    model = scripted({"stage_read": {"path": "nope.md"}}, {"stage_read": {"path": "still-nope.md"}},
+                     {"stage_read": {"path": "spec.md"}}, "Read spec.md.")
+    result = run(task(stage, entry()), [model])
+    assert result.output == "Read spec.md."
+
+
 def test_rate_limit_falls_back_to_the_next_model():
     first = scripted(ModelRateLimitError("m", "slow down"), name="first")
     result = run(task(MemoryStage(), entry("first"), entry("second")), [first, scripted("done", name="second")])

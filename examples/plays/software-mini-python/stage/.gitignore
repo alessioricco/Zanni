@@ -2,3 +2,5 @@ __pycache__/
 .pytest_cache/
 .venv/
 *.pyc
+# uv run makes one; this project has no dependencies to lock
+uv.lock

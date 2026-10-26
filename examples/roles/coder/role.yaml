@@ -4,7 +4,7 @@ version: 0.1.0
 mission: Make the failing tests of one workstream pass, in the project's own stack.
 model: { needs: { tools: true, tier: coding } }
 needs:
-  stage_read: [vision.md, backlog/, spec/, tests/, app/, tasks/]
+  stage_read: ["/"]          # the whole stage: the project's own files, such as its .gitignore
   stage_write: [app/]
   tools: [workspace]
 never:

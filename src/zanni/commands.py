@@ -38,11 +38,18 @@ async def run_command(command: list[str], cwd, timeout: int) -> tuple[bool, str]
     return code == 0, detail
 
 
+def project_env() -> dict[str, str]:
+    """The environment a project's own command runs in: this one, without Zanni's own virtual environment, which
+    belongs to Zanni, not to the project (found by milestone 6's runs: `uv run` warned on every verdict)."""
+    return {k: v for k, v in os.environ.items() if k != "VIRTUAL_ENV"}
+
+
 async def run_for_exit_code(command: list[str], cwd, timeout: int) -> tuple[int | None, str]:
     """(the exit code, or None when it timed out, couldn't start or was killed by a signal; the end of its output)."""
     try:
         proc = await asyncio.create_subprocess_exec(*command, cwd=cwd, stdout=asyncio.subprocess.PIPE,
-                                                    stderr=asyncio.subprocess.STDOUT, start_new_session=True)
+                                                    stderr=asyncio.subprocess.STDOUT, start_new_session=True,
+                                                    env=project_env())
     except OSError as e:
         return None, f"couldn't start {command[0]}: {e}"
     try:
@@ -51,6 +58,9 @@ async def run_for_exit_code(command: list[str], cwd, timeout: int) -> tuple[int 
         _kill_group(proc.pid)
         await proc.wait()
         return None, f"timed out after {timeout} s, and was stopped"
+    finally:  # cancelled, such as when the play stops: the command must not outlive it
+        if proc.returncode is None:
+            _kill_group(proc.pid)
     text = out.decode(errors="replace").strip()
     code = proc.returncode if proc.returncode >= 0 else None
     return code, (text[-OUTPUT:] or f"exit code {proc.returncode}")

@@ -164,12 +164,17 @@ async def _play(client, task_id, cast, stage, role, models, servers, log, say, r
                 answered.add(message.cue)
                 report = await _answer(message, stage, role, models, servers, cast.seat, log, say, runner, workspace)
                 reports.append(report)
-                await client.send(task_id, cast.seat_token, report)
+                if failed := await _send_answer(client, task_id, cast.seat_token, report, say):
+                    reason = failed
+                    break
             elif isinstance(message, Verify) and status.state == "input-required" and message.verify not in answered:
                 from zanni.actor.verifier import run_verify
 
                 answered.add(message.verify)
-                await client.send(task_id, cast.seat_token, await run_verify(message, stage, cast.seat, log, say))
+                if failed := await _send_answer(client, task_id, cast.seat_token,
+                                                await run_verify(message, stage, cast.seat, log, say), say):
+                    reason = failed
+                    break
             elif isinstance(message, Release):
                 reason = message.reason
                 if status.state == "input-required":  # asked to stop: discard, then confirm
@@ -185,6 +190,20 @@ async def _play(client, task_id, cast, stage, role, models, servers, log, say, r
             await follower
     log.event("released", seat=cast.seat, reason=reason)
     return SeatOutcome(0 if reason == "done" else 1, reason, cast.seat, reports)
+
+
+async def _send_answer(client, task_id, token, answer, say) -> str | None:
+    """Send an answer; the reason the seat ends when it can't arrive: `revoked` when the seat was released while the
+    actor worked, such as a cue past its deadline, or `lost` when the director can't be reached."""
+    try:
+        await client.send(task_id, token, answer)
+        return None
+    except NotAuthorised as e:
+        say(f"  the director revoked this seat before the answer arrived: {e}")
+        return "revoked"
+    except DirectorError as e:
+        say(f"  lost the director while sending the answer: {e}")
+        return "lost"
 
 
 class CueError(Exception):

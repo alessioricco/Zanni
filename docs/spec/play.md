@@ -204,7 +204,7 @@ The play's spend is every report's cost plus the director's own (D39):
 | `stage-unavailable` | `detail` | An `mcp` stage stopped answering (D47). |
 | `actor-joined` | `seat`, `part`, `role`, `actor` (its configuration's `name`) | An actor is cast into a seat. |
 | `join-refused` | `reason`, `actor`, `role` | The director refuses an actor (D24). |
-| `cue` | `seat`, `scene`, `cue`, `budget` | The director gives a cue. |
+| `cue` | `seat`, `scene`, `cue`, `budget`, `deadline` | The director gives a cue. A resent cue has a new `deadline` (D36). |
 | `report` | `seat`, `scene`, `outcome`, `summary`, `changes` and `refused` (from the stage's record, D41, D52) | An actor reports back. `refused` lists the operations the permission layer refused during the cue. |
 | `verdict` | `scene`, `verifier`, `kind` (`hard` or `soft`), `passed`, `detail`, `source` (`script` or `play`), `marker` (the stage's change marker it ran against), `by` (`director`, or the verifier seat) | A verifier runs (D45). |
 | `gate-pending` | `gate`, `summary` | The play waits at a gate. |

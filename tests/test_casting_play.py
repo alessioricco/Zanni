@@ -10,6 +10,7 @@ import subprocess
 import sys
 import time
 from dataclasses import replace
+from datetime import timedelta
 from decimal import Decimal
 from pathlib import Path
 
@@ -254,6 +255,46 @@ def test_a_seat_lost_mid_cue_is_recast_and_its_cue_resent_and_completed(tmp_path
     log = events(tmp_path)
     assert [e["reason"] for e in log if e["event"] == "seat-released"][0] == "no-heartbeat"
     assert [(e["cue"], e["seat"], e["was"]) for e in log if e["event"] == "cue-resent"] == [("r1-c1", "coder-2", "coder-1")]
+
+
+def test_a_cue_resent_after_a_missed_deadline_gets_a_new_deadline(tmp_path):
+    """A seat lost to its cue's deadline: the next seat gets as long again, not the deadline that already passed."""
+    play, script, stage = kata(tmp_path, gates=())
+    p = production(tmp_path, play, script, stage, interval=1)
+    later = timedelta()
+    real = p.casting.utcnow
+    p.casting.utcnow = lambda: real() + later
+
+    async def body(p):
+        nonlocal later
+        started = asyncio.Event()
+        info = DirectorInfo(name="d", description="t", version="0", play="kata", script="./kata")
+        async with serving(p.casting, info) as server:
+            first = asyncio.create_task(actor(server.url, tmp_path, "coder", slow_runner(started), name="coder-a"))
+            await until(lambda: len(p.active_seats("coder")) == 1)
+            await p.cue("coder", "Build", "Write app/slug.py.", writes=["app/"], deadline_minutes=60)
+            await started.wait()
+            later = timedelta(minutes=61)  # the first seat misses its deadline, and is released
+            write = actor_runner({"app/slug.py": "x = 1\n"})
+
+            async def takes_a_while(task):  # long enough for the director to check the deadline
+                await asyncio.sleep(3)
+                return await write(task)
+
+            second = asyncio.create_task(actor(server.url, tmp_path, "coder", takes_a_while, name="coder-b"))
+            report = await asyncio.wait_for(p.wait_for_reports(), 60)
+            await p.finish()
+            first.cancel()
+            await asyncio.gather(first, second, return_exceptions=True)
+            return report
+
+    report = asyncio.run(body(p))
+    assert 'seat="coder-2"' in report and 'cue="r1-c1-again"' in report and 'outcome="done"' in report
+    log = events(tmp_path)
+    released = [(e["seat"], e["reason"]) for e in log if e["event"] == "seat-released"]
+    assert released[0] == ("coder-1", "no-heartbeat") and ("coder-2", "no-heartbeat") not in released
+    first, again = [e["deadline"] for e in log if e["event"] == "cue"]
+    assert again > first  # the log shows each cue's deadline
 
 
 def test_a_lost_seat_nobody_replaces_is_reported_as_lost(tmp_path):

@@ -5,6 +5,7 @@ import inspect
 from pydantic_ai import FunctionToolset, ModelRetry
 
 from zanni.actor.contract import Stage, StageError
+from zanni.engine.mcp import TOOL_RETRIES
 
 
 def skill_toolset(skills: dict[str, str]) -> FunctionToolset:
@@ -14,7 +15,7 @@ def skill_toolset(skills: dict[str, str]) -> FunctionToolset:
             raise ModelRetry(f"No skill named {name!r}; your skills are: {', '.join(sorted(skills)) or 'none'}.")
         return skills[name]
 
-    return FunctionToolset([load_skill])
+    return FunctionToolset([load_skill], max_retries=TOOL_RETRIES)
 
 
 def stage_toolset(stage: Stage) -> FunctionToolset:
@@ -67,5 +68,7 @@ def stage_toolset(stage: Stage) -> FunctionToolset:
             raise refuse(e) from None
         return {"changes": [{"path": p, "change": c} for p, c in changes], "marker": marker}
 
-    # Sequential: several calls in one reply must reach the stage in the order the model wrote them.
-    return FunctionToolset([stage_read, stage_write, stage_list, stage_delete, stage_changes], sequential=True)
+    # Sequential: several calls in one reply must reach the stage in the order the model wrote them. A refusal goes
+    # back to the model as many times as an MCP tool's error does: one wrong path twice must not end the cue
+    return FunctionToolset([stage_read, stage_write, stage_list, stage_delete, stage_changes], sequential=True,
+                           max_retries=TOOL_RETRIES)

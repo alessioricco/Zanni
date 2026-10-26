@@ -240,3 +240,49 @@ def test_a_stage_that_goes_away_mid_cue_ends_the_cue_as_failed_not_as_a_crash(se
                                Log(tmp_path / "actor.jsonl", "r1"), lines.append,
                                lambda t: run_cue(t, build=lambda rm: model)))
     assert gone.outcome == "failed" and "isn't answering" in gone.summary and len(asked) == 1  # no model call at all
+
+
+def test_an_answer_that_cannot_arrive_ends_the_seat_not_in_a_crash(setup, tmp_path):
+    """Recorded run local-b of milestone 6: a cue finished after its deadline had released the seat, and sending the
+    report raised `not-authorised` out of the actor as a traceback."""
+    from types import SimpleNamespace
+
+    from zanni.actor.seat import _play
+    from zanni.engine.a2a_client import DirectorError, NotAuthorised
+    from zanni.log import Log
+    from zanni.protocol.messages import Cue
+
+    _, _, role, _, _, models = setup
+    cue = Cue(kind="zanni.cue", cue="c-1", scene="Tests", instructions="Write tests.")
+
+    class LateClient:
+        async def follow(self, task_id, token, **_):
+            yield SimpleNamespace(state="input-required", message=cue)
+            await asyncio.sleep(60)  # nothing more: the seat ends on the refused answer
+
+        async def send(self, task_id, token, message):
+            raise NotAuthorised("not-authorised: the seat tester-3 was released (no-heartbeat), and its tokens revoked")
+
+    async def runner(task):
+        from zanni.protocol.messages import Report
+        return Report(kind="zanni.report", cue=cue.cue, outcome="done", summary="late", changes=[])
+
+    cast = SimpleNamespace(seat="tester-3", seat_token="seat-token-fake",
+                           heartbeat=SimpleNamespace(interval=30, misses=3))
+    lines: list[str] = []
+    stage = SimpleNamespace(changes=lambda since=None: asyncio.sleep(0, ([], "1")))
+    outcome = asyncio.run(asyncio.wait_for(
+        _play(LateClient(), "t-1", cast, stage, role, models, [], Log(tmp_path / "actor.jsonl", "r1"), lines.append,
+              runner), 10))
+    assert outcome.exit_code == 1 and outcome.reason == "revoked"
+    assert any("revoked this seat before the answer arrived" in line for line in lines)
+
+    class GoneClient(LateClient):  # the two-machine run: another server had taken the director's address
+        async def send(self, task_id, token, message):
+            raise DirectorError("A2AClientError: HTTP Error 501: Server error '501 Unsupported method ('POST')'")
+
+    outcome = asyncio.run(asyncio.wait_for(
+        _play(GoneClient(), "t-1", cast, stage, role, models, [], Log(tmp_path / "actor.jsonl", "r1"), lines.append,
+              runner), 10))
+    assert outcome.exit_code == 1 and outcome.reason == "lost"
+    assert any("lost the director while sending the answer" in line for line in lines)

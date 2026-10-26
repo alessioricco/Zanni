@@ -84,6 +84,8 @@ def _message(err: dict, loaded: Loaded, model: type[BaseModel], hidden: tuple[st
         # Validators raise ValueError("problem; fix"), already in plain words.
         problem, _, fix = str(err["ctx"]["error"]).partition("; ")
         return FileError(loaded.file, loaded.line(path), path, problem, fix)
+    if kind == "string_too_short" and err.get("input") == "":
+        return FileError(loaded.file, loaded.line(path), path, "is empty", "give it a value, or remove it")
     if kind in ("greater_than_equal", "greater_than", "less_than_equal", "less_than"):
         bound = next(iter(err["ctx"].values()))
         words = {"greater_than_equal": "at least", "greater_than": "more than",

@@ -2,8 +2,12 @@
 `zanni:workspace`, the MCP server an engine works through. D54: a cue's `writes` narrow the seat's own."""
 
 import asyncio
+import contextlib
 import json
+import os
+import signal
 import sys
+import time
 from decimal import Decimal
 from pathlib import Path
 
@@ -86,6 +90,58 @@ def test_a_command_not_listed_is_refused_and_one_past_its_timeout_is_stopped(tmp
     assert "not-permitted: other isn't a command this actor may run; it may run: slow" in str(out[0])
     assert "not-permitted: /bin/sh" in str(out[1])
     assert out[2]["exit_code"] is None and out[2]["output"].startswith("stopped after 1 s")
+
+
+def test_a_command_still_running_when_its_call_is_abandoned_is_stopped(tmp_path):
+    """A cue that ends mid-call, or a client that stops waiting, must not leave the command running: found by
+    milestone 6's runs, where a test suite that started the app outlived its cue by hours."""
+    folder = tmp_path / "ws"
+    folder.mkdir()
+    bin_dir = script_bin(tmp_path, slow=f"echo $$ > {tmp_path}/pid; sleep 30")
+    model = scripted({"workspace_run": {"command": ["slow"], "timeout_seconds": 5}}, "done")
+    task = CueTask(instructions="i", skills={}, prompt="p", stage=MemoryStage(), models=[free()],
+                   mcp_servers=[server_in(folder, ["slow"], bin_dir)])
+
+    async def abandoned():
+        cue = asyncio.create_task(run_cue(task, build=lambda rm: model))
+        for _ in range(100):
+            if (tmp_path / "pid").exists():
+                break
+            await asyncio.sleep(0.1)
+        cue.cancel()  # the cue ends while the command runs: the workspace server is stopped
+        with contextlib.suppress(asyncio.CancelledError):
+            await cue
+
+    asyncio.run(abandoned())
+    pid = int((tmp_path / "pid").read_text())
+    deadline = time.monotonic() + 10
+    while time.monotonic() < deadline:
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            return
+        time.sleep(0.1)
+    os.kill(pid, signal.SIGKILL)
+    pytest.fail("the command outlived its call")
+
+
+def test_what_a_command_leaves_running_is_stopped_when_the_cue_ends(tmp_path):
+    """A command may leave a process running, such as the app for the next call to probe; it ends with the cue."""
+    folder = tmp_path / "ws"
+    folder.mkdir()
+    bin_dir = script_bin(tmp_path, start=f"sleep 30 > /dev/null 2>&1 & echo $! > {tmp_path}/pid")
+    out = run_tools(server_in(folder, ["start"], bin_dir), {"workspace_run": {"command": ["start"]}})
+    assert out[0]["exit_code"] == 0
+    pid = int((tmp_path / "pid").read_text())
+    deadline = time.monotonic() + 10
+    while time.monotonic() < deadline:
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            return
+        time.sleep(0.1)
+    os.kill(pid, signal.SIGKILL)
+    pytest.fail("a process the command started outlived the cue")
 
 
 def test_a_path_that_leaves_the_workspace_is_refused(tmp_path):

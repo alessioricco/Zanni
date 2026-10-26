@@ -2,7 +2,7 @@
 
 A role is a package describing a persona: who it is, what it knows how to do, which tools it needs, and what it may touch. A zanni is an empty shell until it is given a role, so adding a role needs no code. A role holds capabilities only: names, models and credentials belong to each actor's configuration.
 
-> **Status:** `zanni` validates a whole role folder today: `role.yaml`, `AGENTS.md`, the skills and `mcp.json`. Actors that load roles come with the engine adapter (D4 in [DECISIONS.md](../DECISIONS.md)), so you can start writing roles now.
+> **Status:** actors play roles today, in rehearsals and in plays. `zanni` validates a whole role folder: `role.yaml`, `AGENTS.md`, the skills, `mcp.json` and the rehearsals. The repository's examples include the software team's six roles in `examples/roles/` (`product-owner`, `architect`, `ui-designer`, `tester`, `developer-lead`, `coder`), each with a rehearsal.
 
 ## The folder
 
@@ -22,29 +22,31 @@ Only `role.yaml` is Zanni's own format. The other files follow their standards u
 ## 1. `role.yaml`: what the role asks for
 
 ```yaml
+# examples/roles/tester/role.yaml
 name: tester
-version: 1.4.0
+version: 0.1.0
 mission: Turn acceptance criteria into tests; explore the running app and report findings.
-model:
-  needs: { tools: true, context: 32k, tier: judgement }
-  suggested: claude-sonnet-5-5
+model: { needs: { tools: true, tier: coding } }
 needs:
-  stage_read: [vision.md, backlog/, spec/]
-  stage_write: [tests/, findings/]
-  tools: [browser, test-runner]
+  stage_read: ["/"]          # the whole stage: the project's own files, such as its .gitignore
+  stage_write: [tests/, findings/, reviews/]
+  tools: [workspace]
 never:
   - edit application code
+  - change priorities
+  - change a test to make it pass
 outputs:
-  findings/<item>.md: one finding per file, each with a failing test
+  findings/<item>.md: one finding per file, each with a failing test under tests/findings/
 ```
 
 - **`needs` are requests, not grants.** The play decides what to grant, and the stage enforces what a seat may read and write. A role can't give itself more access.
 - **`never` is guidance for the model, not a limit.** The real limits are the stage's permissions and the verifiers. Write `never` rules anyway: they keep the role on task.
 - **`model.needs` says what kind of model the role needs, not which one.** The model is chosen in each actor's configuration; `model.needs` and `suggested` are hints for whoever writes it. A role never requires a particular model or vendor.
 
-- **`needs.tools` names the role's MCP servers,** and each must be a server in its `mcp.json`.
+- **`needs.tools` names the tools the role needs,** and each must be a server in its `mcp.json`, its default. An actor may bring its own server for any of them ([below](#tools-and-the-workspace)).
 - **`outputs` must sit inside `needs.stage_write`.**
-- **`model.needs.tier`** is a free label. The reference roles use `judgement`, `coding` and `basic`.
+- **`model.needs.tier`** is a free label. The reference roles use `judgement`, `coding`, `planning` and `basic`.
+- **Name no stack or product.** A coder role writes code in whatever stack the project's own files name; a role never says "Python" or names a coding engine. What a role needs, it names by what it does.
 
 Check the manifest alone, or the whole folder:
 
@@ -109,6 +111,38 @@ Zanni has no built-in tools. A role lists the MCP servers it expects, in the sta
 ```
 
 A role is shared, so a secret in `mcp.json` must be a `${NAME}` reference, never a value. Each actor supplies its own value from its configuration's `credentials`, or from its environment. Two actors playing this role can then use different tokens. `zanni` rejects a literal value in an `env` or `headers` entry whose name looks like a secret.
+
+### Tools and the workspace
+
+A role that works on real files, such as a coder writing code and running its tests, or a writer revising a manuscript with a spell checker, asks for a **workspace**: Zanni's one built-in server.
+
+```json
+{
+  "mcpServers": {
+    "workspace": { "command": "zanni:workspace" }
+  }
+}
+```
+
+- **What it is:** a local folder on the actor's machine. At the start of each cue the actor fills it with every stage file the seat may read; the model works there with `workspace_read_file`, `workspace_write_file`, `workspace_list_files` and `workspace_run`; and when the cue ends done, the actor sends what changed back to the stage (D52).
+- **What reaches the stage:** text files only, and none that the project's own `.gitignore` ignores, such as build output. Each change is an ordinary stage write, so the director checks it against the cue's paths, and a git stage commits it with the seat as author. A change outside the cue's paths is refused, and the refusal is in the report. A cue that fails, or stops at its budget, sends nothing.
+- **What `run` may run:** only the commands the actor's configuration lists in `workspace.commands`, such as `[uv]` or `[npm, node]`; none by default. Running commands on a machine is its owner's decision, never the role's. The command's environment holds nothing that looks like a secret. A process a command leaves running, such as the app a tester starts and then probes, lasts until the cue ends, and no longer. A listed command runs with its owner's permissions, and the workspace isn't a sandbox: `uv run python` can do anything Python can, including writing outside the folder, so list only what you would let the role's model run on your machine.
+- **Give it the project's files:** a role with a workspace usually reads the whole stage (`stage_read: ["/"]`), so the project's `.gitignore`, `pyproject.toml` or `package.json` reach the folder too.
+
+**An actor brings its own tools,** as it brings its own models (D53). Its configuration may replace any server the role needs with one of its own, such as its favourite coding engine, and says what each call costs the play:
+
+```yaml
+# coder-1.yaml, an actor configuration
+tools:
+  workspace:
+    command: some-engine            # stands for any MCP server that works in a folder
+    args: [mcp, --folder, "${ZANNI_WORKSPACE}"]
+    price: { per_call: 0 }          # what a play is charged per call: here, nothing
+```
+
+- **Only the tools the role needs:** a name the role's `needs.tools` doesn't list is refused.
+- **`${ZANNI_WORKSPACE}`** is the workspace's folder; a server the actor brings also starts there. Its changes reach the stage the same way, at the end of the cue.
+- **The price is the actor's word:** the director counts what the actor declares, as it counts models' costs. Under a budget, a tool with no price is refused at join, since an unknown cost is never counted as zero.
 
 ## 5. Publishing
 
