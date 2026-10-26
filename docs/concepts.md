@@ -2,7 +2,7 @@
 
 Zanni runs a team of AI personas as separate processes. Each persona works on its own and shares only what is on the stage. Its work is checked by verifiers it doesn't control.
 
-The name comes from the zanni, the servant characters of the commedia dell'arte: they did the work, each playing whatever character the scenario needed. Each Zanni process is a zanni too: an empty shell, until it is given a role to play.
+The name comes from the zanni, the servant characters of the commedia dell'arte: they did the work, each playing whatever character the scenario needed. Each Zanni process is a zanni too: an empty shell, until it is given a role to play. The same shell becomes a coder, a reporter, a priest or a jester, depending on its role and the script it plays: nothing in the engine is about software, or any other domain (D56).
 
 > **Status:** this page describes the design. [What works today](getting-started.md#what-works-today) lists what runs now, and the [roadmap](../ROADMAP.md) shows what comes next.
 
@@ -40,14 +40,17 @@ As in the theatre, the script is written once and performed many times. Two comp
 
 Two actors on the same machine can play different roles with different models and access: one on OpenAI with GitHub access, the other on Claude with an SSH terminal. Each has its own configuration file.
 
+**An actor is like a professional:** it brings its own models and its favourite tools, and pays for them. A role names a tool by what it does, such as a `workspace` to work on files in; an actor's configuration may bring its own server for it, such as a coding engine it likes, and declares what each call costs the play, which may be nothing (D53). One actor can run on a model the play's owner pays for, another on a friend's laptop, with a model and an engine the friend pays for. For now, what an actor declares it spent is taken on trust, as with models.
+
 ## How a play runs
 
 1. **Start the director.** You start the director with the play file: `zanni play.yaml`. The director is an actor too: its own models and credentials are in its configuration, `director.yaml` beside the play (role `zanni:director`). It fetches the script and roles, and pins them in `play.lock`. Seats marked `host: local` are started by the director itself, from actor configurations its configuration lists, so one command can run a whole play on one machine.
 2. **Actors join.** Each actor starts from its configuration: `zanni tester.yaml`. Only the director listens: the actor connects to it, presents a card built from its role, and shows the play's join token. Actors never open a port, so they can run behind a firewall.
 3. **Casting.** The director checks the role against the part it is cast for (the right role, the pinned version, needs within the part's limits) and assigns a seat. It sends the actor the seat's permissions, where the stage is, and credentials scoped to that seat.
 4. **Cues and reports.** The director follows the script and gives cues. It is an agent, but it acts only through tools that check the rules in code first: it can't skip a gate, spend past the budget by more than one model call, or call the play done while a verifier disagrees (D33, D39). Each actor works on the stage and reports back. Actors never read the whole script, only their cue. The actor stays in touch with the director, and that contact is its heartbeat.
-5. **Gates.** At a gate, the play waits for its owner, who decides from any machine with `zanni gate`, using the play's owner token (D38).
+5. **Gates.** At a gate, the play waits for its owner, who decides from any machine with `zanni gate`, using the play's owner token (D38). A gate can hold back parts, or paths that nobody may write until it is approved (D48, D62).
 6. **Release.** The director ends each seat and revokes the credentials it gave. If an actor stops answering, the director recasts its seat; the work survives on the stage.
+7. **Continuing.** The owner can grant another round when approving a gate, or start a new run later that continues from where an earlier one left the stage, with `zanni play.yaml --continue <run-id>` (D60).
 
 Under the hood, all of this is plain A2A: a seat is one A2A task on the director, from join to release. Zanni adds only the casting extension (see the [spec](spec/casting-extension.md)).
 
@@ -68,6 +71,8 @@ The stage holds the play's shared state. What it is made of depends on the play:
   | `mcp` | any MCP server offering the five stage tools, such as a document store | whatever the server keeps, such as who wrote each file; the director presents the server's token, seats never see it (D47) |
 
 - **Verifiers see a snapshot.** A verifier runs on a fresh copy of the stage as it is at that moment, never on the stage itself, so a command can't change the work it checks (D45).
+- **A workspace, for work on real files.** An actor whose role asks for a workspace gets a local copy of the stage for each cue. Its engine edits files and runs commands there, and when the cue ends done, the changes go back to the stage as ordinary writes, checked like any other. The stage never sees half-done work (D52).
+- **Nobody merges.** Seats that work in parallel get paths of their own for each cue, and the stage holds them to those paths until they report (D54).
 
 ## Limits are enforced where they can't be bypassed
 

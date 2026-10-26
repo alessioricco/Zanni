@@ -103,6 +103,30 @@ tester.yaml, line 4, models[0]: an openai-compatible model needs a `base_url`; a
 
 `openai-compatible` can be any server, so `zanni` needs its address.
 
+### "is not a tool the role needs"
+
+```
+coder-1.yaml, line 6, tools.browser: "browser" is not a tool the role needs; bind only tools in the role's needs.tools: workspace
+```
+
+An actor's `tools` may only replace servers its role asks for, by the same name (D53). Use the name from the role's `needs.tools`, such as `workspace`. A role whose folder isn't on this machine is checked when the actor fetches it.
+
+### "holds a secret's value, which belongs only in `credentials`"
+
+```
+coder-1.yaml, line 8, tools.coding-engine.env.ENGINE_API_KEY: holds a secret's value, which belongs only in `credentials`; write ${ENGINE_API_KEY} here, and put the value under `credentials`
+```
+
+A tool the actor brings may take a key, but only as a `${NAME}` reference; the value goes under `credentials`, where `zanni` protects it ([Models and keys](models-and-keys.md#tools-an-actor-brings-and-their-keys)).
+
+### "has no tools to bind and runs no workspace"
+
+```
+director.yaml, line 5, tools: the built-in role zanni:director has no tools to bind and runs no workspace; remove `tools`
+```
+
+`tools` and `workspace` belong in a seat's configuration. The director and verifier seats run Zanni's built-in roles, which need neither.
+
 ## Plays
 
 ### "is not a part in the script", "doesn't cast the script's part"
@@ -149,6 +173,14 @@ play.yaml, line 8, stage.push: is "sometimes"; use one of: 'approved' or 'always
 
 Seats are a number of at least 1, or a range written smaller number first. A `git` stage takes `url`, `branch` and `push`; a `folder` stage takes `path`; an `mcp` stage takes `url`, an `http` or `https` URL ([stage spec](spec/stage.md#in-the-play-file)).
 
+### "is more than the script's stop.max_rounds"
+
+```
+play.yaml, line 7, house_rules.max_rounds: 3 is more than the script's stop.max_rounds, 2; use 2 or fewer; a play may lower the script's limit, never raise it
+```
+
+A play may lower its script's round limit, never raise it. To go on after a run's last round, grant one more at the release gate (`zanni gate <play> approve --another-round`), or continue the run later (`zanni <play> --continue <run-id>`) ([getting started](getting-started.md#the-software-team)).
+
 ## Scripts
 
 ### "a script is a Markdown file"
@@ -166,6 +198,14 @@ SCRIPT.md, line 8: has no prose after the frontmatter; describe the acts and sce
 ```
 
 The prose is what the director follows, so it is required.
+
+### "is not a file in the script's folder"
+
+```
+SCRIPT.md, line 12, verifiers.tests-cover-criteria.files[0]: "checks/criteria.py" is not a file in the script's folder; add it to …/my-script, or fix the path, relative to the script's folder
+```
+
+A verifier's `files` are check files shipped in the script's own folder, run from `${ZANNI_SCRIPT}` (D55). Write each path relative to the folder holding `SCRIPT.md`, with `/`, and never leaving it: `../criteria.py` is refused too.
 
 ## Running a rehearsal
 
@@ -339,6 +379,14 @@ Before its first turn, the director waits for every part's minimum seats, and fo
 
 Not an error: the actor reached its cue's budget and ended the cue there, reporting `over-budget` (D39). The director gives each cue a share of what is left of the play's budget. The actor checks after each model response, so one response can overshoot the cue's budget, by a lot when the budget is small. If cues keep stopping, the play's budget is too small for its models: raise `house_rules.budget`, or use cheaper models. When nothing is left to reserve, the play stops with reason `budget` (exit code 1).
 
+### "there is no run … in …/log"
+
+```
+plays/software-mini-python/play.yaml: there is no run '20261025T100000Z' in …/plays/software-mini-python/log; the play's runs are: 20261025T200034Z; nothing was started.
+```
+
+`--continue` takes the id of an earlier run of the same play: the name of its log file, `log/<run-id>.jsonl`, which the message lists. Continue from the same play folder that ran it.
+
 ### "no director is running for …", from `zanni gate`
 
 ```
@@ -362,6 +410,14 @@ not-authorised: this needs the play's owner token (ZANNI_OWNER_TOKEN), not a joi
 ```
 
 The `ZANNI_OWNER_TOKEN` in your environment isn't the one in the director's configuration. Set the same value in both (D38). Exit code 2.
+
+### "--another-round goes with approve", from `zanni gate`
+
+```
+--another-round goes with approve: it approves the gate and grants one more round.
+```
+
+One more round is granted only by approving a gate. Exit code 2. A play with no round limit (neither its `house_rules.max_rounds` nor the script's `stop.max_rounds`) has no round to add: the director answers "this play has no round limit, so there is no round to add; approve without --another-round".
 
 ### "Nothing decided", from `zanni gate`
 
@@ -450,11 +506,13 @@ roles/tester/AGENTS.md: is missing or empty; write the role's character and inst
 roles/tester/role.yaml, line 5, needs.tools[0]: "browser" is not a server in mcp.json; add a `browser` server to mcp.json
 roles/tester/skills/write-test/SKILL.md, line 2, name: "write-tests" doesn't match its folder "write-test"; rename the folder or the skill so they match
 roles/tester/mcp.json, line 5, mcpServers.gh.env.GITHUB_TOKEN: holds a literal secret, and a role is shared, so it never holds secrets; write ${GITHUB_TOKEN} and give the value in the actor configuration
+roles/coder/mcp.json, line 3, mcpServers.shell: "zanni:shell" is not a server Zanni ships; use zanni:workspace
 ```
 
 - **`needs.tools`:** each name must be a server in the role's `mcp.json`.
 - **Skills:** a skill's `name` must match its folder, as the Agent Skills spec requires.
 - **Secrets in `mcp.json`:** write them as `${NAME}`. Each actor then supplies its own value, from its configuration's `credentials` or its environment.
+- **Built-in servers:** `zanni:workspace` is the only server Zanni ships, and takes no `args` or `env` ([Writing a role: tools](writing-a-role.md#tools-and-the-workspace)).
 
 ## Still stuck?
 

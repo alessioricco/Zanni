@@ -1,6 +1,6 @@
 # Models and keys
 
-> **Status:** an actor runs its models in a [rehearsal](spec/rehearsal.md) or in a seat it joined over A2A, and a play's director runs its own. Recorded runs are in [docs/runs/](runs/): [milestone 2](runs/milestone-2.md), [milestone 3](runs/milestone-3.md) and [milestone 4](runs/milestone-4.md).
+> **Status:** an actor runs its models in a [rehearsal](spec/rehearsal.md) or in a seat it joined over A2A, and a play's director runs its own. Recorded runs are in [docs/runs/](runs/), milestone 2 to [milestone 6](runs/milestone-6.md).
 
 ## Each actor brings its own models and keys
 
@@ -27,10 +27,29 @@ credentials:
 ```
 
 - **Order:** the first model is used; the next is tried when one fails with an error, a timeout, a rate limit, or a request too long for its context. A refusal moves to the next model only if you add `refusal` to `fall_back_on`.
+- **`max_output`:** the most tokens one response may hold, such as `max_output: 4000`. A local model stuck repeating itself then stops early instead of looping for minutes; without it, the provider's own limit applies.
 - **Other servers:** `openai-compatible` reaches any OpenAI-compatible server, with its `base_url`.
 - **Where credentials go:** a model entry's `credential` names the credential it uses. The role's `mcp.json` picks up `${GITHUB_TOKEN}` and the like from `credentials` first, then from the environment.
 
 Every field is in the [actor configuration spec](spec/actor-configuration.md).
+
+## Tools an actor brings, and their keys
+
+An actor may bring its own tools as well as its own models, such as a coding engine it prefers, in its configuration's `tools` ([Writing a role: tools](writing-a-role.md#tools-and-the-workspace)). A tool's key belongs to the actor that brings it:
+
+```yaml
+tools:
+  workspace:
+    command: some-engine
+    env: { ENGINE_API_KEY: "${ENGINE_API_KEY}" }   # always a reference, never a value
+    price: { per_call: 0 }
+credentials:
+  ENGINE_API_KEY: …                               # stays on this machine, under the same safeguards
+```
+
+- **Never a value in `env` or `headers`:** a secret-looking name there must hold a `${NAME}` reference; the value lives in `credentials`, or in the environment.
+- **What a play pays for it:** `price.per_call`, which may be 0 when the actor's owner pays. Each call that ran is added to the cue's cost. Under a budget, a tool with no price makes the actor `unpriced`, and it is refused at join (D53).
+- **The director never sees it:** like a model's key, a tool's key stays with its actor.
 
 ## The director's models and keys
 
@@ -51,6 +70,7 @@ credentials:
 ```
 
 - **Its keys stay its own:** the director never holds an actor's keys. Local seats resolve their own credentials, from their own configurations (D36).
+- **Its instructions are cached:** every director turn sends the same instructions and tools again, so on a provider with prompt caching (Anthropic's), the director asks for them to be cached, and pays a fraction for each turn after the first. Seats don't, until a measurement shows it doesn't cost them more (D61). The cached tokens are priced at their own prices, so the budget stays exact.
 - **The owner token:** `ZANNI_OWNER_TOKEN`, one per play, decides gates. The owner sets the same value in the environment where they run `zanni gate`; it is never a flag, and never logged (D38).
 - **The stage server's token:** `ZANNI_STAGE_TOKEN`, for a play on an `mcp` stage. Only the director presents it to the stage server; seats never see it (D47).
 - **The verifier token:** `ZANNI_VERIFIER_TOKEN`, when verifier seats join from other machines. Each of those seats presents the same value instead of the join token (D45). With only local verifier seats, the director makes one for the run itself.
@@ -91,6 +111,6 @@ No role, script or play depends on a particular model or vendor:
 - **Priced models:** a seat's cost comes from published prices, for the cloud models those prices cover.
 - **Local models:** the actor's configuration can declare a price, which can be 0 for its own hardware.
 - **Unknown cost is never counted as zero.** The director treats a seat with an unknown cost as unsafe for the play's budget (D7).
-- **Under a budget, every model needs a price** (D39): an actor whose models aren't all priced is refused when it joins (`unpriced`), and a director whose models aren't all priced doesn't start. Add `price:` to a local model's entry, even `{ input: 0, output: 0 }`.
+- **Under a budget, every model needs a price** (D39): an actor whose models aren't all priced is refused when it joins (`unpriced`), and a director whose models aren't all priced doesn't start. Add `price:` to a local model's entry, even `{ input: 0, output: 0 }`. The same holds for a tool the actor brings.
 - **A cue's budget:** each cue carries a budget, and the actor stops its work when the cue's spend reaches it, reporting `over-budget`.
 - **What a budget can't do:** costs are what actors report. The real cap on a key is its owner's, such as a provider's spending limit.

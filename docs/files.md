@@ -44,8 +44,20 @@ credentials:
   GITHUB_TOKEN: ${GITHUB_TOKEN}
 ```
 
-- **`models`:** tried in order: the next is used when one fails.
+- **`models`:** tried in order: the next is used when one fails. An entry may set `max_output`, the most tokens one response may hold, so a model stuck repeating itself stops early.
 - **`credentials`:** may store values, as long as the file is private (`chmod 600`) and git doesn't track it. This example uses `${VAR}` references because it lives in a repository. See [Models and keys](models-and-keys.md).
+- **`tools`:** servers this actor brings for tools its role needs, such as its own coding engine, each with what it charges a play per call. See [Writing a role: tools](writing-a-role.md#tools-and-the-workspace).
+- **`workspace.commands`:** for a role with a workspace, the commands its workspace may run on this machine, such as `[uv]` or `[npm, node]`; none by default.
+
+```yaml
+tools:
+  workspace:                        # replaces the role's own `workspace` server
+    command: some-engine            # stands for any MCP server that works in a folder
+    args: [mcp, --folder, "${ZANNI_WORKSPACE}"]
+    price: { per_call: 0 }          # what a play is charged per call: here, nothing
+workspace:
+  commands: [uv]
+```
 
 `role` is a package reference: `host/owner/name@version`, or a local folder such as `roles/tester`. A remote reference needs its version.
 
@@ -82,6 +94,7 @@ house_rules:
 - **`house_rules.gate_timeout`:** how long a gate, or a pause, may wait for a person, such as `2h`; with none, it waits.
 - **`house_rules.max_director_turns`:** the most model turns the director takes in a round (default 30).
 - **`house_rules.requests_per_turn`:** the most model requests in one director turn (default 25). A turn also ends after each long wait: reports, or a gate (D49).
+- **`house_rules.max_rounds`:** the most rounds one run takes, at most the script's `stop.max_rounds`. The owner may grant one more at a gate, with `zanni gate … approve --another-round`.
 - **`house_rules.cast_timeout`:** how long the play waits for a part's minimum seats, or a verifier seat, before stopping as `uncastable` (default `10m`).
 - **`verifiers`:** the play's own commands for its script's verifiers, and where each runs, such as `tests-pass: { command: [npm, test], runs_on: ci-box }`. Without `runs_on`, a verifier runs on the director's machine, on a snapshot of the stage.
 
@@ -90,6 +103,7 @@ More examples:
 - `examples/plays/slug-kata/` is a whole play you can run, with its director's configuration and its local seats ([getting started](getting-started.md#running-a-play)).
 - `examples/plays/slug-kata-git/` runs the same kata on a git stage ([getting started](getting-started.md#a-play-on-a-git-stage)).
 - `examples/plays/release-notes/` runs on an MCP stage server, with a verifier seat ([getting started](getting-started.md#a-play-on-a-stage-server)).
+- `examples/plays/software-mini-python/` and `software-mini-node/` run one round of the software script, with its six parts, on two stacks ([getting started](getting-started.md#the-software-team)).
 
 ## Director configuration
 
@@ -128,18 +142,21 @@ seats:
 ```yaml
 # examples/roles/tester/role.yaml
 name: tester
-version: 1.4.0
+version: 0.1.0
 mission: Turn acceptance criteria into tests; explore the running app and report findings.
-model: { needs: { tools: true, tier: judgement }, suggested: claude-sonnet-5-5 }
+model: { needs: { tools: true, tier: coding } }
 needs:
-  stage_read: [vision.md, backlog/, spec/]
-  stage_write: [tests/, findings/]
-  tools: [browser, test-runner]
+  stage_read: ["/"]          # the whole stage: the project's own files, such as its .gitignore
+  stage_write: [tests/, findings/, reviews/]
+  tools: [workspace]
 never:
   - edit application code
   - change priorities
+  - change a test to make it pass
 outputs:
-  findings/<item>.md: one finding per file, each with a failing test
+  findings/<item>.md: one finding per file, each with a failing test under tests/findings/
 ```
+
+- **`needs.tools`:** the tools the role needs, each a server in its `mcp.json`. This tester's is `zanni:workspace`, a local copy of the stage where it writes tests and runs them; an actor may bring its own server instead.
 
 **Write versions as text:** `1.4.0` works, and `"1.4"` is rejected as not being `major.minor.patch`. Unquoted, `1.4` is read as a number, and `zanni` tells you to quote it.

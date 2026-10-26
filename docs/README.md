@@ -2,7 +2,7 @@
 
 Zanni is an open-source engine for teams of AI personas. Each process is a **zanni**, an empty shell that becomes an **actor** when given a **role**. A **script** is the reusable work; a **play** is one production of it, where a **director** casts actors into the script's parts and coordinates them on a shared **stage**, the play's workspace.
 
-**Status: early.** `zanni <file>` validates Zanni files, runs an actor on its models, and lets it join a director over A2A. `zanni play.yaml` runs a whole play, on a folder, a git repository or an MCP stage server. See [what works today](getting-started.md#what-works-today), and the [roadmap](../ROADMAP.md).
+**Status: early.** `zanni <file>` validates Zanni files, runs an actor on its models, and lets it join a director over A2A. `zanni play.yaml` runs a whole play, on a folder, a git repository or an MCP stage server, including the software script's team of six parts. See [what works today](getting-started.md#what-works-today), and the [roadmap](../ROADMAP.md).
 
 ## Using Zanni
 

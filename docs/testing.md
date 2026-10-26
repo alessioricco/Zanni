@@ -32,6 +32,9 @@ The full suite needs no API key, no network and no model. That is a hard rule: C
 | `tests/test_play_command.py`, `tests/test_slug_kata.py`, `tests/test_example_plays.py` | `zanni play.yaml` in another process, every exit code, a director killed with `-9`, a part or verifier seat nobody takes; the slug kata, the slug kata on git and release notes on the example stage server, end to end from a copy of `examples/` |
 | `tests/fake_openai.py` | Not a test: a tiny OpenAI-compatible server on loopback, so real `zanni` subprocesses can play a director or a seat with no model and no network |
 | `tests/conftest.py` | Not a test: fails the session if any test changed `examples/` |
+| `tests/test_tool_bindings.py`, `tests/test_workspace.py` | Tools an actor brings: a binding replacing a role's server, its price per call in a cue's cost and budget, an unpriced one refused at join, a server that won't start; the workspace: its server's tools, `run` limited to `workspace.commands`, paths that can't leave the folder, filling and sending back on every backend, a cue's paths, `.gitignore`, and an actor with a workspace over loopback |
+| `tests/test_check_files.py`, `tests/engine/test_model_settings.py` | The software script's check files on crafted folders, a check file run beside the snapshot and on a verifier seat; the director's prompt caching and `max_output` at the engine's door |
+| `tests/test_software_roles.py`, `tests/test_software_play.py`, `tests/test_continuing.py` | Each of the six roles' rehearsals; one round of the software script end to end with all six parts scripted; another round at a gate, and a run continued on git |
 | `tests/test_engine_guard.py` | Only `src/zanni/engine/` imports Pydantic AI, `mcp`, `a2a-sdk` and their providers |
 | `tests/live/` | A real rehearsal on a real model; skipped unless `ZANNI_LIVE_CONFIG` names an actor configuration |
 

@@ -322,19 +322,99 @@ The play is done. Rounds: 1; spent $0.0000; verdicts: notes-structure passed.
 
 The recorded runs of both plays, on local and cloud models and on two machines, are in [docs/runs/milestone-5.md](runs/milestone-5.md).
 
+## The software team
+
+`examples/plays/software-mini-python/` plays one round of the software script (`examples/scripts/software-team/`) with all six of its parts: a product owner, an architect, a UI designer, a tester, a developer lead and a coder, each a local seat with its own models. The vision is "a unit converter web page". Its twin, `software-mini-node/`, plays the same script with the same roles on a Node project: only the play's verifier commands and the starter files differ.
+
+A round goes: the product owner writes the backlog; the architect and the tester review it, and the product owner revises it once; **you approve the plan**; the architect and the UI designer write the spec; the tester and the developer lead review it, and the architect revises it once; the tester writes a failing test per criterion; the developer lead splits the work; the coder makes the tests pass; the tester explores the app; the product owner reviews the round; **you approve the release**.
+
+1. **What the machine needs:** `uv`, and for the Node play, Node.js 22 with `npm`. The tester and the coder run the project's tests in their workspaces, so their configurations list what they may run: `workspace: { commands: [uv] }` (Python) or `[npm, node]` (Node).
+2. **Copy the examples and make the remote,** as for [the git kata](#a-play-on-a-git-stage):
+   ```bash
+   cp -R examples ~/software-run
+   python3 ~/software-run/plays/software-mini-python/make-remote.py
+   ```
+3. **Check the models** in the seven configurations (`director.yaml` and one per seat), and set the join and owner tokens, as in [Running a play](#running-a-play). The examples put the judgement roles (product owner, architect, UI designer) on a stronger cloud model, and the tester, coder and developer lead on a local model first.
+4. **Run it, and decide its two gates** from another terminal:
+   ```bash
+   uv run zanni ~/software-run/plays/software-mini-python/play.yaml
+   uv run zanni gate ~/software-run/plays/software-mini-python/play.yaml            # what is waiting
+   uv run zanni gate ~/software-run/plays/software-mini-python/play.yaml approve
+   ```
+
+A recorded run, on `claude-haiku-5-5` for every seat (cloud d in [the recorded runs](runs/milestone-6.md); paths shortened, and the verifier list and the casting cut):
+
+```text
+Directing 'software-mini-python' (software-team 2.0.0) at http://127.0.0.1:50631; run 20261025T203358Z
+  …
+  cue r1-c1 to product-owner-1: Scene 1: Plan (budget $0.3332)
+  report from product-owner-1 on r1-c1: done, cost $0.0017163
+  cue r1-c2 to architect-1: Scene 2: Backlog review (budget $0.2)
+  cue r1-c3 to tester-1: Scene 2: Backlog review (budget $0.2)
+  report from architect-1 on r1-c2: done, cost $0.0025075
+  report from tester-1 on r1-c3: done, cost $0.0025751
+  cue r1-c4 to product-owner-1: Scene 2: Backlog review (revision) (budget $0.3)
+  report from product-owner-1 on r1-c4: done, cost $0.0067023
+Gate 'plan' is waiting for a decision: zanni gate <play> approve | reject --note …
+Gate 'plan' approved by owner
+  pushed zanni/software-mini-python/20261025T203358Z (the approved gate plan)
+  cue r1-c5 to architect-1: Scene 3: Specify. Round 1 of the unit converter. The plan is approved. (budget $0.3)
+  report from architect-1 on r1-c5: done, cost $0.0085960
+  cue r1-c6 to tester-1: Scene 4: Spec review. Round 1 of the unit converter. (budget $0.2)
+  cue r1-c7 to developer-lead-1: Scene 4: Spec review. Round 1 of the unit converter. (budget $0.2)
+  report from tester-1 on r1-c6: done, cost $0.0047226
+  report from developer-lead-1 on r1-c7: done, cost $0.0052815
+  cue r1-c8 to architect-1: Scene 4: Spec review, revision. Round 1 of the unit converter. (budget $0.25)
+  report from architect-1 on r1-c8: done, cost $0.0099332
+  cue r1-c9 to tester-1: Scene 5: Tests. Round 1 of the unit converter. (budget $0.3)
+  report from tester-1 on r1-c9: done, 1 write(s) refused, cost $0.0155066
+  verifier tests-cover-criteria: passed
+  verifier new-tests-fail: passed
+  cue r1-c10 to developer-lead-1: Scene 6: Build. Round 1 of the unit converter. (budget $0.25)
+  report from developer-lead-1 on r1-c10: done, cost $0.0064887
+  cue r1-c11 to coder-1: Scene 6: Build. Round 1 of the unit converter. Workstream `app`. (budget $0.3)
+  report from coder-1 on r1-c11: done, 1 write(s) refused, cost $0.0115644
+  verifier tests-pass: passed
+  verifier app-starts: passed
+  cue r1-c12 to tester-1: Scene 8: Explore. Round 1 of the unit converter. The app is built and its tests pass. (budget $0.3)
+  report from tester-1 on r1-c12: done, 1 write(s) refused, cost $0.0277716
+  cue r1-c13 to product-owner-1: Scene 9: Review. Round 1 of the unit converter. (budget $0.2)
+  report from product-owner-1 on r1-c13: done, cost $0.0025423
+  verifier tests-pass: passed
+  verifier app-starts: passed
+Gate 'release' is waiting for a decision: zanni gate <play> approve | reject --note …
+Gate 'release' approved by owner
+  pushed zanni/software-mini-python/20261025T203358Z (the approved gate release)
+  …
+  pushed zanni/software-mini-python/20261025T203358Z (the end of the run)
+The play is done. Rounds: 1; spent $0.1182; verdicts: tests-cover-criteria passed, new-tests-fail passed, tests-pass passed, app-starts passed.
+```
+
+The refused writes were `uv.lock`, which the play's `.gitignore` didn't yet leave out; it does now.
+
+- **The plan gate holds back the work, not the people:** until you approve the plan, the director can't cue anyone to write `spec/`, `tests/`, `tasks/` or `app/`. The architect and the tester can still review the backlog (D62).
+- **The reviews are files:** `reviews/round-1/` holds each review, and the author's answers: what changed, and why.
+- **The coder's workspace:** the coder works in a local copy of the stage and runs the tests there; its changes reach the stage when its cue ends, as commits with `coder-1` as their author.
+- **Another round:** at the release gate, `zanni gate <play> approve --another-round --note "weights next"` grants one more round, with your note as its input. Or later: `uv run zanni <play> --continue <run-id>` starts a new run from where this one left off (D60).
+- **Bring your own coding engine:** a seat's configuration may replace the coder's `workspace` with any MCP server that works in a folder, with what it charges per call ([Writing a role: tools](writing-a-role.md#tools-and-the-workspace)).
+
+The recorded runs, on cloud, mixed and local models, on both stacks and on two machines, are in [docs/runs/milestone-6.md](runs/milestone-6.md).
+
 ## What works today
 
 | Works | Not yet |
 |---|---|
-| Validating actor configurations, plays, scripts, lockfiles, rehearsals and whole role folders | Isolated writes: every seat writes to the one shared stage |
+| Validating actor configurations, plays, scripts, lockfiles, rehearsals and whole role folders | Isolated writes: every seat writes to the one shared stage, on paths of its own |
 | Running one actor on a rehearsal, on local or cloud models, with fallback | Renewing a seat's tokens: a seat ends when they expire, after 24 hours |
 | An actor joining a director over A2A, by URL or through a play file's `director` | TLS: the director speaks plain HTTP |
-| Serving a rehearsal to an actor on another machine (`--serve`), with the stage over MCP | A director that survives a restart of its process |
+| Serving a rehearsal to an actor on another machine (`--serve`), with the stage over MCP | |
 | Running a whole play: `zanni play.yaml` starts a director that casts local seats and joining actors, follows the script, runs its verifiers and enforces the budget | Files that aren't text on the stage |
 | Fetching roles and scripts from git, pinned in `play.lock` | Signed tags, and version ranges |
 | Deciding gates, and resuming a paused play, with `zanni gate` | Telling anyone a gate is waiting |
-| A stage in a folder, a git repository (a branch per run, a commit per write, pushed at approved gates) or any MCP stage server | A seat working on a real git checkout: every seat reaches the stage through the director |
-| Verifiers on a snapshot of the stage, or on verifier seats; gates every round, before a part's cues | |
+| A stage in a folder, a git repository (a branch per run, a commit per write, pushed at approved gates) or any MCP stage server | A seat working on a real git checkout: a workspace reaches the stage through the director |
+| Verifiers on a snapshot of the stage, or on verifier seats, with check files from the script; gates every round, before a part's cues or a path's writes | Browser tests: milestone 7 |
+| A workspace for a seat that works on files, and tools an actor brings, with a price per call | Checking what actors say they spent |
+| The software script, its six roles, and two plays on two stacks; another round at a gate; continuing a run that ended | A director that survives a crash: a run that ended can be continued, a crashed one can't |
 | Errors with their line and how to fix them; rejecting secrets in shared files | |
 
 ## Next steps

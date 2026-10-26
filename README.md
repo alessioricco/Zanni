@@ -8,7 +8,7 @@ An open-source engine for teams of AI personas. Each process is a **zanni**, an 
 - **Verifiers decide when work is done**, not the actor that did it.
 - **Built on standards:** AGENTS.md, Agent Skills, MCP and A2A. Zanni specifies only the gaps, and [the spec](docs/spec/README.md) is the product.
 
-**Status: early development.** `zanni <file>` validates Zanni files and runs them. An actor runs on its models and joins a director over A2A, and `zanni play.yaml` starts a director that runs a whole play: it casts local seats and actors joining from other machines, follows the script, runs its verifiers, and enforces the budget and the human gates ([getting started](docs/getting-started.md#running-a-play)). The stage is a folder, a git repository, or any MCP stage server ([getting started](docs/getting-started.md#a-play-on-a-git-stage)); see the [roadmap](ROADMAP.md) for what comes next.
+**Status: early development.** `zanni <file>` validates Zanni files and runs them. An actor runs on its models and joins a director over A2A, and `zanni play.yaml` starts a director that runs a whole play: it casts local seats and actors joining from other machines, follows the script, runs its verifiers, and enforces the budget and the human gates ([getting started](docs/getting-started.md#running-a-play)). The stage is a folder, a git repository, or any MCP stage server ([getting started](docs/getting-started.md#a-play-on-a-git-stage)). The software script plays a round with a product owner, an architect, a UI designer, a tester, a developer lead and coders working on real files, on any stack the project names ([the software team](docs/getting-started.md#the-software-team)); see the [roadmap](ROADMAP.md) for what comes next.
 
 ## Quick start
 
